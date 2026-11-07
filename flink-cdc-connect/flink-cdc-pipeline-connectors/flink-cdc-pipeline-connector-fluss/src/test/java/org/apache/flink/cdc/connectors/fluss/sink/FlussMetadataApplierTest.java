@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.ExistingTableSchemaExpansionMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -53,6 +54,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -62,6 +64,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -308,6 +311,206 @@ class FlussMetadataApplierTest {
                     new CreateTableEvent(tableId, schemaWithDifferentExistingColumnType));
             assertThat(applier.getExistingTableSchema(tableId)).contains(expectedSchema);
         }
+    }
+
+    @Test
+    void testExternalAddColumnValidationDoesNotAlterTable() throws Exception {
+        TableId tableId = TableId.tableId(DATABASE_NAME, "external_add");
+        TablePath tablePath = TablePath.of(DATABASE_NAME, "external_add");
+        Schema target =
+                Schema.newBuilder()
+                        .physicalColumn("value", DataTypes.STRING())
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("added", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        Schema source =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("value", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        AtomicInteger alterCalls = new AtomicInteger();
+        try (FlussMetaDataApplier external = trackingApplier(false, alterCalls)) {
+            external.applySchemaChange(new CreateTableEvent(tableId, target));
+            external.applySchemaChange(new CreateTableEvent(tableId, source));
+            int schemaId = admin.getTableInfo(tablePath).get().getSchemaId();
+            AddColumnEvent event =
+                    new AddColumnEvent(
+                            tableId,
+                            Collections.singletonList(
+                                    AddColumnEvent.last(
+                                            Column.physicalColumn("added", DataTypes.STRING()))));
+            external.applySchemaChange(event);
+            assertThat(alterCalls).hasValue(0);
+            external.applySchemaChange(
+                    new AddColumnEvent(
+                            tableId,
+                            Collections.singletonList(
+                                    AddColumnEvent.first(
+                                            Column.physicalColumn("added", DataTypes.STRING())))));
+            assertThat(admin.getTableInfo(tablePath).get().getSchemaId()).isEqualTo(schemaId);
+
+            assertThatThrownBy(
+                            () ->
+                                    external.applySchemaChange(
+                                            new AddColumnEvent(
+                                                    tableId,
+                                                    Collections.singletonList(
+                                                            AddColumnEvent.last(
+                                                                    Column.physicalColumn(
+                                                                            "missing",
+                                                                            DataTypes.INT()))))))
+                    .rootCause()
+                    .hasMessageContaining("missing from Fluss table");
+            assertThatThrownBy(
+                            () ->
+                                    external.applySchemaChange(
+                                            new AddColumnEvent(
+                                                    tableId,
+                                                    Collections.singletonList(
+                                                            AddColumnEvent.last(
+                                                                    Column.physicalColumn(
+                                                                            "added",
+                                                                            DataTypes.INT()))))))
+                    .rootCause()
+                    .hasMessageContaining("cannot contain");
+            assertThatThrownBy(
+                            () ->
+                                    external.applySchemaChange(
+                                            new AddColumnEvent(
+                                                    tableId,
+                                                    Arrays.asList(
+                                                            AddColumnEvent.last(
+                                                                    Column.physicalColumn(
+                                                                            "added",
+                                                                            DataTypes.STRING())),
+                                                            AddColumnEvent.last(
+                                                                    Column.physicalColumn(
+                                                                            "added",
+                                                                            DataTypes.STRING()))))))
+                    .rootCause()
+                    .hasMessageContaining("Duplicate added column");
+            assertThat(admin.getTableInfo(tablePath).get().getSchemaId()).isEqualTo(schemaId);
+            assertThat(alterCalls).hasValue(0);
+        }
+
+        AtomicInteger automaticAlterCalls = new AtomicInteger();
+        try (FlussMetaDataApplier automatic = trackingApplier(true, automaticAlterCalls)) {
+            automatic.applySchemaChange(
+                    new AddColumnEvent(
+                            tableId,
+                            Collections.singletonList(
+                                    AddColumnEvent.last(
+                                            Column.physicalColumn("added", DataTypes.STRING())))));
+            assertThat(automaticAlterCalls.get()).isGreaterThan(0);
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(ExistingTableSchemaExpansionMode.class)
+    void testExternalModeRejectsMissingInitialColumn(ExistingTableSchemaExpansionMode mode)
+            throws Exception {
+        TableId tableId = TableId.tableId(DATABASE_NAME, "external_initial");
+        TablePath tablePath = TablePath.of(DATABASE_NAME, "external_initial");
+        Schema target = Schema.newBuilder().physicalColumn("id", DataTypes.INT()).build();
+        Schema source =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("missing", DataTypes.STRING())
+                        .build();
+        try (FlussMetaDataApplier external = externalApplier()) {
+            external.applySchemaChange(new CreateTableEvent(tableId, target));
+            external.setAcceptedSchemaEvolutionTypes(
+                    new HashSet<>(
+                            Arrays.asList(
+                                    SchemaChangeEventType.CREATE_TABLE,
+                                    SchemaChangeEventType.ADD_COLUMN)));
+            int schemaId = admin.getTableInfo(tablePath).get().getSchemaId();
+            CreateTableEvent create = new CreateTableEvent(tableId, source);
+            if (mode == ExistingTableSchemaExpansionMode.DISABLED) {
+                assertThatThrownBy(() -> external.applySchemaChange(create))
+                        .rootCause()
+                        .hasMessageContaining("missing");
+            } else {
+                ExistingTableSchemaExpander expander =
+                        new ExistingTableSchemaExpander(
+                                external, external, SchemaChangeBehavior.EVOLVE, mode);
+                assertThatThrownBy(() -> expander.handleExistingTableCreation(create))
+                        .hasStackTraceContaining("missing");
+            }
+            assertThat(admin.getTableInfo(tablePath).get().getSchemaId()).isEqualTo(schemaId);
+
+            admin.alterTable(
+                            tablePath,
+                            Collections.singletonList(
+                                    TableChange.addColumn(
+                                            "missing",
+                                            toFlussType(DataTypes.STRING()),
+                                            null,
+                                            TableChange.ColumnPosition.last())),
+                            false)
+                    .get();
+            int externalSchemaId = admin.getTableInfo(tablePath).get().getSchemaId();
+            boolean applyCreate = true;
+            if (mode != ExistingTableSchemaExpansionMode.DISABLED) {
+                ExistingTableSchemaExpander expander =
+                        new ExistingTableSchemaExpander(
+                                external, external, SchemaChangeBehavior.EVOLVE, mode);
+                applyCreate = expander.handleExistingTableCreation(create);
+                assertThat(applyCreate).isEqualTo(mode != ExistingTableSchemaExpansionMode.CHECK);
+            }
+            if (applyCreate) {
+                external.applySchemaChange(create);
+            }
+            assertThat(admin.getTableInfo(tablePath).get().getSchemaId())
+                    .isEqualTo(externalSchemaId);
+        }
+    }
+
+    private static FlussMetaDataApplier externalApplier() {
+        return new FlussMetaDataApplier(
+                FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                Collections.emptyMap(),
+                Collections.emptyMap(),
+                Collections.emptyMap(),
+                false);
+    }
+
+    private static FlussMetaDataApplier trackingApplier(
+            boolean autoAddColumns, AtomicInteger alterCalls) {
+        return new FlussMetaDataApplier(
+                FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                Collections.emptyMap(),
+                Collections.emptyMap(),
+                Collections.emptyMap(),
+                autoAddColumns) {
+            @Override
+            Connection createConnection() {
+                Connection connection = super.createConnection();
+                return (Connection)
+                        Proxy.newProxyInstance(
+                                Connection.class.getClassLoader(),
+                                new Class<?>[] {Connection.class},
+                                (proxy, method, args) -> {
+                                    if (method.getName().equals("getAdmin")) {
+                                        Admin delegate = connection.getAdmin();
+                                        return Proxy.newProxyInstance(
+                                                Admin.class.getClassLoader(),
+                                                new Class<?>[] {Admin.class},
+                                                (adminProxy, adminMethod, adminArgs) -> {
+                                                    if (adminMethod
+                                                            .getName()
+                                                            .equals("alterTable")) {
+                                                        alterCalls.incrementAndGet();
+                                                    }
+                                                    return adminMethod.invoke(delegate, adminArgs);
+                                                });
+                                    }
+                                    return method.invoke(connection, args);
+                                });
+            }
+        };
     }
 
     @Test

@@ -59,11 +59,13 @@ import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Test for {@link FlussEventSerializationSchema}. */
 public class FlussEventSerializationSchemaTest {
@@ -295,6 +297,125 @@ public class FlussEventSerializationSchemaTest {
                 table1,
                 new FlussRowWithOp(CdcAsFlussRow.replace(newRecord), FlussOperationType.UPSERT),
                 serializer.serialize(updateEvent1));
+    }
+
+    @Test
+    void testExternalSchemaValidationAndRefresh() throws Exception {
+        TableId tableId = TableId.parse("test.external_serializer");
+        TablePath tablePath = TablePath.of(tableId.getSchemaName(), tableId.getTableName());
+        Schema source =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("value", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        Schema target =
+                Schema.newBuilder()
+                        .physicalColumn("value", DataTypes.STRING())
+                        .physicalColumn("id", DataTypes.INT())
+                        .primaryKey("id")
+                        .build();
+        flussMetaDataApplier.applySchemaChange(new CreateTableEvent(tableId, target));
+        FlussEventSerializationSchema external = new FlussEventSerializationSchema(false);
+        external.open(conn);
+        external.serialize(new CreateTableEvent(tableId, source));
+        AddColumnEvent add =
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                AddColumnEvent.first(
+                                        Column.physicalColumn("added", DataTypes.STRING()))));
+        assertThatThrownBy(() -> external.serialize(add)).hasMessageContaining("missing");
+
+        flussMetaDataApplier.applySchemaChange(
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                AddColumnEvent.last(
+                                        Column.physicalColumn("added", DataTypes.STRING())))));
+        external.serialize(add);
+        Schema evolved =
+                Schema.newBuilder()
+                        .physicalColumn("added", DataTypes.STRING())
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("value", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        RecordData record =
+                new BinaryRecordDataGenerator(evolved.getColumnDataTypes().toArray(new DataType[0]))
+                        .generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("new"),
+                                    1,
+                                    BinaryStringData.fromString("old")
+                                });
+        FlussEvent result = external.serialize(DataChangeEvent.insertEvent(tableId, record));
+        CdcAsFlussRow row = (CdcAsFlussRow) result.getRowWithOps().get(0).getRow();
+        assertThat(row.getString(0).toString()).isEqualTo("old");
+        assertThat(row.getInt(1)).isEqualTo(1);
+        assertThat(row.getString(2).toString()).isEqualTo("new");
+
+        flussMetaDataApplier.applySchemaChange(
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                AddColumnEvent.last(
+                                        Column.physicalColumn("extra", DataTypes.INT())))));
+        external.serialize(add);
+        result = external.serialize(DataChangeEvent.insertEvent(tableId, record));
+        assertThat(result.getSchemaId())
+                .isEqualTo(conn.getTable(tablePath).getTableInfo().getSchemaId());
+        assertThat(result.getRowWithOps().get(0).getRow().isNullAt(3)).isTrue();
+
+        AddColumnEvent duplicate =
+                new AddColumnEvent(
+                        tableId,
+                        Arrays.asList(add.getAddedColumns().get(0), add.getAddedColumns().get(0)));
+        assertThatThrownBy(() -> external.serialize(duplicate))
+                .hasMessageContaining("Duplicate added column");
+
+        FlussEventSerializationSchema reinitialized = new FlussEventSerializationSchema(false);
+        reinitialized.open(conn);
+        reinitialized.serialize(new CreateTableEvent(tableId, evolved));
+        FlussEvent restored = reinitialized.serialize(DataChangeEvent.insertEvent(tableId, record));
+        assertThat(restored.getSchemaId())
+                .isEqualTo(conn.getTable(tablePath).getTableInfo().getSchemaId());
+        CdcAsFlussRow restoredRow = (CdcAsFlussRow) restored.getRowWithOps().get(0).getRow();
+        assertThat(restoredRow.getString(0).toString()).isEqualTo("old");
+        assertThat(restoredRow.getInt(1)).isEqualTo(1);
+        assertThat(restoredRow.getString(2).toString()).isEqualTo("new");
+        assertThat(restoredRow.isNullAt(3)).isTrue();
+    }
+
+    @Test
+    void testExternalSerializerRejectsIncompatibleReinitialization() throws Exception {
+        TableId tableId = TableId.parse("test.external_required");
+        Schema target =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("required", DataTypes.STRING().notNull())
+                        .build();
+        flussMetaDataApplier.applySchemaChange(new CreateTableEvent(tableId, target));
+        FlussEventSerializationSchema external = new FlussEventSerializationSchema(false);
+        external.open(conn);
+        Schema source = Schema.newBuilder().physicalColumn("id", DataTypes.INT()).build();
+        assertThatThrownBy(() -> external.serialize(new CreateTableEvent(tableId, source)))
+                .hasMessageContaining("Target-only column required");
+        Schema missing =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("missing", DataTypes.STRING())
+                        .build();
+        assertThatThrownBy(() -> external.serialize(new CreateTableEvent(tableId, missing)))
+                .hasMessageContaining("Column missing is missing");
+        Schema wrongType =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT())
+                        .physicalColumn("required", DataTypes.STRING().notNull())
+                        .build();
+        assertThatThrownBy(() -> external.serialize(new CreateTableEvent(tableId, wrongType)))
+                .hasMessageContaining("Column id")
+                .hasMessageContaining("cannot contain");
     }
 
     private void verifyDataChangeEvent(TableId tableId, FlussRowWithOp row, FlussEvent flussEvent)

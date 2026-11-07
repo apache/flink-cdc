@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.sink.DataSink;
+import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.ForwardHashFunctionProvider;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
 import org.apache.flink.cdc.connectors.fluss.sink.FlussDataSink;
@@ -58,6 +59,7 @@ class FlussDataSinkFactoryTest {
         Assertions.assertThat(dataSink).isInstanceOf(FlussDataSink.class);
         Assertions.assertThat(dataSink.getDataChangeEventHashFunctionProvider())
                 .isInstanceOf(FlussHashFunctionProvider.class);
+        assertAutoAddColumns(dataSink, true);
     }
 
     @Test
@@ -74,6 +76,32 @@ class FlussDataSinkFactoryTest {
 
         Assertions.assertThat(dataSink.getDataChangeEventHashFunctionProvider())
                 .isInstanceOf(ForwardHashFunctionProvider.class);
+    }
+
+    @Test
+    void testCreateDataSinkWithExternalAddColumns() {
+        DataSinkFactory sinkFactory =
+                FactoryDiscoveryUtils.getFactoryByIdentifier("fluss", DataSinkFactory.class);
+        Configuration conf =
+                Configuration.fromMap(
+                        ImmutableMap.of(
+                                "bootstrap.servers", "localhost:9123",
+                                "schema.evolution.auto-add-columns", "false"));
+
+        DataSink dataSink =
+                sinkFactory.createDataSink(
+                        new FactoryHelper.DefaultContext(
+                                conf, conf, Thread.currentThread().getContextClassLoader()));
+
+        assertThat(dataSink).isInstanceOf(FlussDataSink.class);
+        assertAutoAddColumns(dataSink, false);
+    }
+
+    private static void assertAutoAddColumns(DataSink dataSink, boolean expected) {
+        assertThat(dataSink.getMetadataApplier()).extracting("autoAddColumns").isEqualTo(expected);
+        assertThat(((FlinkSinkProvider) dataSink.getEventSinkProvider()).getSink())
+                .extracting("serializer.autoAddColumns")
+                .isEqualTo(expected);
     }
 
     @ParameterizedTest

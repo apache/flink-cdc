@@ -40,6 +40,7 @@ public class FlussDataSink implements DataSink {
     private final Map<String, List<String>> bucketKeysMap;
     private final Map<String, Integer> bucketNumMap;
     private final SinkPartitioningStrategy sinkPartitioningStrategy;
+    private final boolean autoAddColumns;
 
     public FlussDataSink(
             Configuration flussClientConfig,
@@ -47,23 +48,41 @@ public class FlussDataSink implements DataSink {
             Map<String, List<String>> bucketKeysMap,
             Map<String, Integer> bucketNumMap,
             SinkPartitioningStrategy sinkPartitioningStrategy) {
+        this(
+                flussClientConfig,
+                tableProperties,
+                bucketKeysMap,
+                bucketNumMap,
+                sinkPartitioningStrategy,
+                true);
+    }
+
+    public FlussDataSink(
+            Configuration flussClientConfig,
+            Map<String, String> tableProperties,
+            Map<String, List<String>> bucketKeysMap,
+            Map<String, Integer> bucketNumMap,
+            SinkPartitioningStrategy sinkPartitioningStrategy,
+            boolean autoAddColumns) {
         this.flussClientConfig = flussClientConfig;
         this.tableProperties = tableProperties;
         this.bucketKeysMap = bucketKeysMap;
         this.bucketNumMap = bucketNumMap;
         this.sinkPartitioningStrategy = sinkPartitioningStrategy;
+        this.autoAddColumns = autoAddColumns;
     }
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
         return FlinkSinkProvider.of(
-                new FlussSink<>(flussClientConfig, new FlussEventSerializationSchema()));
+                new FlussSink<>(
+                        flussClientConfig, new FlussEventSerializationSchema(autoAddColumns)));
     }
 
     @Override
     public MetadataApplier getMetadataApplier() {
         return new FlussMetaDataApplier(
-                flussClientConfig, tableProperties, bucketKeysMap, bucketNumMap);
+                flussClientConfig, tableProperties, bucketKeysMap, bucketNumMap, autoAddColumns);
     }
 
     @Override

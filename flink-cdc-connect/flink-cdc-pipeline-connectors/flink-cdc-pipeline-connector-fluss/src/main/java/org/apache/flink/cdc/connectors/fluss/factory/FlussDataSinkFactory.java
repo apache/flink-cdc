@@ -39,6 +39,7 @@ import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.BO
 import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.BUCKET_KEY;
 import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.BUCKET_NUMBER;
 import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.CLIENT_PROPERTIES_PREFIX;
+import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.SCHEMA_EVOLUTION_AUTO_ADD_COLUMNS;
 import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.SINK_PARTITIONING_STRATEGY;
 import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.TABLE_PROPERTIES_PREFIX;
 import static org.apache.flink.cdc.connectors.fluss.utils.FlussConfigUtils.parseBucketKeys;
@@ -78,7 +79,8 @@ public class FlussDataSinkFactory implements DataSinkFactory {
                 tableProperties,
                 bucketKeysMap,
                 bucketNumMap,
-                factoryConfiguration.get(SINK_PARTITIONING_STRATEGY));
+                factoryConfiguration.get(SINK_PARTITIONING_STRATEGY),
+                factoryConfiguration.get(SCHEMA_EVOLUTION_AUTO_ADD_COLUMNS));
     }
 
     @Override
@@ -99,6 +101,7 @@ public class FlussDataSinkFactory implements DataSinkFactory {
         options.add(BUCKET_KEY);
         options.add(BUCKET_NUMBER);
         options.add(SINK_PARTITIONING_STRATEGY);
+        options.add(SCHEMA_EVOLUTION_AUTO_ADD_COLUMNS);
         return options;
     }
 

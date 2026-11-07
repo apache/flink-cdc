@@ -763,6 +763,66 @@ public class FlussSinkPipelineITCase {
         checkResult(TABLE_1, Collections.singletonList("+I[value-1, 1, b-202, a-101]"));
     }
 
+    @ParameterizedTest
+    @CsvSource({"true", "false"})
+    void testWriteAfterExternalAddColumn(boolean primaryKeyTable) throws Exception {
+        tBatchEnv
+                .executeSql(
+                        String.format(
+                                "CREATE TABLE %s.%s (payload STRING, id STRING NOT NULL, b STRING, a STRING, extra STRING%s)",
+                                TABLE_1.getSchemaName(),
+                                TABLE_1.getTableName(),
+                                primaryKeyTable ? ", PRIMARY KEY (id) NOT ENFORCED" : ""))
+                .await();
+
+        Schema.Builder source =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.STRING().notNull())
+                        .physicalColumn("payload", DataTypes.STRING());
+        if (primaryKeyTable) {
+            source.primaryKey("id");
+        }
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        RowType.of(
+                                DataTypes.STRING().notNull(),
+                                DataTypes.STRING(),
+                                DataTypes.STRING(),
+                                DataTypes.STRING()));
+        List<Event> events =
+                Arrays.asList(
+                        new CreateTableEvent(TABLE_1, source.build()),
+                        new AddColumnEvent(
+                                TABLE_1,
+                                Arrays.asList(
+                                        AddColumnEvent.last(
+                                                Column.physicalColumn("a", DataTypes.STRING())),
+                                        AddColumnEvent.last(
+                                                Column.physicalColumn("b", DataTypes.STRING())))),
+                        DataChangeEvent.insertEvent(
+                                TABLE_1,
+                                generator.generate(
+                                        new Object[] {
+                                            BinaryStringData.fromString("1"),
+                                            BinaryStringData.fromString("value-1"),
+                                            BinaryStringData.fromString("a-101"),
+                                            BinaryStringData.fromString("b-202")
+                                        })));
+        Map<String, String> sinkOptions = new HashMap<>();
+        sinkOptions.put(BOOTSTRAP_SERVERS.key(), getBootstrapServers());
+        sinkOptions.put("properties.client.security.protocol", "sasl");
+        sinkOptions.put("properties.client.security.sasl.mechanism", "PLAIN");
+        sinkOptions.put("properties.client.security.sasl.username", "guest");
+        sinkOptions.put("properties.client.security.sasl.password", "password2");
+        sinkOptions.put(FlussDataSinkOptions.SCHEMA_EVOLUTION_AUTO_ADD_COLUMNS.key(), "false");
+
+        composeAndExecute(
+                Collections.singletonList(events),
+                sinkOptions,
+                new Configuration().set(PIPELINE_SCHEMA_CHANGE_BEHAVIOR, EVOLVE));
+        checkResult(TABLE_1, Collections.singletonList("+I[value-1, 1, b-202, a-101, null]"));
+    }
+
     private void composeAndExecuteInEvolveMode(List<List<Event>> customSourceEvents)
             throws Exception {
         composeAndExecute(
