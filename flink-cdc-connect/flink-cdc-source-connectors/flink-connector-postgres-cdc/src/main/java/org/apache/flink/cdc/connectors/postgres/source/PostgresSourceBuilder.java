@@ -365,6 +365,12 @@ public class PostgresSourceBuilder<T> {
         return this;
     }
 
+    public PostgresSourceBuilder<T> scanRateLimitRecordsPerSecond(
+            double scanRateLimitRecordsPerSecond) {
+        this.configFactory.scanRateLimitRecordsPerSecond(scanRateLimitRecordsPerSecond);
+        return this;
+    }
+
     /**
      * Build the {@link PostgresIncrementalSource}.
      *

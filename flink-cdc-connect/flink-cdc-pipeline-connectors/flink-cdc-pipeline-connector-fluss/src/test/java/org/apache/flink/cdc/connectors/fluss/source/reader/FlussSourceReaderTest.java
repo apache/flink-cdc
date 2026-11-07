@@ -83,12 +83,12 @@ class FlussSourceReaderTest {
         TrackingFetcherManager fetcherManager = new TrackingFetcherManager(queue);
         FlussSourceReader<Event> reader =
                 new FlussSourceReader<>(
-                        queue,
                         readerContext,
                         new WrapperFlussMetricRegistry(
                                 readerContext.metricGroup(), Collections.emptySet()),
                         new FlussRecordEmitter<>(new FlussRecordDeserializer()),
-                        fetcherManager);
+                        fetcherManager,
+                        null);
         FlussLogSplit restoredSplit = testSplit();
         FlussLogSplit freshSplit =
                 new FlussLogSplit(
@@ -120,12 +120,12 @@ class FlussSourceReaderTest {
         TrackingFetcherManager fetcherManager = new TrackingFetcherManager(queue);
         FlussSourceReader<Event> reader =
                 new FlussSourceReader<>(
-                        queue,
                         readerContext,
                         new WrapperFlussMetricRegistry(
                                 readerContext.metricGroup(), Collections.emptySet()),
                         new FlussRecordEmitter<>(new FlussRecordDeserializer()),
-                        fetcherManager);
+                        fetcherManager,
+                        null);
         FlussSplitBase split = testSplit();
         FlussSplitState splitState = reader.initializedState(split);
         long requestId = 7L;
@@ -162,12 +162,12 @@ class FlussSourceReaderTest {
         TrackingFetcherManager fetcherManager = new TrackingFetcherManager(queue);
         FlussSourceReader<Event> reader =
                 new FlussSourceReader<>(
-                        queue,
                         readerContext,
                         new WrapperFlussMetricRegistry(
                                 readerContext.metricGroup(), Collections.emptySet()),
                         new FlussRecordEmitter<>(new FlussRecordDeserializer()),
-                        fetcherManager);
+                        fetcherManager,
+                        null);
         TablePath tablePath = testSplit().getTablePath();
 
         try {
@@ -197,12 +197,12 @@ class FlussSourceReaderTest {
         TrackingFetcherManager fetcherManager = new TrackingFetcherManager(queue);
         FlussSourceReader<Event> reader =
                 new FlussSourceReader<>(
-                        queue,
                         readerContext,
                         new WrapperFlussMetricRegistry(
                                 readerContext.metricGroup(), Collections.emptySet()),
                         new FlussRecordEmitter<>(new FlussRecordDeserializer()),
-                        fetcherManager);
+                        fetcherManager,
+                        null);
         FlussHybridSnapshotLogSplit split = finishedSnapshotSplit();
         TablePath tablePath = split.getTablePath();
 
@@ -250,7 +250,8 @@ class FlussSourceReaderTest {
                 new Configuration(),
                 new WrapperFlussMetricRegistry(readerContext.metricGroup(), Collections.emptySet()),
                 new FlussSourceReaderMetrics(readerContext.metricGroup()),
-                new FlussRecordEmitter<>(new FlussRecordDeserializer()));
+                new FlussRecordEmitter<>(new FlussRecordDeserializer()),
+                null);
     }
 
     private static FlussLogSplit testSplit() {

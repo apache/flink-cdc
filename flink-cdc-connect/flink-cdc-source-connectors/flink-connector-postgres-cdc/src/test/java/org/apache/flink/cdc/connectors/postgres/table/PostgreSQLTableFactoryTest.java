@@ -67,6 +67,7 @@ import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SPLIT_K
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.HEARTBEAT_INTERVAL;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_LSN_COMMIT_CHECKPOINTS_DELAY;
+import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND;
 import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertProducedTypeOfSourceFunction;
 
 /** Test for {@link PostgreSQLTableSource} created by {@link PostgreSQLTableFactory}. */
@@ -159,7 +160,8 @@ class PostgreSQLTableFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
                         SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED.defaultValue(),
                         SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED.defaultValue(),
-                        SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED.defaultValue(),
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -210,7 +212,8 @@ class PostgreSQLTableFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
                         true,
                         SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED.defaultValue(),
-                        SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED.defaultValue(),
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -258,7 +261,8 @@ class PostgreSQLTableFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
                         SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED.defaultValue(),
                         SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED.defaultValue(),
-                        SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED.defaultValue(),
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("row_kind", "op_ts", "database_name", "schema_name", "table_name");
@@ -316,7 +320,8 @@ class PostgreSQLTableFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
                         SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED.defaultValue(),
                         SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED.defaultValue(),
-                        SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED.defaultValue(),
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -364,7 +369,64 @@ class PostgreSQLTableFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
                         SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED.defaultValue(),
                         SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED.defaultValue(),
-                        SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED.defaultValue(),
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+    }
+
+    @Test
+    void testRateLimitRequiresIncrementalSnapshot() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.rate-limit.records-per-second", "100");
+
+        Assertions.assertThatThrownBy(() -> createTableSource(SCHEMA, properties))
+                .hasStackTraceContaining(
+                        "Option 'scan.rate-limit.records-per-second' requires option "
+                                + "'scan.incremental.snapshot.enabled'");
+    }
+
+    @Test
+    void testRateLimitWithIncrementalSnapshot() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.incremental.snapshot.enabled", "true");
+        properties.put("scan.rate-limit.records-per-second", "100");
+
+        DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
+        PostgreSQLTableSource expectedSource =
+                new PostgreSQLTableSource(
+                        SCHEMA,
+                        5432,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_SCHEMA,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        "decoderbufs",
+                        MY_SLOT_NAME,
+                        DebeziumChangelogMode.ALL,
+                        PROPERTIES,
+                        true,
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        CHUNK_META_GROUP_SIZE.defaultValue(),
+                        SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        CONNECT_TIMEOUT.defaultValue(),
+                        CONNECT_MAX_RETRIES.defaultValue(),
+                        CONNECTION_POOL_SIZE.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        HEARTBEAT_INTERVAL.defaultValue(),
+                        StartupOptions.initial(),
+                        null,
+                        SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
+                        SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
+                        SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED.defaultValue(),
+                        SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED.defaultValue(),
+                        100d);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 

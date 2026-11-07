@@ -260,6 +260,12 @@ public class OracleSourceBuilder<T> {
         return this;
     }
 
+    public OracleSourceBuilder<T> scanRateLimitRecordsPerSecond(
+            double scanRateLimitRecordsPerSecond) {
+        this.configFactory.scanRateLimitRecordsPerSecond(scanRateLimitRecordsPerSecond);
+        return this;
+    }
+
     /**
      * Whether to release the finished snapshot split metadata from the coordinator after entering
      * the stream phase, to reduce JobManager memory pressure (FLINK-40697).

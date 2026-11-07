@@ -89,6 +89,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
     private final boolean appendOnly;
     private final boolean includePartitionedTables;
     private final boolean releaseSnapshotMetadataEnabled;
+    private final double scanRateLimitRecordsPerSecond;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -132,7 +133,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
             boolean assignUnboundedChunkFirst,
             boolean appendOnly,
             boolean includePartitionedTables,
-            boolean releaseSnapshotMetadataEnabled) {
+            boolean releaseSnapshotMetadataEnabled,
+            double scanRateLimitRecordsPerSecond) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -168,6 +170,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
         this.appendOnly = appendOnly;
         this.includePartitionedTables = includePartitionedTables;
         this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
+        this.scanRateLimitRecordsPerSecond = scanRateLimitRecordsPerSecond;
     }
 
     @Override
@@ -238,6 +241,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                             .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
                             .includePartitionedTables(includePartitionedTables)
                             .releaseSnapshotMetadataEnabled(releaseSnapshotMetadataEnabled)
+                            .scanRateLimitRecordsPerSecond(scanRateLimitRecordsPerSecond)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -310,7 +314,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                         assignUnboundedChunkFirst,
                         appendOnly,
                         includePartitionedTables,
-                        releaseSnapshotMetadataEnabled);
+                        releaseSnapshotMetadataEnabled,
+                        scanRateLimitRecordsPerSecond);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -358,7 +363,9 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                 && Objects.equals(appendOnly, that.appendOnly)
                 && Objects.equals(includePartitionedTables, that.includePartitionedTables)
                 && Objects.equals(
-                        releaseSnapshotMetadataEnabled, that.releaseSnapshotMetadataEnabled);
+                        releaseSnapshotMetadataEnabled, that.releaseSnapshotMetadataEnabled)
+                && Objects.equals(
+                        scanRateLimitRecordsPerSecond, that.scanRateLimitRecordsPerSecond);
     }
 
     @Override
@@ -396,7 +403,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                 assignUnboundedChunkFirst,
                 appendOnly,
                 includePartitionedTables,
-                releaseSnapshotMetadataEnabled);
+                releaseSnapshotMetadataEnabled,
+                scanRateLimitRecordsPerSecond);
     }
 
     @Override

@@ -163,6 +163,16 @@ Pipeline Connector Options
       <td>String</td>
       <td>将 Fluss client 支持的参数传递给 pipeline，See <a href="https://fluss.apache.org/docs/engine-flink/options/#write-options">Fluss client options</a>。</td>
     </tr>
+    <tr>
+      <td>scan.rate-limit.records-per-second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">-1</td>
+      <td>Double</td>
+      <td>
+        每秒发出的最大记录数，默认值为 -1，表示不进行速率限制。（仅适用于 flink 2.x）<br>
+        警告：在日志读取阶段，速率限制可能导致 Source 落后于表的日志保留时间（table.log.ttl），记录在被消费之前就可能过期，从而导致数据丢失。
+      </td>
+    </tr>
     </tbody>
 </table>    
 </div>

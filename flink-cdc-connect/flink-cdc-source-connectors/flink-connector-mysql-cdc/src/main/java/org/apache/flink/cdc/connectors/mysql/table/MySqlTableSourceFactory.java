@@ -112,6 +112,21 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         boolean appendOnly =
                 config.get(MySqlSourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
 
+        double scanRateLimitRecordsPerSecond =
+                config.get(MySqlSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
+
+        if (!enableParallelRead
+                && scanRateLimitRecordsPerSecond
+                        != MySqlSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue()) {
+            throw new ValidationException(
+                    String.format(
+                            "Option '%s' requires option '%s' to be enabled. The legacy "
+                                    + "non-incremental source does not support rate limiting, "
+                                    + "please enable incremental snapshot.",
+                            MySqlSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.key(),
+                            MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.key()));
+        }
+
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema, chunkKeyColumn);
             validateIntegerOption(
@@ -159,7 +174,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 parseOnLineSchemaChanges,
                 useLegacyJsonFormat,
                 assignUnboundedChunkFirst,
-                appendOnly);
+                appendOnly,
+                scanRateLimitRecordsPerSecond);
     }
 
     @Override
@@ -210,6 +226,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(MySqlSourceOptions.USE_LEGACY_JSON_FORMAT);
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST);
         options.add(MySqlSourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
+        options.add(MySqlSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
         return options;
     }
 

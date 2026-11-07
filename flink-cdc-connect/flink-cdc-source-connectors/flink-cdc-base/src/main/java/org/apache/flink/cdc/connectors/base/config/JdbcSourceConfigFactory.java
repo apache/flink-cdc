@@ -65,6 +65,8 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
                     .defaultValue();
     protected boolean releaseSnapshotMetadataEnabled =
             JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED.defaultValue();
+    protected double scanRateLimitRecordsPerSecond =
+            JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue();
 
     /** Integer port number of the database server. */
     public JdbcSourceConfigFactory hostname(String hostname) {
@@ -275,6 +277,12 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     public JdbcSourceConfigFactory releaseSnapshotMetadataEnabled(
             boolean releaseSnapshotMetadataEnabled) {
         this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
+        return this;
+    }
+
+    public JdbcSourceConfigFactory scanRateLimitRecordsPerSecond(
+            double scanRateLimitRecordsPerSecond) {
+        this.scanRateLimitRecordsPerSecond = scanRateLimitRecordsPerSecond;
         return this;
     }
 

@@ -413,6 +413,11 @@ class IncrementalSourceEnumeratorReleaseTest {
         public boolean isReleaseSnapshotMetadataEnabled() {
             return releaseSnapshotMetadataEnabled;
         }
+
+        @Override
+        public double getScanRateLimitRecordsPerSecond() {
+            return -1d;
+        }
     }
 
     /** A serializable no-op {@link OffsetFactory}. */

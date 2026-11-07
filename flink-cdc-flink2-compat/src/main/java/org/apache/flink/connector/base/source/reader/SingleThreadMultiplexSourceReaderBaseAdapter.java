@@ -15,30 +15,39 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.source;
+package org.apache.flink.connector.base.source.reader;
 
+import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.api.connector.source.SourceSplit;
+import org.apache.flink.api.connector.source.util.ratelimit.RateLimiterStrategy;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.connector.base.source.reader.RecordEmitter;
-import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
-import org.apache.flink.connector.base.source.reader.SingleThreadMultiplexSourceReaderBase;
 import org.apache.flink.connector.base.source.reader.fetcher.SingleThreadFetcherManager;
-import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
+
+import javax.annotation.Nullable;
 
 /**
- * Compatibility adapter for Flink 1.18. This class is part of the multi-version compatibility layer
+ * Compatibility adapter for Flink 2.2. This class is part of the multi-version compatibility layer
  * that allows Flink CDC to work across different Flink versions.
  */
+@Internal
 public abstract class SingleThreadMultiplexSourceReaderBaseAdapter<
                 E, T, SplitT extends SourceSplit, SplitStateT>
         extends SingleThreadMultiplexSourceReaderBase<E, T, SplitT, SplitStateT> {
+
     public SingleThreadMultiplexSourceReaderBaseAdapter(
-            FutureCompletingBlockingQueue<RecordsWithSplitIds<E>> elementsQueue,
             SingleThreadFetcherManager<E, SplitT> splitFetcherManager,
             RecordEmitter<E, T, SplitStateT> recordEmitter,
+            @Nullable RecordEvaluator<T> eofRecordEvaluator,
             Configuration config,
-            SourceReaderContext context) {
-        super(splitFetcherManager, recordEmitter, config, context);
+            SourceReaderContext context,
+            @Nullable RateLimiterStrategy<SplitT> rateLimiterStrategy) {
+        super(
+                splitFetcherManager,
+                recordEmitter,
+                eofRecordEvaluator,
+                config,
+                context,
+                rateLimiterStrategy);
     }
 }
