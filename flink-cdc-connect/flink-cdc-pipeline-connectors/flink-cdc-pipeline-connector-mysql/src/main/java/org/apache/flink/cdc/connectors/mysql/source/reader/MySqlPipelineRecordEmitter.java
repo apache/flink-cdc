@@ -17,9 +17,11 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.reader;
 
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.connectors.mysql.schema.MySqlFieldDefinition;
@@ -35,6 +37,7 @@ import org.apache.flink.cdc.connectors.mysql.utils.MySqlTypeUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
+import org.apache.flink.util.Collector;
 
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
 import io.debezium.jdbc.JdbcConnection;
@@ -94,7 +97,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
             MySqlSourceConfig sourceConfig,
             boolean isTableIdCaseInsensitive) {
         super(
-                debeziumDeserializationSchema,
+                filterSchemaChangeEvents(debeziumDeserializationSchema, sourceConfig),
                 sourceReaderMetrics,
                 sourceConfig.isIncludeSchemaChanges(),
                 false, // Explicitly disable heartbeat events
@@ -107,6 +110,53 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                         .getCreateTableEventCache();
         this.isBounded = StartupOptions.snapshot().equals(sourceConfig.getStartupOptions());
         this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
+    }
+
+    private static DebeziumDeserializationSchema<Event> filterSchemaChangeEvents(
+            DebeziumDeserializationSchema<Event> deserializer, MySqlSourceConfig sourceConfig) {
+        return new DebeziumDeserializationSchema<Event>() {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public void deserialize(SourceRecord record, Collector<Event> out) throws Exception {
+                if (!isSchemaChangeEvent(record)) {
+                    deserializer.deserialize(record, out);
+                    return;
+                }
+                // Deserialize the entire record before filtering events by actual table IDs.
+                deserializer.deserialize(
+                        record,
+                        new Collector<Event>() {
+                            @Override
+                            public void collect(Event event) {
+                                if (event instanceof SchemaChangeEvent) {
+                                    org.apache.flink.cdc.common.event.TableId tableId =
+                                            ((SchemaChangeEvent) event).tableId();
+                                    if (!sourceConfig
+                                            .getTableFilter()
+                                            .test(
+                                                    new TableId(
+                                                            tableId.getSchemaName(),
+                                                            null,
+                                                            tableId.getTableName()))) {
+                                        return;
+                                    }
+                                }
+                                out.collect(event);
+                            }
+
+                            @Override
+                            public void close() {
+                                out.close();
+                            }
+                        });
+            }
+
+            @Override
+            public TypeInformation<Event> getProducedType() {
+                return deserializer.getProducedType();
+            }
+        };
     }
 
     @Override
