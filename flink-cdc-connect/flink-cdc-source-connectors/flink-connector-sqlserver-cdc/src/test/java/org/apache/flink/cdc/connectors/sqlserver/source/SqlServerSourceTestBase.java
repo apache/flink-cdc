@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.sqlserver.source;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.cdc.connectors.sqlserver.SqlServerSource;
 import org.apache.flink.cdc.connectors.sqlserver.SqlServerTestBase;
+import org.apache.flink.cdc.connectors.sqlserver.testutils.SqlServerTestUtils;
 import org.apache.flink.cdc.connectors.utils.ExternalResourceProxy;
 import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
 import org.apache.flink.runtime.minicluster.MiniCluster;
@@ -66,10 +67,13 @@ public abstract class SqlServerSourceTestBase extends TestLogger {
     public static final Network NETWORK = Network.newNetwork();
     protected static final Logger LOG = LoggerFactory.getLogger(SqlServerSourceTestBase.class);
     public static final MSSQLServerContainer MSSQL_SERVER_CONTAINER =
-            new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2019-latest")
+            new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2025-latest")
                     .withPassword("Password!")
                     .withEnv("MSSQL_AGENT_ENABLED", "true")
                     .withEnv("MSSQL_PID", "Standard")
+                    // SQL Server 2025 occasionally crashes during startup on CI; retry with a
+                    // fresh container.
+                    .withStartupAttempts(3)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
     protected static final int DEFAULT_PARALLELISM = 4;
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
@@ -95,6 +99,7 @@ public abstract class SqlServerSourceTestBase extends TestLogger {
     public static void startContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MSSQL_SERVER_CONTAINER)).join();
+        SqlServerTestUtils.waitForSqlServerAgent(MSSQL_SERVER_CONTAINER);
         LOG.info("Containers are started.");
     }
 

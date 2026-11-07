@@ -64,7 +64,7 @@ class PostgresE2eITCase extends FlinkContainerTestEnvironment {
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
     private static final DockerImageName PG_IMAGE =
-            DockerImageName.parse("debezium/postgres:9.6").asCompatibleSubstituteFor("postgres");
+            DockerImageName.parse("postgres:14").asCompatibleSubstituteFor("postgres");
 
     private static final Path postgresCdcJar = TestUtils.getResource("postgres-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
@@ -95,7 +95,9 @@ class PostgresE2eITCase extends FlinkContainerTestEnvironment {
                             "-c",
                             "max_wal_senders=20",
                             "-c",
-                            "max_replication_slots=20")
+                            "max_replication_slots=20",
+                            "-c",
+                            "wal_level=logical")
                     .withReuse(true);
 
     @BeforeEach
@@ -162,6 +164,7 @@ class PostgresE2eITCase extends FlinkContainerTestEnvironment {
                         " 'schema-name' = 'inventory',",
                         " 'table-name' = 'products',",
                         " 'slot.name' = '" + getSlotName("flink_incremental_") + "',",
+                        " 'decoding.plugin.name' = 'pgoutput',",
                         " 'scan.incremental.snapshot.chunk.size' = '4',",
                         " 'scan.incremental.snapshot.enabled' = 'true',",
                         " 'scan.startup.mode' = 'initial'",
@@ -194,6 +197,7 @@ class PostgresE2eITCase extends FlinkContainerTestEnvironment {
                         " 'schema-name' = 'inventory',",
                         " 'table-name' = 'products',",
                         " 'slot.name' = '" + getSlotName("flink_") + "',",
+                        " 'decoding.plugin.name' = 'pgoutput',",
                         // dropping the slot allows WAL segments to be
                         // discarded by the database
                         " 'debezium.slot.drop.on.stop' = 'true'",
