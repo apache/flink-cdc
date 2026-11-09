@@ -248,6 +248,10 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
         if (tableChanges.isEmpty()) {
             return;
         }
+        tableChanges = getRemainingChanges(admin.getTableInfo(tablePath).get(), tableChanges);
+        if (tableChanges.isEmpty()) {
+            return;
+        }
         try {
             admin.alterTable(tablePath, tableChanges, false).get();
         } catch (Exception e) {
@@ -270,12 +274,6 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
         if (!(ExceptionUtils.stripExecutionException(cause)
                 instanceof InvalidAlterTableException)) {
             throw cause;
-        }
-        Set<String> requestedNames = new HashSet<>();
-        for (TableChange change : tableChanges) {
-            if (!requestedNames.add(((TableChange.AddColumn) change).getName())) {
-                throw cause;
-            }
         }
         List<TableChange> remainingChanges =
                 getRemainingChanges(admin.getTableInfo(tablePath).get(), tableChanges);
@@ -304,8 +302,13 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
             TableInfo tableInfo, List<TableChange> tableChanges) {
         RowType rowType = tableInfo.getRowType();
         List<TableChange> remainingChanges = new ArrayList<>();
+        Set<String> requestedNames = new HashSet<>();
         for (TableChange change : tableChanges) {
             TableChange.AddColumn addition = (TableChange.AddColumn) change;
+            if (!requestedNames.add(addition.getName())) {
+                throw new InvalidAlterTableException(
+                        "Column " + addition.getName() + " already exists.");
+            }
             int index = rowType.getFieldIndex(addition.getName());
             if (index < 0) {
                 remainingChanges.add(change);
