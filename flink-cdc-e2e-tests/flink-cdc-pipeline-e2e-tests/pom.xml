@@ -875,9 +875,10 @@ limitations under the License.
 
     <profiles>
         <profile>
+            <!-- Module-specific Flink 2 adjustments; flink.version itself is
+                 switched by the root pom flink2 profile. -->
             <id>flink2</id>
             <properties>
-                <flink.version>${flink.2.x.version}</flink.version>
                 <flink.hadoop.compatibility.artifact-id>flink-hadoop-compatibility</flink.hadoop.compatibility.artifact-id>
             </properties>
         </profile>

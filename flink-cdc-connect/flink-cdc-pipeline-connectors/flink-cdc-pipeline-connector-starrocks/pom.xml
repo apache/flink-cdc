@@ -114,6 +114,10 @@ limitations under the License.
                         </goals>
                         <configuration>
                             <shadeTestJar>false</shadeTestJar>
+                            <!-- The StarRocks flink connector is only published
+                                 for Flink 1.x; skip the fat jar on the flink2
+                                 generation (root pom sets this property). -->
+                            <skip>${connector.generation.skip}</skip>
                             <artifactSet>
                                 <includes>
                                     <include>com.starrocks:*</include>

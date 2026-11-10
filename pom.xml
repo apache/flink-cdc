@@ -75,6 +75,10 @@ limitations under the License.
         <flink.2.x.version>2.2.0</flink.2.x.version>
         <flink.version>${flink.1.x.version}</flink.version>
         <flink.major.version>1.20</flink.major.version>
+        <flink.compat.artifactId>flink-cdc-flink1-compat</flink.compat.artifactId>
+        <!-- Set to true by the flink2 profile for connectors whose external
+             dependency line has no Flink 2.x artifact (starrocks, hudi). -->
+        <connector.generation.skip>false</connector.generation.skip>
         <flink.shaded.version>17.0</flink.shaded.version>
         <debezium.version>1.9.8.Final</debezium.version>
         <tikv.version>3.2.0</tikv.version>
@@ -114,6 +118,7 @@ limitations under the License.
         <maven.compiler.source>${source.java.version}</maven.compiler.source>
         <maven.compiler.target>${target.java.version}</maven.compiler.target>
         <flink.kafka.connector.version>3.3.0-1.20</flink.kafka.connector.version>
+        <flink.connector.elasticsearch.version>3.1.0-1.20</flink.connector.elasticsearch.version>
         <paimon.flink.major.version>1.20</paimon.flink.major.version>
         <fluss.flink.major.version>1.20</fluss.flink.major.version>
     </properties>
@@ -297,6 +302,12 @@ limitations under the License.
         </dependency>
 
         <dependency>
+            <!-- Retained deliberately: although flink-cdc now owns its shaded
+                 guava, this empty jar drives the maven-shade-plugin to produce a
+                 dependency-reduced-pom for every module, pinning parent properties
+                 (e.g. ${flink.version}) to concrete values, which the release and
+                 staging deployment process relies on. The jar itself is empty, so
+                 there is no shaded package prefix to conflict with anything. -->
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-shaded-force-shading</artifactId>
             <version>${flink.shaded.version}</version>
@@ -851,9 +862,37 @@ limitations under the License.
             </build>
         </profile>
         <profile>
+            <!--
+              Default Flink generation (1.20 line). The properties mirror the root
+              pom defaults so the generation switching point stays explicit.
+              Never declare compat dependencies in this profile: the compat
+              modules are part of the reactor and would inherit a dependency on
+              themselves.
+            -->
+            <id>flink1</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <flink.version>${flink.1.x.version}</flink.version>
+                <flink.major.version>1.20</flink.major.version>
+                <flink.compat.artifactId>flink-cdc-flink1-compat</flink.compat.artifactId>
+                <flink.kafka.connector.version>3.3.0-1.20</flink.kafka.connector.version>
+                <flink.connector.elasticsearch.version>3.1.0-1.20</flink.connector.elasticsearch.version>
+                <paimon.flink.major.version>1.20</paimon.flink.major.version>
+                <iceberg.flink.major.version>1.20</iceberg.flink.major.version>
+                <fluss.flink.major.version>1.20</fluss.flink.major.version>
+            </properties>
+        </profile>
+        <profile>
             <id>flink2</id>
             <properties>
+                <flink.version>${flink.2.x.version}</flink.version>
+                <flink.major.version>2.2</flink.major.version>
+                <flink.compat.artifactId>flink-cdc-flink2-compat</flink.compat.artifactId>
+                <connector.generation.skip>true</connector.generation.skip>
                 <flink.kafka.connector.version>4.0.1-2.0</flink.kafka.connector.version>
+                <flink.connector.elasticsearch.version>4.0.0-2.0</flink.connector.elasticsearch.version>
                 <paimon.flink.major.version>2.1</paimon.flink.major.version>
                 <iceberg.flink.major.version>2.0</iceberg.flink.major.version>
                 <fluss.flink.major.version>2.2</fluss.flink.major.version>

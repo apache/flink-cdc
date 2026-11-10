@@ -43,6 +43,14 @@ limitations under the License.
             <artifactId>flink-cdc-shaded-guava</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <!-- Compat layer of the active Flink generation, selected via
+                 flink.compat.artifactId in the root pom flink1/flink2 profiles. -->
+            <groupId>org.apache.flink</groupId>
+            <artifactId>${flink.compat.artifactId}</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
         <!-- YAML parser utilities -->
         <dependency>
             <groupId>org.snakeyaml</groupId>
@@ -86,34 +94,5 @@ limitations under the License.
         </dependency>
 
     </dependencies>
-
-    <profiles>
-        <profile>
-            <id>flink2</id>
-            <properties>
-                <flink.version>${flink.2.x.version}</flink.version>
-            </properties>
-            <dependencies>
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink2-compat</artifactId>
-                    <version>${project.version}</version>
-                    <scope>provided</scope>
-                </dependency>
-            </dependencies>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-dependency-plugin</artifactId>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-surefire-plugin</artifactId>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
 
 </project>
