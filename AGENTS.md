@@ -66,8 +66,8 @@ Flink CDC is organized around the Pipeline abstraction: a user-defined data pipe
 
 Currently, Flink CDC supports two Flink generations simultaneously:
 
-- `flink-cdc-flink1-compat` — Flink 1.x compatibility layer (currently 1.20.3). Default profile.
-- `flink-cdc-flink2-compat` — Flink 2.x compatibility layer (currently 2.2.0). Activated via `-Pflink2`.
+- `flink-cdc-flink1-common` (under the `flink-cdc-flink` aggregate) — Flink 1.x compatibility layer (currently 1.20.3). Used by the default build.
+- `flink-cdc-flink2-common` (under the `flink-cdc-flink` aggregate) — Flink 2.x compatibility layer (currently 2.2.0). Used by the `-Pflink2` build.
 
 All modules that depend on Flink APIs must declare their Flink dependencies as `provided` and reference `${flink.version}`, which is resolved by the active profile.
 Please verify your changes in both Flink 1.20 (LTS) and Flink 2.x (latest).
@@ -102,6 +102,7 @@ Write unit tests and integration tests in the corresponding submodules. End-to-e
   - `com.google.common.*` — use `flink-cdc-shaded-guava` instead
   - `com.google.common.base.Preconditions` — use Flink CDC's `Preconditions`
   - `com.google.common.annotations.VisibleForTesting` — use `@VisibleForTesting` from `org.apache.flink.cdc.common.annotation`
+- **Version-sensitive Flink APIs:** route calls through the Adapters in `flink-cdc-flink/flink1-common` / `flink-cdc-flink2-common` (or the `flink-cdc-flink-1.20` / `flink-cdc-flink-2.2` thin modules) instead of adding direct imports of version-sensitive `org.apache.flink.*` classes or reflection into `org.apache.flink` internals. Existing imports of the shadowed compat classes are exempt; unrelated third-party shadowing (`org.apache.calcite.sql.type.*`, `org.tikv.*`) is unaffected.
 - **API stability annotations:** User-facing API types should carry stability annotations, and methods/fields/constructors only need explicit annotations when they differ from the enclosing type or when needed.
   - `@Public` — stable across major versions
   - `@PublicEvolving` — may change in minor versions

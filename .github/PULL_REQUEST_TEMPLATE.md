@@ -25,6 +25,18 @@ Briefly describe the problem this PR fixes or the feature it introduces. Referen
 
 List the key changes in this PR. 
 
+## Flink version-sensitive API check
+
+<!--
+Flink CDC supports multiple Flink generations through the compat layer under
+`flink-cdc-flink/`. Version-sensitive Flink API usage must be routed through that
+compat layer rather than referenced directly from main code. Existing imports of the
+shadowed compat classes are not affected by this checklist.
+-->
+
+- [ ] This PR adds no direct import of a version-sensitive `org.apache.flink.*` class (a class beyond the shadowed compat class list that is added, removed, or changed between Flink versions) and no reflection into `org.apache.flink` internals (fields, constructors, or methods).
+- [ ] Any such usage added by this PR is routed through an Adapter in `flink-cdc-flink/flink1-common` or `flink-cdc-flink2-common`, or carried by a thin module (`flink-cdc-flink-1.20` / `flink-cdc-flink-2.2`).
+
 ---
 
 ## Verifying this change
