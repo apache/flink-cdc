@@ -28,6 +28,12 @@ limitations under the License.
     <artifactId>flink-cdc-common</artifactId>
 
     <dependencies>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-shaded-guava</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Test dependencies -->
         <dependency>
             <groupId>mysql</groupId>

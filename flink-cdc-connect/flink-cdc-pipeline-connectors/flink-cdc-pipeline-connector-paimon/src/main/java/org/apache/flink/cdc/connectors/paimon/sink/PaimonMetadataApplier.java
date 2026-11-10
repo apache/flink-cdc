@@ -36,8 +36,7 @@ import org.apache.flink.cdc.common.sink.ExistingTableSchemaExpansionSupport;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.connectors.paimon.sink.utils.TypeUtils;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.Sets;
 
 import org.apache.paimon.CoreOptions;
 import org.apache.paimon.catalog.Catalog;

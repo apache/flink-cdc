@@ -68,11 +68,6 @@ limitations under the License.
                     <artifactId>flink-cdc-flink2-compat</artifactId>
                     <version>${project.version}</version>
                 </dependency>
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-shaded-guava</artifactId>
-                    <version>${flink.2.x.shaded.guava.version}</version>
-                </dependency>
             </dependencies>
         </profile>
         <profile>
@@ -85,11 +80,6 @@ limitations under the License.
                     <groupId>org.apache.flink</groupId>
                     <artifactId>flink-cdc-flink1-compat</artifactId>
                     <version>${project.version}</version>
-                </dependency>
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-shaded-guava</artifactId>
-                    <version>${flink.1.x.shaded.guava.version}</version>
                 </dependency>
             </dependencies>
         </profile>

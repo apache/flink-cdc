@@ -22,9 +22,8 @@ import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.ImmutableMap;
 import org.apache.flink.runtime.client.JobStatusMessage;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;

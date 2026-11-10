@@ -30,8 +30,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.ImmutableList;
 
 import com.aliyun.odps.Column;
 import com.aliyun.odps.TableSchema;

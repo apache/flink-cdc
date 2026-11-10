@@ -36,11 +36,10 @@ import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.SchemaMergingUtils;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
-
-import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
-import org.apache.flink.shaded.guava31.com.google.common.cache.CacheLoader;
-import org.apache.flink.shaded.guava31.com.google.common.cache.LoadingCache;
-import org.apache.flink.shaded.guava31.com.google.common.collect.Table;
+import org.apache.flink.cdc.shaded.guava.com.google.common.cache.CacheBuilder;
+import org.apache.flink.cdc.shaded.guava.com.google.common.cache.CacheLoader;
+import org.apache.flink.cdc.shaded.guava.com.google.common.cache.LoadingCache;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.Table;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

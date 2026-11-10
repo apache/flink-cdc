@@ -23,9 +23,8 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.connectors.maxcompute.EmulatorTestBase;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.ImmutableList;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.ImmutableMap;
 
 import com.aliyun.odps.OdpsException;
 import com.aliyun.odps.TableSchema;

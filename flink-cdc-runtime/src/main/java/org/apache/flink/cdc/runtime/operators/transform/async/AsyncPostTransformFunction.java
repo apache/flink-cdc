@@ -58,6 +58,12 @@ import org.apache.flink.cdc.runtime.serializer.event.CreateTableEventSerializer;
 import org.apache.flink.cdc.runtime.serializer.schema.SchemaSerializer;
 import org.apache.flink.cdc.runtime.typeutils.BinaryInternalObjectConverter;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import org.apache.flink.cdc.shaded.guava.com.google.common.cache.CacheBuilder;
+import org.apache.flink.cdc.shaded.guava.com.google.common.cache.CacheLoader;
+import org.apache.flink.cdc.shaded.guava.com.google.common.cache.LoadingCache;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.HashBasedTable;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.Table;
+import org.apache.flink.cdc.shaded.guava.com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
@@ -66,13 +72,6 @@ import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.streaming.api.functions.async.ResultFuture;
 import org.apache.flink.streaming.api.functions.async.RichAsyncFunction;
 import org.apache.flink.util.FlinkRuntimeException;
-
-import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
-import org.apache.flink.shaded.guava31.com.google.common.cache.CacheLoader;
-import org.apache.flink.shaded.guava31.com.google.common.cache.LoadingCache;
-import org.apache.flink.shaded.guava31.com.google.common.collect.HashBasedTable;
-import org.apache.flink.shaded.guava31.com.google.common.collect.Table;
-import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -20,10 +20,9 @@ package org.apache.flink.cdc.runtime.operators.transform;
 import org.apache.flink.api.common.InvalidProgramException;
 import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
 import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
+import org.apache.flink.cdc.shaded.guava.com.google.common.cache.Cache;
+import org.apache.flink.cdc.shaded.guava.com.google.common.cache.CacheBuilder;
 import org.apache.flink.util.FlinkRuntimeException;
-
-import org.apache.flink.shaded.guava31.com.google.common.cache.Cache;
-import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
 
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.janino.ExpressionEvaluator;

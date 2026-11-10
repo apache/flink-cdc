@@ -35,6 +35,14 @@ limitations under the License.
         <module>flink-cdc-pipeline-e2e-tests</module>
     </modules>
 
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-shaded-guava</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+
     <build>
         <plugins>
             <plugin>

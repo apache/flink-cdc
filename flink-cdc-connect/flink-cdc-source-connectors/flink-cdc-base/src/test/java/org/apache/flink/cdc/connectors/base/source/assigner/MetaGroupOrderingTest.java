@@ -26,10 +26,9 @@ import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import org.apache.flink.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SchemalessSnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReader;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.Lists;
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.RowType;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
 import io.debezium.relational.TableId;
 import org.junit.jupiter.api.Test;
