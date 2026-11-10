@@ -242,6 +242,21 @@ limitations under the License.
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- Standard connector test machinery. Also provides the Flink test
+             utilities (e.g. RestartStrategyUtils) that the flink2 build needs
+             from flink-runtime's test jar. -->
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-test-utils</artifactId>
+            <version>${flink.version}</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.testcontainers</groupId>
+                    <artifactId>testcontainers</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
 
         <dependency>
             <groupId>org.apache.flink</groupId>
@@ -276,6 +291,10 @@ limitations under the License.
                         </goals>
                         <configuration>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <!-- The Hudi flink bundle only covers Flink 1.20;
+                                 skip the fat jar on the flink2 generation
+                                 (root pom sets this property). -->
+                            <skip>${connector.generation.skip}</skip>
                             <artifactSet>
                                 <includes>
                                     <include>org.apache.hudi:*</include>

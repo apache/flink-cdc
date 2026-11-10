@@ -74,34 +74,14 @@ limitations under the License.
                 </exclusion>
             </exclusions>
         </dependency>
+        <dependency>
+            <!-- Compat layer of the active Flink generation, selected via
+                 flink.compat.artifactId in the root pom flink1/flink2 profiles.
+                 Compile scope: source connector fat jars shade it in. -->
+            <groupId>org.apache.flink</groupId>
+            <artifactId>${flink.compat.artifactId}</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
-
-    <profiles>
-        <!-- Default profile: use flink-cdc-flink1-compat -->
-        <profile>
-            <id>flink1</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <dependencies>
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink1-compat</artifactId>
-                    <version>${project.version}</version>
-                </dependency>
-            </dependencies>
-        </profile>
-        <!-- Flink 2 profile: use flink-cdc-flink2-compat -->
-        <profile>
-            <id>flink2</id>
-            <dependencies>
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink2-compat</artifactId>
-                    <version>${project.version}</version>
-                </dependency>
-            </dependencies>
-        </profile>
-    </profiles>
 
 </project>

@@ -95,6 +95,12 @@ if [ -n "${FLINK_VERSION:-}" ]; then
     if [[ "${FLINK_VERSION}" == 2* ]]; then
         echo "Enabling flink2 profile"
         MVN_OPTIONS="${MVN_OPTIONS} -Pflink2"
+        # TODO(FLINK-XXXX): under -Pflink2 the starrocks and hudi connector
+        # modules skip their shade step (connector.generation.skip=true in the
+        # root pom) and would deploy thin, unusable jars into the
+        # ${RELEASE_VERSION}-2.x line. Until the per-version dist restructuring
+        # lands, exclude them from a flink2 deployment via CUSTOM_OPTIONS, e.g.:
+        #   CUSTOM_OPTIONS="-pl '!flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks,!flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-hudi'"
     fi
 fi
 

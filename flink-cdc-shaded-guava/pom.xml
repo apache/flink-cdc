@@ -57,6 +57,11 @@ limitations under the License.
                             <artifactSet>
                                 <includes>
                                     <include>com.google.guava:guava</include>
+                                    <!-- guava's AbstractFuture extends InternalFutureFailureAccess,
+                                         which lives in the separate failureaccess artifact; it must
+                                         be shaded and relocated too, or any runtime use of guava
+                                         futures fails with NoClassDefFoundError. -->
+                                    <include>com.google.guava:failureaccess</include>
                                 </includes>
                             </artifactSet>
                             <relocations>

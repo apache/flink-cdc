@@ -147,6 +147,8 @@ All artifacts use group ID `org.apache.flink`. See the [DataStream API packaging
 | 1.1       | 1.11                         |                                                                 |
 | 1.0       | 1.11                         |                                                                 |
 
+Note: the StarRocks and Hudi pipeline connectors are only built and tested against Flink 1.20; the Doris pipeline connector is built against the Flink 1.20 line and is not verified on Flink 2.x.
+
 See the [Pipeline connector overview](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/pipeline-connectors/overview/) and [source connector overview](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/flink-sources/overview/) for details.
 
 ## Join the Community
