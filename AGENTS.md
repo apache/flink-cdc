@@ -99,7 +99,7 @@ Write unit tests and integration tests in the corresponding submodules. End-to-e
 - **Forbidden imports** (enforced by Checkstyle):
   - JUnit 4 (`org.junit.*` except `org.junit.jupiter.*`) — use JUnit 5 Jupiter instead
   - `org.junit.jupiter.api.Assertions` and `org.hamcrest` — use AssertJ instead
-  - `com.google.common.*` — use `flink-shaded-guava` instead
+  - `com.google.common.*` — use `flink-cdc-shaded-guava` instead
   - `com.google.common.base.Preconditions` — use Flink CDC's `Preconditions`
   - `com.google.common.annotations.VisibleForTesting` — use `@VisibleForTesting` from `org.apache.flink.cdc.common.annotation`
 - **API stability annotations:** User-facing API types should carry stability annotations, and methods/fields/constructors only need explicit annotations when they differ from the enclosing type or when needed.

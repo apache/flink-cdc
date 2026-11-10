@@ -41,11 +41,10 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.runtime.testutils.operators.RegularEventOperatorTestHarness;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.ImmutableMap;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.Sets;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.FlinkRuntimeException;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
-import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
 import org.apache.commons.collections.ListUtils;
 import org.assertj.core.api.Assertions;

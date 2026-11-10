@@ -18,8 +18,8 @@
 
 package org.apache.calcite.sql.type;
 
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.ImmutableList;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.ImmutableMap;
 
 import org.apache.calcite.avatica.util.TimeUnit;
 import org.apache.calcite.rel.type.RelDataType;

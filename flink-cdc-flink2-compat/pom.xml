@@ -29,7 +29,6 @@ limitations under the License.
 
     <properties>
         <flink.version>${flink.2.x.version}</flink.version>
-        <shaded.guava.version>${flink.2.x.shaded.guava.version}</shaded.guava.version>
     </properties>
 
     <dependencies>

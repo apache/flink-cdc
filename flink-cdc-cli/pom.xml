@@ -38,6 +38,11 @@ limitations under the License.
             <artifactId>flink-cdc-common</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-shaded-guava</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- YAML parser utilities -->
         <dependency>
             <groupId>org.snakeyaml</groupId>

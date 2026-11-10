@@ -26,6 +26,7 @@ import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.cdc.connectors.tidb.metrics.TiDBSourceMetrics;
 import org.apache.flink.cdc.connectors.tidb.table.StartupMode;
 import org.apache.flink.cdc.connectors.tidb.table.utils.TableKeyRangeUtils;
+import org.apache.flink.cdc.shaded.guava.com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
@@ -35,8 +36,6 @@ import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunctio
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
-
-import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

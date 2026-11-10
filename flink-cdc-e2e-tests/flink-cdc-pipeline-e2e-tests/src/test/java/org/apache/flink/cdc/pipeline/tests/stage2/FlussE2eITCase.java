@@ -20,8 +20,7 @@ package org.apache.flink.cdc.pipeline.tests.stage2;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.ImmutableMap;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;

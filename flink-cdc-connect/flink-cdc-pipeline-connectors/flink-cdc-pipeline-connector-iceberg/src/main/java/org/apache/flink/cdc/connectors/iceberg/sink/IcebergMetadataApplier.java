@@ -34,8 +34,7 @@ import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
 import org.apache.flink.cdc.connectors.iceberg.sink.utils.HadoopConfUtils;
 import org.apache.flink.cdc.connectors.iceberg.sink.utils.IcebergTypeUtils;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.Sets;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogUtil;

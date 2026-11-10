@@ -33,6 +33,7 @@ limitations under the License.
     <packaging>pom</packaging>
 
     <modules>
+        <module>flink-cdc-shaded-guava</module>
         <module>flink-cdc-flink1-compat</module>
         <module>flink-cdc-flink2-compat</module>
         <module>flink-cdc-cli</module>
@@ -74,9 +75,6 @@ limitations under the License.
         <flink.2.x.version>2.2.0</flink.2.x.version>
         <flink.version>${flink.1.x.version}</flink.version>
         <flink.major.version>1.20</flink.major.version>
-        <flink.1.x.shaded.guava.version>31.1-jre-17.0</flink.1.x.shaded.guava.version>
-        <flink.2.x.shaded.guava.version>33.4.0-jre-20.0</flink.2.x.shaded.guava.version>
-        <shaded.guava.version>${flink.1.x.shaded.guava.version}</shaded.guava.version>
         <flink.shaded.version>17.0</flink.shaded.version>
         <debezium.version>1.9.8.Final</debezium.version>
         <tikv.version>3.2.0</tikv.version>
@@ -296,12 +294,6 @@ limitations under the License.
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <version>${slf4j.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.flink</groupId>
-            <artifactId>flink-shaded-guava</artifactId>
-            <version>${shaded.guava.version}</version>
         </dependency>
 
         <dependency>
@@ -871,38 +863,11 @@ limitations under the License.
                     <plugins>
                         <plugin>
                             <groupId>org.apache.maven.plugins</groupId>
-                            <artifactId>maven-dependency-plugin</artifactId>
-                            <executions>
-                                <execution>
-                                    <id>copy-flink2-guava</id>
-                                    <phase>process-test-resources</phase>
-                                    <goals>
-                                        <goal>copy</goal>
-                                    </goals>
-                                    <configuration>
-                                        <artifactItems>
-                                            <artifactItem>
-                                                <groupId>org.apache.flink</groupId>
-                                                <artifactId>flink-shaded-guava</artifactId>
-                                                <version>${flink.2.x.shaded.guava.version}</version>
-                                                <destFileName>flink-shaded-guava.jar</destFileName>
-                                                <outputDirectory>${project.build.directory}/flink2-extra-libs</outputDirectory>
-                                            </artifactItem>
-                                        </artifactItems>
-                                    </configuration>
-                                </execution>
-                            </executions>
-                        </plugin>
-                        <plugin>
-                            <groupId>org.apache.maven.plugins</groupId>
                             <artifactId>maven-surefire-plugin</artifactId>
                             <configuration>
                                 <systemPropertyVariables>
                                     <flink.profile>flink2</flink.profile>
                                 </systemPropertyVariables>
-                                <additionalClasspathElements>
-                                    <additionalClasspathElement>${project.build.directory}/flink2-extra-libs/flink-shaded-guava.jar</additionalClasspathElement>
-                                </additionalClasspathElements>
                             </configuration>
                         </plugin>
                     </plugins>
