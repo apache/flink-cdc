@@ -34,8 +34,7 @@ limitations under the License.
 
     <modules>
         <module>flink-cdc-shaded-guava</module>
-        <module>flink-cdc-flink1-compat</module>
-        <module>flink-cdc-flink2-compat</module>
+        <module>flink-cdc-flink</module>
         <module>flink-cdc-cli</module>
         <module>flink-cdc-common</module>
         <module>flink-cdc-composer</module>
@@ -73,9 +72,16 @@ limitations under the License.
         <!-- dependencies versions -->
         <flink.1.x.version>1.20.3</flink.1.x.version>
         <flink.2.x.version>2.2.0</flink.2.x.version>
+        <!-- Line-scoped Flink versions: each version thin module pins its Flink line
+             here so the generation baseline above can move to a newer minor (e.g.
+             flink.2.x.version -> 2.3) without dragging the older line's thin module
+             along. Nothing else references these: flink-cdc-flink{1,2}-common track
+             the generation baseline, thin modules track their line. -->
+        <flink.1.20.version>1.20.3</flink.1.20.version>
+        <flink.2.2.version>2.2.0</flink.2.2.version>
         <flink.version>${flink.1.x.version}</flink.version>
         <flink.major.version>1.20</flink.major.version>
-        <flink.compat.artifactId>flink-cdc-flink1-compat</flink.compat.artifactId>
+        <flink.compat.artifactId>flink-cdc-flink1-common</flink.compat.artifactId>
         <!-- Set to true by the flink2 profile for connectors whose external
              dependency line has no Flink 2.x artifact (starrocks, hudi). -->
         <connector.generation.skip>false</connector.generation.skip>
@@ -876,7 +882,7 @@ limitations under the License.
             <properties>
                 <flink.version>${flink.1.x.version}</flink.version>
                 <flink.major.version>1.20</flink.major.version>
-                <flink.compat.artifactId>flink-cdc-flink1-compat</flink.compat.artifactId>
+                <flink.compat.artifactId>flink-cdc-flink1-common</flink.compat.artifactId>
                 <flink.kafka.connector.version>3.3.0-1.20</flink.kafka.connector.version>
                 <flink.connector.elasticsearch.version>3.1.0-1.20</flink.connector.elasticsearch.version>
                 <paimon.flink.major.version>1.20</paimon.flink.major.version>
@@ -889,7 +895,7 @@ limitations under the License.
             <properties>
                 <flink.version>${flink.2.x.version}</flink.version>
                 <flink.major.version>2.2</flink.major.version>
-                <flink.compat.artifactId>flink-cdc-flink2-compat</flink.compat.artifactId>
+                <flink.compat.artifactId>flink-cdc-flink2-common</flink.compat.artifactId>
                 <connector.generation.skip>true</connector.generation.skip>
                 <flink.kafka.connector.version>4.0.1-2.0</flink.kafka.connector.version>
                 <flink.connector.elasticsearch.version>4.0.0-2.0</flink.connector.elasticsearch.version>
