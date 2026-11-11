@@ -80,11 +80,19 @@ limitations under the License.
         <flink.1.20.version>1.20.3</flink.1.20.version>
         <flink.2.2.version>2.2.0</flink.2.2.version>
         <flink.version>${flink.1.x.version}</flink.version>
-        <flink.major.version>1.20</flink.major.version>
         <flink.compat.artifactId>flink-cdc-flink1-common</flink.compat.artifactId>
+        <!-- The Flink line this build targets. It drives the coordinates of the
+             per-version dist jar and the per-line artifact selection of the e2e
+             tests. The flink2 profile overrides it; a CI job may override it further
+             for a same-generation minor (e.g. -Dflink.line=2.3, with that line
+             artifacts installed in the local repository). -->
+             same-generation minor while both are installed). -->
+        <flink.line>1.20</flink.line>
+        <flink.dist.artifactId>flink-cdc-dist-flink-${flink.line}</flink.dist.artifactId>
         <!-- Set to true by the flink2 profile for connectors whose external
              dependency line has no Flink 2.x artifact (starrocks, hudi). -->
         <connector.generation.skip>false</connector.generation.skip>
+             bin tarball, nothing installed or deployed). Flipped by the flink2 profile. -->
         <flink.shaded.version>17.0</flink.shaded.version>
         <debezium.version>1.9.8.Final</debezium.version>
         <tikv.version>3.2.0</tikv.version>
@@ -881,7 +889,6 @@ limitations under the License.
             </activation>
             <properties>
                 <flink.version>${flink.1.x.version}</flink.version>
-                <flink.major.version>1.20</flink.major.version>
                 <flink.compat.artifactId>flink-cdc-flink1-common</flink.compat.artifactId>
                 <flink.kafka.connector.version>3.3.0-1.20</flink.kafka.connector.version>
                 <flink.connector.elasticsearch.version>3.1.0-1.20</flink.connector.elasticsearch.version>
@@ -894,8 +901,10 @@ limitations under the License.
             <id>flink2</id>
             <properties>
                 <flink.version>${flink.2.x.version}</flink.version>
-                <flink.major.version>2.2</flink.major.version>
                 <flink.compat.artifactId>flink-cdc-flink2-common</flink.compat.artifactId>
+                <!-- The 2.x line of this generation is 2.2: the dist coordinates and the
+                     e2e artifact selection of this build follow it. -->
+                <flink.line>2.2</flink.line>
                 <connector.generation.skip>true</connector.generation.skip>
                 <flink.kafka.connector.version>4.0.1-2.0</flink.kafka.connector.version>
                 <flink.connector.elasticsearch.version>4.0.0-2.0</flink.connector.elasticsearch.version>
