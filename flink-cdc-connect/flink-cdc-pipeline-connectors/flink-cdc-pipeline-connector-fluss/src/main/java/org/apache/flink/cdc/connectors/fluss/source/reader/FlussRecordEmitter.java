@@ -23,6 +23,8 @@ import org.apache.flink.cdc.connectors.fluss.source.split.FlussHybridSnapshotLog
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussSplitBase;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussSplitState;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
+import org.apache.flink.metrics.Counter;
+import org.apache.flink.metrics.SimpleCounter;
 
 import org.apache.fluss.client.table.scanner.ScanRecord;
 import org.apache.fluss.metadata.TablePath;
@@ -50,8 +52,9 @@ import java.util.Set;
  *       offset.
  * </ul>
  *
- * <p>For <b>log-only</b> splits, it advances the next offset only after successful emission, so
- * crash recovery re-reads the same offset and the deserializer can reconstruct state correctly.
+ * <p>For real records in <b>log-only</b> splits, it advances the next offset only after successful
+ * emission, so crash recovery re-reads the same offset and the deserializer can reconstruct state
+ * correctly. Progress markers advance the offset without emitting records or changing schema state.
  *
  * @param <T> The type of output records produced by this emitter.
  */
@@ -60,6 +63,7 @@ public class FlussRecordEmitter<T> implements RecordEmitter<FlussSourceRecord, T
     private static final Logger LOG = LoggerFactory.getLogger(FlussRecordEmitter.class);
 
     private final FlussDeserializer<T> deserializer;
+    private final Counter numRecordsIn;
 
     /** Pending events to emit on the first record for each table after state restoration. */
     private final Map<TablePath, List<T>> pendingTableEvents = new HashMap<>();
@@ -67,18 +71,37 @@ public class FlussRecordEmitter<T> implements RecordEmitter<FlussSourceRecord, T
     private final Set<TablePath> inactiveTablePaths = new HashSet<>();
 
     public FlussRecordEmitter(FlussDeserializer<T> deserializer) {
+        this(deserializer, new SimpleCounter());
+    }
+
+    public FlussRecordEmitter(FlussDeserializer<T> deserializer, Counter numRecordsIn) {
         this.deserializer = deserializer;
+        this.numRecordsIn = numRecordsIn;
     }
 
     @Override
     public void emitRecord(
             FlussSourceRecord element, SourceOutput<T> output, FlussSplitState splitState)
             throws Exception {
-        // Emit pending events for this table before processing the actual record.
         TablePath tablePath = element.getTablePath();
+        if (element.isProgressOnly()) {
+            // SourceReaderBase counts every queue element before invoking the emitter.
+            numRecordsIn.dec();
+        }
         if (inactiveTablePaths.contains(tablePath)) {
             return;
         }
+        if (element.isProgressOnly()) {
+            if (splitState.isHybridSnapshotLogSplitState()) {
+                splitState
+                        .asHybridSnapshotLogSplitState()
+                        .setNextOffset(element.getConsumedUpToOffset());
+            } else if (splitState.isLogSplitState()) {
+                splitState.asLogSplitState().setNextOffset(element.getConsumedUpToOffset());
+            }
+            return;
+        }
+        // Emit pending events for this table before processing the actual record.
         List<T> pendingEvents = pendingTableEvents.remove(tablePath);
         if (pendingEvents != null) {
             for (T event : pendingEvents) {

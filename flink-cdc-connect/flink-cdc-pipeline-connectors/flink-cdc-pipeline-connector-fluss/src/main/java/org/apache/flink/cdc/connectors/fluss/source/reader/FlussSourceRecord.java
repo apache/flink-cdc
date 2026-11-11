@@ -33,6 +33,9 @@ import java.util.List;
  * <p>For snapshot records, {@code readRecordsCount} tracks how many records have been read so far
  * (used by the emitter to update {@code recordsToSkip} for checkpoint recovery). For log records,
  * {@code readRecordsCount} is always {@link #NO_READ_RECORDS_COUNT}.
+ *
+ * <p>Progress markers carry only the table path and exclusive consumed offset. The emitter handles
+ * them without deserialization.
  */
 public class FlussSourceRecord {
 
@@ -44,6 +47,30 @@ public class FlussSourceRecord {
     private final long readRecordsCount;
     private final List<String> primaryKeyNames;
     private final List<String> partitionKeyNames;
+    private final Long consumedUpToOffset;
+
+    private FlussSourceRecord(TablePath tablePath, long consumedUpToOffset) {
+        this.scanRecord = null;
+        this.tablePath = tablePath;
+        this.rowType = null;
+        this.readRecordsCount = NO_READ_RECORDS_COUNT;
+        this.primaryKeyNames = Collections.emptyList();
+        this.partitionKeyNames = Collections.emptyList();
+        this.consumedUpToOffset = consumedUpToOffset;
+    }
+
+    /** Creates a progress marker without a row or schema to deserialize. */
+    public static FlussSourceRecord forProgress(TablePath tablePath, long consumedUpToOffset) {
+        return new FlussSourceRecord(tablePath, consumedUpToOffset);
+    }
+
+    public boolean isProgressOnly() {
+        return consumedUpToOffset != null;
+    }
+
+    public long getConsumedUpToOffset() {
+        return consumedUpToOffset;
+    }
 
     /** Creates a log record (no snapshot position tracking). */
     public FlussSourceRecord(MultiTableRecord multiTableRecord) {
@@ -89,6 +116,7 @@ public class FlussSourceRecord {
         this.tablePath = tablePath;
         this.rowType = rowType;
         this.readRecordsCount = readRecordsCount;
+        this.consumedUpToOffset = null;
         this.primaryKeyNames =
                 primaryKeyNames != null
                         ? Collections.unmodifiableList(primaryKeyNames)
