@@ -42,12 +42,15 @@ import org.apache.fluss.types.RowType;
 import org.apache.fluss.types.StringType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -322,6 +325,48 @@ class FlussRecordDeserializerTest {
         assertThat(after.getInt(0)).isEqualTo(3);
         assertThat(after.getString(1).toString()).isEqualTo("Carol");
         assertThat(after.isNullAt(2)).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testReuseProjectionUntilTargetSchemaChanges(boolean advanceThroughRestore) {
+        AtomicInteger nameReads = new AtomicInteger();
+        DataField id =
+                new DataField("id", new IntType(false), null, 1) {
+                    @Override
+                    public String getName() {
+                        nameReads.incrementAndGet();
+                        return super.getName();
+                    }
+                };
+        RowType schema1 = rowType(id);
+        DataField name = field("name", new StringType(true), 2);
+        RowType schema2 = rowType(id, name);
+        RowType schema3 = rowType(id, name, field("age", new IntType(true), 3));
+        FlussSourceRecord newRecord = logRecord(2, schema2, GenericRow.of(1, null));
+        deserializer.deserialize(newRecord, TABLE_PATH);
+        deserializer.deserialize(logRecord(1, schema1, GenericRow.of(2)), TABLE_PATH);
+
+        nameReads.set(0);
+        deserializer.deserialize(newRecord, TABLE_PATH);
+        List<Event> events =
+                deserializer.deserialize(logRecord(1, schema1, GenericRow.of(3)), TABLE_PATH);
+        assertThat(nameReads.get()).as("schema field names read on warm paths").isZero();
+        RecordData row = ((DataChangeEvent) events.get(0)).after();
+        assertThat(row.getInt(0)).isEqualTo(3);
+        assertThat(row.isNullAt(1)).isTrue();
+
+        if (advanceThroughRestore) {
+            deserializer.restoreState(TABLE_PATH, 3, schema3);
+        } else {
+            deserializer.deserialize(logRecord(3, schema3, GenericRow.of(4, null, 10)), TABLE_PATH);
+        }
+        events = deserializer.deserialize(logRecord(1, schema1, GenericRow.of(5)), TABLE_PATH);
+        row = ((DataChangeEvent) events.get(events.size() - 1)).after();
+        assertThat(row.getArity()).isEqualTo(3);
+        assertThat(row.getInt(0)).isEqualTo(5);
+        assertThat(row.isNullAt(1)).isTrue();
+        assertThat(row.isNullAt(2)).isTrue();
     }
 
     @Test

@@ -38,6 +38,7 @@ import org.apache.flink.cdc.connectors.fluss.utils.FlussConversions;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 import org.apache.fluss.client.table.scanner.ScanRecord;
+import org.apache.fluss.metadata.Schema;
 import org.apache.fluss.metadata.TablePath;
 import org.apache.fluss.record.ChangeType;
 import org.apache.fluss.row.BinaryString;
@@ -52,6 +53,7 @@ import org.apache.fluss.types.ArrayType;
 import org.apache.fluss.types.DataField;
 import org.apache.fluss.types.MapType;
 import org.apache.fluss.types.RowType;
+import org.apache.fluss.utils.SchemaUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,6 +88,9 @@ public class FlussRecordDeserializer implements FlussDeserializer<Event> {
 
     /** Cache of field converters per table, used to avoid rebuilding nested type converters. */
     private transient Map<TablePath, FlussDeserializationConverter[]> latestFieldConverterCache;
+
+    /** Source schema ID to column mapping for each table's current target schema. */
+    private transient Map<TablePath, Map<Integer, int[]>> projectionMappings;
 
     /** Tables restored from split state whose CreateTableEvent needs fresh table key metadata. */
     private transient Map<TablePath, RowType> restoredCreateTableRowTypeCache;
@@ -171,14 +176,7 @@ public class FlussRecordDeserializer implements FlussDeserializer<Event> {
                     RowType oldRowType = latestRowTypeCache.get(tablePath);
                     events.addAll(inferSchemaChanges(tableId, tablePath, oldRowType, rowType));
                 }
-                latestSchemaIdCache.put(tablePath, schemaId);
-                latestRowTypeCache.put(tablePath, rowType);
-                org.apache.flink.cdc.common.types.RowType cdcRowType =
-                        (org.apache.flink.cdc.common.types.RowType)
-                                FlussConversions.toCdcType(rowType);
-                latestRecordDataGeneratorCache.put(
-                        tablePath, new BinaryRecordDataGenerator(cdcRowType));
-                latestFieldConverterCache.put(tablePath, createFieldConverters(rowType));
+                updateLatestSchema(tablePath, schemaId, rowType);
             }
         }
     }
@@ -195,15 +193,15 @@ public class FlussRecordDeserializer implements FlussDeserializer<Event> {
         // traversing the RowType on every record.
         int latestSchemaId = latestSchemaIdCache.get(tablePath);
         if (initialSchemaId != latestSchemaId) {
-            org.apache.fluss.metadata.Schema latestSchema =
-                    org.apache.fluss.metadata.Schema.newBuilder()
-                            .fromRowType(latestRowType)
-                            .build();
-            org.apache.fluss.metadata.Schema currentSchema =
-                    org.apache.fluss.metadata.Schema.newBuilder()
-                            .fromRowType(initialRowType)
-                            .build();
-            row = ProjectedRow.from(currentSchema, latestSchema).replaceRow(initialRow);
+            Map<Integer, int[]> mappings = projectionMappings.get(tablePath);
+            int[] mapping = mappings.get(initialSchemaId);
+            if (mapping == null) {
+                Schema latestSchema = Schema.newBuilder().fromRowType(latestRowType).build();
+                Schema currentSchema = Schema.newBuilder().fromRowType(initialRowType).build();
+                mapping = SchemaUtil.getIndexMapping(currentSchema, latestSchema);
+                mappings.put(initialSchemaId, mapping);
+            }
+            row = ProjectedRow.from(mapping).replaceRow(initialRow);
         }
 
         BinaryRecordDataGenerator generator = latestRecordDataGeneratorCache.get(tablePath);
@@ -232,13 +230,7 @@ public class FlussRecordDeserializer implements FlussDeserializer<Event> {
         // Different splits may checkpoint different schemas; retain the one with the highest ID.
         Integer restoredSchemaId = latestSchemaIdCache.get(tablePath);
         if (restoredSchemaId == null || schemaId > restoredSchemaId) {
-            latestSchemaIdCache.put(tablePath, schemaId);
-            latestRowTypeCache.put(tablePath, rowType);
-            org.apache.flink.cdc.common.types.RowType cdcRowType =
-                    (org.apache.flink.cdc.common.types.RowType) FlussConversions.toCdcType(rowType);
-            latestRecordDataGeneratorCache.put(
-                    tablePath, new BinaryRecordDataGenerator(cdcRowType));
-            latestFieldConverterCache.put(tablePath, createFieldConverters(rowType));
+            updateLatestSchema(tablePath, schemaId, rowType);
             restoredCreateTableRowTypeCache.put(tablePath, rowType);
         }
         return Collections.emptyList();
@@ -251,6 +243,7 @@ public class FlussRecordDeserializer implements FlussDeserializer<Event> {
         latestRowTypeCache.remove(tablePath);
         latestRecordDataGeneratorCache.remove(tablePath);
         latestFieldConverterCache.remove(tablePath);
+        projectionMappings.remove(tablePath);
         restoredCreateTableRowTypeCache.remove(tablePath);
     }
 
@@ -276,12 +269,23 @@ public class FlussRecordDeserializer implements FlussDeserializer<Event> {
         return schemaBuilder.build();
     }
 
+    private void updateLatestSchema(TablePath tablePath, int schemaId, RowType rowType) {
+        latestSchemaIdCache.put(tablePath, schemaId);
+        latestRowTypeCache.put(tablePath, rowType);
+        org.apache.flink.cdc.common.types.RowType cdcRowType =
+                (org.apache.flink.cdc.common.types.RowType) FlussConversions.toCdcType(rowType);
+        latestRecordDataGeneratorCache.put(tablePath, new BinaryRecordDataGenerator(cdcRowType));
+        latestFieldConverterCache.put(tablePath, createFieldConverters(rowType));
+        projectionMappings.put(tablePath, new HashMap<>());
+    }
+
     private void ensureCacheInitialized() {
         if (latestSchemaIdCache == null) {
             latestSchemaIdCache = new HashMap<>();
             latestRowTypeCache = new HashMap<>();
             latestRecordDataGeneratorCache = new HashMap<>();
             latestFieldConverterCache = new HashMap<>();
+            projectionMappings = new HashMap<>();
             restoredCreateTableRowTypeCache = new HashMap<>();
         } else if (restoredCreateTableRowTypeCache == null) {
             latestFieldConverterCache = new HashMap<>();
