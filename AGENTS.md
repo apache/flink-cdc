@@ -60,7 +60,7 @@ Flink CDC is organized around the Pipeline abstraction: a user-defined data pipe
 - `flink-cdc-runtime` — Runtime implementation of the Pipeline: operators for reading, routing, transforming (expression evaluation via Calcite + Janino), and writing CDC events.
 - `flink-cdc-composer` — Pipeline assembly and deployment layer. Translates a `PipelineDefinition` into a runnable Flink job, wiring sources, operators, and sinks together. Supports Flink-native, Kubernetes, and YARN deployment.
 - `flink-cdc-cli` — Command-line entry point (`flink-cdc.sh`). Parses YAML pipeline definitions and delegates to `flink-cdc-composer`.
-- `flink-cdc-dist` — Distribution packaging. Produces the `flink-cdc-<version>-bin` release archive.
+- `flink-cdc-dist` — Distribution module. It shades the pipeline core with the Flink compatibility layer and assembles the `flink-cdc-<version>-flink-<flinkVer>-bin` release archive. The module's artifactId is line-parameterized (`flink-cdc-dist-flink-${flink.line}`): each Flink line build produces its own distribution from this single module.
 
 ### Flink Version Compatibility
 

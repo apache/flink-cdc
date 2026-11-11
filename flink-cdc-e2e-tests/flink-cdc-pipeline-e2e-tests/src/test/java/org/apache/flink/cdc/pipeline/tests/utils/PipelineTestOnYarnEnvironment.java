@@ -233,7 +233,9 @@ public class PipelineTestOnYarnEnvironment extends TestLogger {
         env.put("FLINK_CONF_DIR", flinkHome.resolve("conf").toString());
         addFlinkConf(flinkHome.resolve("conf").resolve("config.yaml"));
         Path flinkcdcHome =
-                TestUtils.getResource("flink-cdc-\\d+(\\.\\d+)*(-SNAPSHOT)?$", "flink-cdc-dist");
+                TestUtils.getResource(
+                        "flink-cdc-\\d+(\\.\\d+)*(-SNAPSHOT)?(-flink-\\d+(\\.\\d+)*)?$",
+                        "flink-cdc-dist");
         env.put("FLINK_CDC_HOME", flinkcdcHome.toString());
         env.put("HADOOP_CLASSPATH", getYarnClasspath());
         return env;

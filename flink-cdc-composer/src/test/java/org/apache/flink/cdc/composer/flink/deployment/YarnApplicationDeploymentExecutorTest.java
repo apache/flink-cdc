@@ -51,8 +51,44 @@ class YarnApplicationDeploymentExecutorTest {
         // A directory named like the dist jar must not be picked up either.
         Files.createDirectory(libDir.resolve("flink-cdc-dist-directory.jar"));
 
-        assertThat(YarnApplicationDeploymentExecutor.getFlinkCDCDistJar(toFlinkPath(libDir)))
+        assertThat(
+                        YarnApplicationDeploymentExecutor.getFlinkCDCDistJar(
+                                toFlinkPath(libDir), "1.20"))
                 .endsWith(distJarName);
+    }
+
+    @Test
+    void testParseFlinkMajorVersionFromJarName() {
+        assertThat(
+                        YarnApplicationDeploymentExecutor.parseFlinkMajorVersionFromJarName(
+                                "flink-cdc-dist-flink-2.2-3.8.0.jar"))
+                .isEqualTo("2.2");
+        assertThat(
+                        YarnApplicationDeploymentExecutor.parseFlinkMajorVersionFromJarName(
+                                "flink-cdc-dist-flink-1.20-3.7-SNAPSHOT.jar"))
+                .isEqualTo("1.20");
+        assertThat(
+                        YarnApplicationDeploymentExecutor.parseFlinkMajorVersionFromJarName(
+                                "flink-cdc-dist-3.6.0-1.20.jar"))
+                .isEqualTo("1.20");
+    }
+
+    @Test
+    void testParseFlinkMajorVersionFromUnidentifiableJarNameFails() {
+        for (String jarName :
+                new String[] {
+                    "flink-cdc-composer-3.8.0.jar",
+                    "my-downstream-fat-jar.jar",
+                    "classes",
+                    "flink-cdc-dist-3.5.0.jar"
+                }) {
+            assertThatThrownBy(
+                            () ->
+                                    YarnApplicationDeploymentExecutor
+                                            .parseFlinkMajorVersionFromJarName(jarName))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("flink-cdc-dist-flink-<ver>-*.jar");
+        }
     }
 
     @Test
@@ -62,9 +98,57 @@ class YarnApplicationDeploymentExecutorTest {
         assertThatThrownBy(
                         () ->
                                 YarnApplicationDeploymentExecutor.getFlinkCDCDistJar(
-                                        toFlinkPath(libDir)))
+                                        toFlinkPath(libDir), "1.20"))
                 .isInstanceOf(FileNotFoundException.class)
                 .hasMessageContaining("Failed to fetch Flink CDC dist jar");
+    }
+
+    @Test
+    void testFindExactDistJarByFlinkVersion(@TempDir Path libDir) throws Exception {
+        Files.createFile(libDir.resolve("flink-cdc-dist-flink-1.20-3.8.0.jar"));
+        Files.createFile(libDir.resolve("flink-cdc-dist-flink-2.2-3.8.0.jar"));
+        Files.createFile(libDir.resolve(CONNECTOR_JAR));
+
+        assertThat(
+                        YarnApplicationDeploymentExecutor.getFlinkCDCDistJar(
+                                toFlinkPath(libDir), "1.20"))
+                .endsWith("flink-cdc-dist-flink-1.20-3.8.0.jar");
+        assertThat(YarnApplicationDeploymentExecutor.getFlinkCDCDistJar(toFlinkPath(libDir), "2.2"))
+                .endsWith("flink-cdc-dist-flink-2.2-3.8.0.jar");
+    }
+
+    @Test
+    void testMismatchedFlinkVersionFails(@TempDir Path libDir) throws Exception {
+        Files.createFile(libDir.resolve("flink-cdc-dist-flink-2.2-3.8.0.jar"));
+
+        assertThatThrownBy(
+                        () ->
+                                YarnApplicationDeploymentExecutor.getFlinkCDCDistJar(
+                                        toFlinkPath(libDir), "1.20"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("1.20")
+                .hasMessageContaining("2.2");
+    }
+
+    @Test
+    void testAmbiguousSameVersionDistJarsFail(@TempDir Path libDir) throws Exception {
+        Files.createFile(libDir.resolve("flink-cdc-dist-flink-1.20-3.7.0.jar"));
+        Files.createFile(libDir.resolve("flink-cdc-dist-flink-1.20-3.8.0.jar"));
+
+        assertThatThrownBy(
+                        () ->
+                                YarnApplicationDeploymentExecutor.getFlinkCDCDistJar(
+                                        toFlinkPath(libDir), "1.20"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("flink-cdc-dist-flink-1.20-3.7.0.jar");
+    }
+
+    @Test
+    void testLegacyNamingFallback(@TempDir Path libDir) throws Exception {
+        Files.createFile(libDir.resolve("flink-cdc-dist-3.6.0-1.20.jar"));
+
+        assertThat(YarnApplicationDeploymentExecutor.getFlinkCDCDistJar(toFlinkPath(libDir), "2.2"))
+                .endsWith("flink-cdc-dist-3.6.0-1.20.jar");
     }
 
     private static org.apache.flink.core.fs.Path toFlinkPath(Path path) {
