@@ -325,10 +325,9 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
     }
 
     /**
-     * Assembles the jar list for a SQL job submission: the given jars plus the active
-     * generation's jdbc connector jar. On the Flink 2.x line the split-out MySQL
-     * dialect jar is added too; the 1.20 connector is all-in-one and must not be
-     * paired with the dialect jar (same-FQCN classes).
+     * Assembles the jar list for a SQL job submission: the given jars plus the active generation's
+     * jdbc connector jar. On the Flink 2.x line the split-out MySQL dialect jar is added too; the
+     * 1.20 connector is all-in-one and must not be paired with the dialect jar (same-FQCN classes).
      */
     protected Path[] withJdbcJars(Path... jars) {
         List<Path> result = new ArrayList<>();

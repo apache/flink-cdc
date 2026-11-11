@@ -46,9 +46,9 @@ To set up the Postgres CDC connector, the following table provides dependency in
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-postgres-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-postgres-cdc) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-postgres-cdc-flink-1.20](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-postgres-cdc-flink-1.20) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** Refer to [flink-sql-connector-postgres-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-postgres-cdc), more released versions will be available in the Maven central warehouse.
+**Note:** Refer to [flink-sql-connector-postgres-cdc-flink-1.20](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-postgres-cdc-flink-1.20), more released versions will be available in the Maven central warehouse.
 
 ## How to create a Postgres CDC table
 

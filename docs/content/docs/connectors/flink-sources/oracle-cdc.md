@@ -47,9 +47,9 @@ To set up the Oracle CDC connector, the following table provides dependency info
 
 **Download link is available only for stable releases.**
 
-Download [flink-sql-connector-oracle-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-oracle-cdc-flink-1.20](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc-flink-1.20) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** Refer to [flink-sql-connector-oracle-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc), more released versions will be available in the Maven central warehouse.
+**Note:** Refer to [flink-sql-connector-oracle-cdc-flink-1.20](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc-flink-1.20), more released versions will be available in the Maven central warehouse.
 
 
 Since Oracle Connector's FUTC license is incompatible with Flink CDC project, we can't provide Oracle connector in prebuilt connector jar packages.

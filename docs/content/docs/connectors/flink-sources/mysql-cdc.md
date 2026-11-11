@@ -52,9 +52,9 @@ To set up the MySQL CDC connector, the following table provides dependency infor
 
 ### SQL Client JAR
 
-Download [flink-sql-connector-mysql-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mysql-cdc) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-mysql-cdc-flink-1.20](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mysql-cdc-flink-1.20) (or the `-flink-2.2` variant for Flink 2.x clusters) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** Refer to [flink-sql-connector-mysql-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mysql-cdc), more released versions will be available in the Maven central warehouse.
+**Note:** Refer to [flink-sql-connector-mysql-cdc-flink-1.20](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mysql-cdc-flink-1.20), more released versions will be available in the Maven central warehouse.
 
 Since MySQL Connector's GPLv2 license is incompatible with Flink CDC project, we can't provide MySQL connector in prebuilt connector jar packages.
 You may need to configure the following dependencies manually.

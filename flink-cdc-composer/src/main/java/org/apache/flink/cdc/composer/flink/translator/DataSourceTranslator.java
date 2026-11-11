@@ -34,6 +34,7 @@ import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironmentAdapter;
 
 /** Translator used to build {@link DataSource} which will generate a {@link DataStream}. */
 @Internal
@@ -72,7 +73,8 @@ public class DataSourceTranslator {
             FlinkSourceFunctionProvider sourceFunctionProvider =
                     (FlinkSourceFunctionProvider) eventSourceProvider;
             DataStreamSource<Event> stream =
-                    env.addSource(sourceFunctionProvider.getSourceFunction(), new EventTypeInfo());
+                    StreamExecutionEnvironmentAdapter.addSource(
+                            env, sourceFunctionProvider.getSourceFunction(), new EventTypeInfo());
             sourceDef.getName().ifPresent(stream::name);
             return stream;
         }

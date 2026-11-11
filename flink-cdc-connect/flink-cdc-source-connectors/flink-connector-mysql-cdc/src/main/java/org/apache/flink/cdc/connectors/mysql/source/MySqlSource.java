@@ -59,7 +59,6 @@ import org.apache.flink.util.FlinkRuntimeException;
 import io.debezium.jdbc.JdbcConnection;
 
 import java.io.Serializable;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.function.Supplier;
 
@@ -164,9 +163,7 @@ public class MySqlSource<T>
         MySqlSourceConfig sourceConfig =
                 configFactory.createConfig(readerContext.getIndexOfSubtask());
 
-        final Method metricGroupMethod = readerContext.getClass().getMethod("metricGroup");
-        metricGroupMethod.setAccessible(true);
-        final MetricGroup metricGroup = (MetricGroup) metricGroupMethod.invoke(readerContext);
+        final MetricGroup metricGroup = readerContext.metricGroup();
 
         final MySqlSourceReaderMetrics sourceReaderMetrics =
                 new MySqlSourceReaderMetrics(metricGroup);
