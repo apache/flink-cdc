@@ -70,7 +70,7 @@ class Db2E2eITCase extends FlinkContainerTestEnvironment {
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
     private static final Path db2JccJar = TestUtils.getResource("db2-jcc.jar");
 
-    public static final String DB2_IMAGE = "ibmcom/db2";
+    public static final String DB2_IMAGE = "icr.io/db2_community/db2";
     public static final String DB2_CUSTOM_IMAGE = "custom/db2-cdc:1.4";
     private static DockerImageName debeziumDockerImageName;
     private static boolean db2AsnAgentRunning = false;

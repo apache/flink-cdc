@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.tests;
 
 import org.apache.flink.cdc.common.test.utils.JdbcProxy;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
+import org.apache.flink.cdc.connectors.sqlserver.testutils.SqlServerTestUtils;
 import org.apache.flink.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 
 import org.assertj.core.api.Assertions;
@@ -60,7 +61,7 @@ class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
     private static final Path sqlServerCdcJar =
             TestUtils.getResource("sqlserver-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-    public static final String MSSQL_SERVER_IMAGE = "mcr.microsoft.com/mssql/server:2019-latest";
+    public static final String MSSQL_SERVER_IMAGE = "mcr.microsoft.com/mssql/server:2025-latest";
 
     @Container
     public static final MSSQLServerContainer<?> SQL_SERVER_CONTAINER =
@@ -70,6 +71,9 @@ class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
                     .withEnv("MSSQL_PID", "Standard")
                     .withNetwork(NETWORK)
                     .withNetworkAliases(INTER_CONTAINER_SQL_SERVER_ALIAS)
+                    // SQL Server 2025 occasionally crashes during startup on CI; retry with a
+                    // fresh container.
+                    .withStartupAttempts(3)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @BeforeEach
@@ -77,6 +81,7 @@ class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
         super.before();
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(SQL_SERVER_CONTAINER)).join();
+        SqlServerTestUtils.waitForSqlServerAgent(SQL_SERVER_CONTAINER);
         LOG.info("Containers are started.");
         initializeSqlServerTable("sqlserver_inventory");
     }

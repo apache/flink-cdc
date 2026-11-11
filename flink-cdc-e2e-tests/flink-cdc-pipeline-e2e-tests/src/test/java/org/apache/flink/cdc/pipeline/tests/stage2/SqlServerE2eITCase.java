@@ -20,6 +20,7 @@ package org.apache.flink.cdc.pipeline.tests.stage2;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Deadline;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
+import org.apache.flink.cdc.connectors.sqlserver.testutils.SqlServerTestUtils;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
 import org.assertj.core.api.Assertions;
@@ -66,7 +67,7 @@ public class SqlServerE2eITCase extends PipelineTestEnvironment {
 
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
     private static final String INTER_CONTAINER_SQL_SERVER_ALIAS = "mssqlserver";
-    private static final String MSSQL_SERVER_IMAGE = "mcr.microsoft.com/mssql/server:2019-latest";
+    private static final String MSSQL_SERVER_IMAGE = "mcr.microsoft.com/mssql/server:2025-latest";
 
     @Container
     public static final MSSQLServerContainer<?> SQL_SERVER_CONTAINER =
@@ -76,6 +77,9 @@ public class SqlServerE2eITCase extends PipelineTestEnvironment {
                     .withEnv("MSSQL_PID", "Standard")
                     .withNetwork(NETWORK)
                     .withNetworkAliases(INTER_CONTAINER_SQL_SERVER_ALIAS)
+                    // SQL Server 2025 occasionally crashes during startup on CI; retry with a
+                    // fresh container.
+                    .withStartupAttempts(3)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @BeforeEach
@@ -83,6 +87,7 @@ public class SqlServerE2eITCase extends PipelineTestEnvironment {
         super.before();
         LOG.info("Starting SQL Server containers...");
         Startables.deepStart(Stream.of(SQL_SERVER_CONTAINER)).join();
+        SqlServerTestUtils.waitForSqlServerAgent(SQL_SERVER_CONTAINER);
         LOG.info("SQL Server containers are started.");
         initializeSqlServerTable("sqlserver_inventory");
     }

@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
-FROM ibmcom/db2:11.5.0.0a
+FROM icr.io/db2_community/db2:11.5.9.0
 
 MAINTAINER  Peter Urbanetz
 
