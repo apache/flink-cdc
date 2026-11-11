@@ -17,7 +17,7 @@
 
 package org.apache.flink.cdc.source;
 
-import org.apache.flink.streaming.api.operators.StreamingRuntimeContext;
+import org.apache.flink.api.common.functions.RuntimeContext;
 
 /**
  * Compatibility adapter for Flink 1.18. This class is part of the multi-version compatibility layer
@@ -25,7 +25,7 @@ import org.apache.flink.streaming.api.operators.StreamingRuntimeContext;
  */
 public class RuntimeContextAdapter {
 
-    public static int getIndexOfThisSubtask(StreamingRuntimeContext runtimeContext) {
+    public static int getIndexOfThisSubtask(RuntimeContext runtimeContext) {
         return runtimeContext.getTaskInfo().getIndexOfThisSubtask();
     }
 }

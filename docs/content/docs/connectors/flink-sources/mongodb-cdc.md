@@ -47,9 +47,9 @@ To set up the MongoDB CDC connector, the following table provides dependency inf
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-mongodb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mongodb-cdc) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-mongodb-cdc-flink-1.20](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mongodb-cdc-flink-1.20) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** Refer to [flink-sql-connector-mongodb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mongodb-cdc), more released versions will be available in the Maven central warehouse.
+**Note:** Refer to [flink-sql-connector-mongodb-cdc-flink-1.20](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mongodb-cdc-flink-1.20), more released versions will be available in the Maven central warehouse.
 
 Setup MongoDB
 ----------------

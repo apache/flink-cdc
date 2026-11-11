@@ -29,6 +29,8 @@ under the License.
 
 This guide provides a simple `pom.xml` example for packaging DataStream job JARs with MySQL CDC source.
 
+Since Flink CDC 3.8, SQL connector fat jars are published per Flink version with an artifactId suffix: use `flink-sql-connector-<X>-cdc-flink-1.20` on the Flink 1.20 line and `flink-sql-connector-<X>-cdc-flink-2.2` on the Flink 2.2 line. The examples below target Flink 1.20.x.
+
 ## Example for `pom.xml` with Flink 1.20.x
 
 ```xml
@@ -169,7 +171,7 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
                                     <include>io.debezium:debezium-ddl-parser</include>
                                     <include>io.debezium:debezium-connector-mysql</include>
                                     <include>org.apache.flink:flink-connector-debezium</include>
-                                    <include>org.apache.flink:flink-sql-connector-mysql-cdc</include>
+                                    <include>org.apache.flink:flink-sql-connector-mysql-cdc-flink-1.20</include>
                                     <include>org.antlr:antlr4-runtime</include>
                                     <include>org.apache.kafka:*</include>
                                     <include>mysql:mysql-connector-java</include>
@@ -308,7 +310,7 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-sql-connector-mysql-cdc</artifactId>
+            <artifactId>flink-sql-connector-mysql-cdc-flink-1.20</artifactId>
             <version>${flink.cdc.version}</version>
         </dependency>
         <dependency>
@@ -359,7 +361,7 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
                                     <include>io.debezium:debezium-ddl-parser</include>
                                     <include>io.debezium:debezium-connector-mysql</include>
                                     <include>org.apache.flink:flink-connector-debezium</include>
-                                    <include>org.apache.flink:flink-sql-connector-mysql-cdc</include>
+                                    <include>org.apache.flink:flink-sql-connector-mysql-cdc-flink-1.20</include>
                                     <include>org.antlr:antlr4-runtime</include>
                                     <include>org.apache.kafka:*</include>
                                     <include>mysql:mysql-connector-java</include>

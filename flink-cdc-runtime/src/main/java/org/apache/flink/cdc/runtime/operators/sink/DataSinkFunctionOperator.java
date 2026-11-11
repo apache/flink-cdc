@@ -31,7 +31,6 @@ import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.Output;
-import org.apache.flink.streaming.api.operators.StreamSink;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 
@@ -49,7 +48,7 @@ import java.util.Set;
  * <p>The operator is always part of a sink pipeline and is the first operator.
  */
 @Internal
-public class DataSinkFunctionOperator extends StreamSink<Event> {
+public class DataSinkFunctionOperator extends StreamSinkAdapter<Event> {
 
     private SchemaEvolutionClient schemaEvolutionClient;
     private final OperatorID schemaOperatorID;
@@ -118,7 +117,7 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
 
     // ----------------------------- Helper functions -------------------------------
     private void handleFlushEvent(FlushEvent event) throws Exception {
-        userFunction.finish();
+        finishUserFunction();
         if (event.getSchemaChangeEventType() != SchemaChangeEventType.CREATE_TABLE) {
             event.getTableIds().stream()
                     .filter(tableId -> !processedTableIds.contains(tableId))

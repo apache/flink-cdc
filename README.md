@@ -100,9 +100,9 @@ CREATE TABLE mysql_binlog (
 SELECT id, UPPER(name), description, weight FROM mysql_binlog;
 ```
 
-**Available SQL connectors** (dependencies bundled):
+**Available SQL connectors** (dependencies bundled). Each connector is published per supported Flink version with an artifactId suffix, e.g. `flink-sql-connector-mysql-cdc-flink-1.20` for the Flink 1.20 line and `flink-sql-connector-mysql-cdc-flink-2.2` for Flink 2.2 — pick the one matching your cluster (links below point to the Flink 1.20 line):
 
-[MySQL](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mysql-cdc) | [PostgreSQL](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-postgres-cdc) | [Oracle](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc) | [SQL Server](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-sqlserver-cdc) | [MongoDB](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mongodb-cdc) | [OceanBase](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc) | [TiDB](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc) | [Db2](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-db2-cdc) | [Vitess](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-vitess-cdc)
+[MySQL](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mysql-cdc-flink-1.20) | [PostgreSQL](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-postgres-cdc-flink-1.20) | [Oracle](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc-flink-1.20) | [SQL Server](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-sqlserver-cdc-flink-1.20) | [MongoDB](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mongodb-cdc-flink-1.20) | [OceanBase](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc-flink-1.20) | [TiDB](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc-flink-1.20) | [Db2](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-db2-cdc-flink-1.20) | [Vitess](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-vitess-cdc-flink-1.20)
 
 See the [source connector overview](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/flink-sources/overview/) for a full list and configurations.
 
@@ -148,6 +148,8 @@ All artifacts use group ID `org.apache.flink`. See the [DataStream API packaging
 | 1.0       | 1.11                         |                                                                 |
 
 Note: the StarRocks and Hudi pipeline connectors are only built and tested against Flink 1.20; the Doris pipeline connector is built against the Flink 1.20 line and is not verified on Flink 2.x.
+
+Starting with Flink CDC 3.8, release artifacts carry the Flink version in their artifactId instead of the version string: the pipeline distribution is `flink-cdc-dist-flink-<flinkVer>-<version>.jar` (with the `flink-cdc-<version>-flink-<flinkVer>-bin.tar.gz` bundle), and the SQL connector fat jars are `flink-sql-connector-<X>-cdc-flink-<flinkVer>-<version>.jar`. Among the pipeline connectors, Kafka, Paimon, Elasticsearch and Iceberg follow the same per-version scheme (`flink-cdc-pipeline-connector-<X>-flink-<flinkVer>-<version>.jar`); all other pipeline connectors are published as a single artifact for both Flink lines.
 
 See the [Pipeline connector overview](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/pipeline-connectors/overview/) and [source connector overview](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/flink-sources/overview/) for details.
 

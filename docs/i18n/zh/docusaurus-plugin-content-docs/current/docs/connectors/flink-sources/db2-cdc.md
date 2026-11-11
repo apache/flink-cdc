@@ -52,9 +52,9 @@ Db2 CDC 连接器允许从 Db2 数据库读取快照数据和增量数据。本�
 
 ### SQL Client JAR
 
-下载 [flink-sql-connector-db2-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-db2-cdc) 到 `<FLINK_HOME>/lib/` 目录下。
+下载 [flink-sql-connector-db2-cdc-flink-1.20](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-db2-cdc-flink-1.20) 到 `<FLINK_HOME>/lib/` 目录下。
 
-**注意：** 参考 [flink-sql-connector-db2-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-db2-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
+**注意：** 参考 [flink-sql-connector-db2-cdc-flink-1.20](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-db2-cdc-flink-1.20) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
 由于 Db2 Connector 采用的 IPLA 协议与 Flink CDC 项目不兼容，我们无法在 jar 包中提供 Db2 连接器。
 您可能需要手动配置以下依赖：
