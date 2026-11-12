@@ -34,7 +34,7 @@ import java.io.IOException;
 
 /**
  * Copy from <a
- * href="https://github.com/apache/doris-flink-connector/blob/25.1.0/flink-doris-connector/src/main/java/org/apache/doris/flink/sink/batch/DorisBatchSink.java">DorisBatchSink</a>
+ * href="https://github.com/apache/doris-flink-connector/blob/26.3.0/flink-doris-connector/flink-doris-connector-flink1/src/main/java/org/apache/doris/flink/sink/batch/DorisBatchSink.java">DorisBatchSink</a>
  * to add {@link #createWriter(WriterInitContext)}} method.
  */
 @Deprecated
@@ -58,8 +58,8 @@ public class DorisBatchSink<IN> implements Sink<IN> {
 
     @Override
     public SinkWriter<IN> createWriter(InitContext initContext) throws IOException {
-        DorisBatchWriter<IN> dorisBatchWriter =
-                new DorisBatchWriter<IN>(
+        DorisBatchWriterAdapter<IN> dorisBatchWriter =
+                new DorisBatchWriterAdapter<IN>(
                         initContext,
                         serializer,
                         dorisOptions,
@@ -70,8 +70,8 @@ public class DorisBatchSink<IN> implements Sink<IN> {
 
     @Override
     public SinkWriter<IN> createWriter(WriterInitContext context) throws IOException {
-        DorisBatchWriter<IN> dorisBatchWriter =
-                new DorisBatchWriter<IN>(
+        DorisBatchWriterAdapter<IN> dorisBatchWriter =
+                new DorisBatchWriterAdapter<IN>(
                         new InitContextAdapter(context),
                         serializer,
                         dorisOptions,
