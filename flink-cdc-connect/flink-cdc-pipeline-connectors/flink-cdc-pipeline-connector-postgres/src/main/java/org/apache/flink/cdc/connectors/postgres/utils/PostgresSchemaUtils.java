@@ -40,6 +40,7 @@ import javax.annotation.Nullable;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -153,22 +154,41 @@ public class PostgresSchemaUtils {
             io.debezium.relational.TableId tableId,
             PostgresSourceConfig sourceConfig,
             PostgresConnection jdbc) {
+        Table tableSchema = newPostgresSchema(sourceConfig, jdbc).tableFor(tableId);
+        return toSchema(tableSchema, sourceConfig.getDbzConnectorConfig(), jdbc.getTypeRegistry());
+    }
+
+    /** Fetches the schemas of the given tables with a single schema refresh. */
+    public static Map<TableId, Schema> getTableSchemas(
+            List<TableId> tableIds, PostgresSourceConfig sourceConfig, PostgresConnection jdbc) {
+        PostgresSchema postgresSchema = newPostgresSchema(sourceConfig, jdbc);
+        Map<TableId, Schema> schemas = new HashMap<>();
+        for (TableId tableId : tableIds) {
+            Table tableSchema = postgresSchema.tableFor(toDbzTableId(tableId));
+            schemas.put(
+                    tableId,
+                    toSchema(
+                            tableSchema,
+                            sourceConfig.getDbzConnectorConfig(),
+                            jdbc.getTypeRegistry()));
+        }
+        return schemas;
+    }
+
+    private static PostgresSchema newPostgresSchema(
+            PostgresSourceConfig sourceConfig, PostgresConnection jdbc) {
         try {
-            // fetch table schemas
+            // refreshes the schemas of all captured tables
             TopicSelector<io.debezium.relational.TableId> topicSelector =
                     PostgresTopicSelector.create(sourceConfig.getDbzConnectorConfig());
             PostgresConnection.PostgresValueConverterBuilder valueConverterBuilder =
                     newPostgresValueConverterBuilder(sourceConfig.getDbzConnectorConfig());
-            PostgresSchema postgresSchema =
-                    PostgresObjectUtils.newSchema(
-                            jdbc,
-                            sourceConfig.getDbzConnectorConfig(),
-                            jdbc.getTypeRegistry(),
-                            topicSelector,
-                            valueConverterBuilder.build(jdbc.getTypeRegistry()));
-            Table tableSchema = postgresSchema.tableFor(tableId);
-            return toSchema(
-                    tableSchema, sourceConfig.getDbzConnectorConfig(), jdbc.getTypeRegistry());
+            return PostgresObjectUtils.newSchema(
+                    jdbc,
+                    sourceConfig.getDbzConnectorConfig(),
+                    jdbc.getTypeRegistry(),
+                    topicSelector,
+                    valueConverterBuilder.build(jdbc.getTypeRegistry()));
         } catch (SQLException e) {
             throw new RuntimeException("Failed to initialize PostgresReplicationConnection", e);
         }

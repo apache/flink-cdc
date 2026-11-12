@@ -448,6 +448,39 @@ public class PostgresDataSourceFactoryTest extends PostgresTestBase {
     }
 
     @Test
+    public void testChangelogModeUpsertReportsOnlyTablesWithoutPrimaryKey() throws SQLException {
+        try (Connection connection =
+                        PostgresTestBase.getJdbcConnection(
+                                POSTGRES_CONTAINER, POSTGRES_CONTAINER.getDatabaseName());
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "CREATE TABLE inventory.no_pk_mixed_table (id INTEGER, name VARCHAR(64))");
+        }
+
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), POSTGRES_CONTAINER.getHost());
+        options.put(
+                PG_PORT.key(), String.valueOf(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT)));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(
+                TABLES.key(),
+                POSTGRES_CONTAINER.getDatabaseName()
+                        + ".inventory.products,"
+                        + POSTGRES_CONTAINER.getDatabaseName()
+                        + ".inventory.no_pk_mixed_table");
+        options.put(SLOT_NAME.key(), slotName);
+        options.put(CHANGELOG_MODE.key(), "upsert");
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        PostgresDataSourceFactory factory = new PostgresDataSourceFactory();
+        assertThatThrownBy(() -> factory.createDataSource(context))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("inventory.no_pk_mixed_table")
+                .hasMessageNotContaining("inventory.products");
+    }
+
+    @Test
     public void testSupportedMetadataColumns() {
         Map<String, String> options = new HashMap<>();
         options.put(HOSTNAME.key(), POSTGRES_CONTAINER.getHost());

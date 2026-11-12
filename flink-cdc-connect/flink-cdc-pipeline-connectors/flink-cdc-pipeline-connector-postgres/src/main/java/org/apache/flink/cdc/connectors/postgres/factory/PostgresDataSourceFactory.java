@@ -239,9 +239,10 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         List<String> tablesWithoutPrimaryKey = new ArrayList<>();
         try (PostgresConnection jdbc =
                 PostgresSchemaUtils.getPostgresDialect(sourceConfig).openJdbcConnection()) {
+            Map<TableId, Schema> schemas =
+                    PostgresSchemaUtils.getTableSchemas(capturedTableIds, sourceConfig, jdbc);
             for (TableId tableId : capturedTableIds) {
-                Schema schema = PostgresSchemaUtils.getTableSchema(tableId, sourceConfig, jdbc);
-                if (schema.primaryKeys().isEmpty()) {
+                if (schemas.get(tableId).primaryKeys().isEmpty()) {
                     tablesWithoutPrimaryKey.add(tableId.toString());
                 }
             }
