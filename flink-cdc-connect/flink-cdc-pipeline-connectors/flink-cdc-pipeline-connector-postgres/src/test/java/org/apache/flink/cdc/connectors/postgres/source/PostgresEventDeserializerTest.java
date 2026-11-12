@@ -114,6 +114,41 @@ class PostgresEventDeserializerTest {
         assertThat(event.after().getString(1).toString()).isEqualTo("scooter");
     }
 
+    @Test
+    void testUpdateWithUnavailableValueFailsInUpsertMode() {
+        PostgresEventDeserializer deserializer =
+                new PostgresEventDeserializer(DebeziumChangelogMode.UPSERT);
+
+        assertThatThrownBy(
+                        () ->
+                                deserialize(
+                                        deserializer,
+                                        buildUpdateRecord(
+                                                null, row(1, "__debezium_unavailable_value"))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("column 'name'")
+                .hasMessageContaining("REPLICA IDENTITY FULL");
+    }
+
+    @Test
+    void testInsertWithUnavailableValueFailsInUpsertMode() {
+        // A primary key change is emitted as a DELETE and an INSERT carrying the new row.
+        PostgresEventDeserializer deserializer =
+                new PostgresEventDeserializer(DebeziumChangelogMode.UPSERT);
+
+        assertThatThrownBy(
+                        () ->
+                                deserialize(
+                                        deserializer,
+                                        buildRecord(
+                                                Envelope.Operation.CREATE,
+                                                null,
+                                                row(2, "__debezium_unavailable_value"))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("column 'name'")
+                .hasMessageContaining("REPLICA IDENTITY FULL");
+    }
+
     private static List<Event> deserialize(
             PostgresEventDeserializer deserializer, SourceRecord record) throws Exception {
         List<Event> events = new ArrayList<>();
@@ -136,9 +171,14 @@ class PostgresEventDeserializerTest {
     }
 
     private static SourceRecord buildUpdateRecord(Struct before, Struct after) {
+        return buildRecord(Envelope.Operation.UPDATE, before, after);
+    }
+
+    private static SourceRecord buildRecord(
+            Envelope.Operation operation, Struct before, Struct after) {
         Struct value =
                 new Struct(VALUE_SCHEMA)
-                        .put(Envelope.FieldName.OPERATION, Envelope.Operation.UPDATE.code())
+                        .put(Envelope.FieldName.OPERATION, operation.code())
                         .put(Envelope.FieldName.AFTER, after);
         if (before != null) {
             value.put(Envelope.FieldName.BEFORE, before);

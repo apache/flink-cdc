@@ -82,7 +82,11 @@ public class PostgresDataSource implements DataSource {
                         changelogMode,
                         readableMetadataList,
                         includeDatabaseInTableId,
-                        databaseName);
+                        databaseName,
+                        new String(
+                                postgresSourceConfig
+                                        .getDbzConnectorConfig()
+                                        .getUnavailableValuePlaceholder()));
 
         PostgresOffsetFactory postgresOffsetFactory = new PostgresOffsetFactory();
         PostgresDialect postgresDialect = new PostgresDialect(postgresSourceConfig);
