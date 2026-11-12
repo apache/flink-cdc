@@ -147,7 +147,7 @@ class OceanBaseE2eITCase extends FlinkContainerTestEnvironment {
                         "INSERT INTO products_sink",
                         "SELECT * FROM products_source;");
 
-        submitSQLJob(sqlLines, oceanbaseCdcJar, jdbcJar, jdbcDriver);
+        submitSQLJob(sqlLines, withJdbcJars(oceanbaseCdcJar, jdbcDriver));
         waitUntilJobRunning(Duration.ofSeconds(30));
 
         // generate binlogs

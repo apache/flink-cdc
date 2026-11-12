@@ -179,7 +179,7 @@ class TiDBE2eITCase extends FlinkContainerTestEnvironment {
                         "INSERT INTO products_sink",
                         "SELECT * FROM tidb_source;");
 
-        submitSQLJob(sqlLines, tidbCdcJar, jdbcJar, mysqlDriverJar);
+        submitSQLJob(sqlLines, withJdbcJars(tidbCdcJar, mysqlDriverJar));
         waitUntilJobRunning(Duration.ofSeconds(30));
 
         // generate binlogs

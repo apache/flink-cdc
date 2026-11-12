@@ -130,7 +130,7 @@ class VitessE2eITCase extends FlinkContainerTestEnvironment {
                         sourceDDL,
                         sinkDDL,
                         "INSERT INTO products_sink SELECT * FROM products_source;");
-        submitSQLJob(sqlLines, VITESS_CDC_JAR, MYSQL_DRIVER_JAR, jdbcJar);
+        submitSQLJob(sqlLines, withJdbcJars(VITESS_CDC_JAR, MYSQL_DRIVER_JAR));
         waitUntilJobRunning(Duration.ofSeconds(30));
         waitUntilBinlogDumpStarted();
 

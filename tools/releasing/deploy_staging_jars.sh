@@ -58,14 +58,22 @@ MVN_OPTIONS="-Papache-release -DskipTests -DretryFailedDeploymentCount=10"
 # root pom makes sure only the selected line's dist module installs/deploys; invoke this
 # script once per Flink line (FLINK_VERSION=1.20.3, then FLINK_VERSION=2.2.0).
 #
-# TODO(FLINK-XXXX) (open for the community proposal): a full reactor deploy runs once
-# per Flink line, but the intermediate modules (flink-cdc-common/runtime/composer/cli/
-# python and the pipeline connectors) share one GAV across generations with different
-# per-generation content. Deploying both lines' full reactor into one staging
-# repository will be rejected on the second run (same GAV already deployed). Until the
-# community settles the deployment strategy, the second line's invocation should
-# restrict the deploy to the per-version dist module via CUSTOM_OPTIONS, e.g.:
-#   CUSTOM_OPTIONS="-pl 'flink-cdc-dist/flink-cdc-dist-flink-2.2 -am'"
+# Deployment strategy (two invocations, one per Flink line):
+#   - Flink 1.20 line: full reactor deploy. This deploys the intermediate modules
+#     (common/runtime/composer/cli/python, the thin pipeline connector code modules
+#     and the non-forking pipeline connector fat jars) exactly once; their content
+#     is generation-equivalent (verified by jar-level comparison), so the single
+#     copy serves both Flink lines.
+#   - Flink 2.2 line: full reactor build (install), then a deploy restricted to
+#     the per-version modules whose artifactIds carry the Flink line (dist-flink-2.2,
+#     the sql-connector-*-flink-2.2 fat jars and the forking pipeline connector
+#     fat jars). The restricted deploy resolves everything else from the local
+#     repository; -am must NOT be used here or the shared-GAV intermediate modules
+#     would be deployed a second time and rejected by the staging repository.
+#     The restriction also keeps the flink2-only thin starrocks/hudi jars
+#     (connector.generation.skip) out of the staging repository.
+# The restriction is applied via a default -pl list; override with CUSTOM_OPTIONS
+# if a different module set is needed.
 if [ -n "${FLINK_VERSION:-}" ]; then
     echo "Using Flink version: ${FLINK_VERSION}"
 
@@ -84,30 +92,61 @@ if [ -n "${FLINK_VERSION:-}" ]; then
     if [[ "${FLINK_VERSION}" == 2* ]]; then
         echo "Enabling flink2 profile"
         MVN_OPTIONS="${MVN_OPTIONS} -Pflink2"
-        # TODO(FLINK-XXXX): under -Pflink2 the starrocks and hudi connector
-        # modules skip their shade step (connector.generation.skip=true in the
-        # root pom) and would deploy thin, unusable jars into the 2.x line. The
-        # dist side is covered by generation gating; until the connector
-        # per-version restructuring lands, exclude them from a flink2
-        # deployment via CUSTOM_OPTIONS, e.g.:
-        #   CUSTOM_OPTIONS="-pl '!flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks,!flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-hudi'"
+        if [ -z "${CUSTOM_OPTIONS:-}" ]; then
+            per_version_modules="flink-cdc-dist"
+            for connector in db2 mongodb mysql oceanbase oracle postgres sqlserver tidb vitess; do
+                per_version_modules="${per_version_modules},flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-${connector}-cdc"
+            done
+            for connector in elasticsearch iceberg kafka paimon; do
+                per_version_modules="${per_version_modules},flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-${connector}"
+            done
+            CUSTOM_OPTIONS="-pl '${per_version_modules}'"
+        fi
+        # Full flink2 build first: populates the local repository with the
+        # flink2-form artifacts the restricted deploy resolves from.
+        echo "Building the full flink2 reactor (install, no deploy)"
+        ${MVN} clean install ${MVN_OPTIONS} -DskipTests
     fi
 fi
 
 echo "Deploying to repository.apache.org"
 ${MVN} clean deploy ${MVN_OPTIONS} ${CUSTOM_OPTIONS}
 
-# Transition-period convenience: also emit legacy-named dist jars
-# (flink-cdc-dist-<rev>-<flinkMajor>.jar) next to the per-version artifacts,
-# keeping download links from the version-suffix era working.
+# Transition-period convenience: also emit legacy-named jars
+# (flink-cdc-dist-<rev>-<flinkMajor>.jar, flink-sql-connector-<X>-cdc-<rev>-<flinkMajor>.jar)
+# next to the per-version artifacts, keeping download links from the version-suffix era working.
 if [ -n "${FLINK_VERSION:-}" ]; then
+    legacy_dir="${PROJECT_ROOT}/release-artifacts"
+    mkdir -p "${legacy_dir}"
+
     dist_jar="flink-cdc-dist/target/flink-cdc-dist-flink-${flink_major_version}-${RELEASE_VERSION}.jar"
     if [ -f "${dist_jar}" ]; then
-        legacy_dir="${PROJECT_ROOT}/release-artifacts"
-        mkdir -p "${legacy_dir}"
         cp "${dist_jar}" "${legacy_dir}/flink-cdc-dist-${RELEASE_VERSION}-${flink_major_version}.jar"
         echo "Legacy-named dist jar written to ${legacy_dir}"
     fi
+
+    # Per-version source connector fat jars: the active Flink line's
+    # shaded jar is also copied under the legacy version-suffix name.
+    for connector_dir in flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-*-cdc; do
+        connector=$(basename "${connector_dir}")
+        fat_jar="${connector_dir}/target/${connector}-flink-${flink_major_version}-${RELEASE_VERSION}.jar"
+        if [ -f "${fat_jar}" ]; then
+            cp "${fat_jar}" "${legacy_dir}/${connector}-${RELEASE_VERSION}-${flink_major_version}.jar"
+        fi
+    done
+    echo "Legacy-named source connector jars written to ${legacy_dir}"
+
+    # Per-version pipeline connector fat jars (kafka/paimon/elasticsearch/iceberg):
+    # the active Flink line's shaded jar is also copied under the legacy
+    # version-suffix name, replacing the single-GAV fat jar of the 3.7 era.
+    for connector in elasticsearch iceberg kafka paimon; do
+        connector_module="flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-${connector}"
+        fat_jar="${connector_module}/target/flink-cdc-pipeline-connector-${connector}-flink-${flink_major_version}-${RELEASE_VERSION}.jar"
+        if [ -f "${fat_jar}" ]; then
+            cp "${fat_jar}" "${legacy_dir}/flink-cdc-pipeline-connector-${connector}-${RELEASE_VERSION}-${flink_major_version}.jar"
+        fi
+    done
+    echo "Legacy-named pipeline connector jars written to ${legacy_dir}"
 fi
 
 cd ${CURR_DIR}

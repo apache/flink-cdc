@@ -142,7 +142,7 @@ limitations under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-cdc-pipeline-connector-paimon</artifactId>
+            <artifactId>flink-cdc-pipeline-connector-paimon${pipeline.fatjar.suffix}</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>
             <scope>test</scope>
@@ -155,7 +155,7 @@ limitations under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-cdc-pipeline-connector-iceberg</artifactId>
+            <artifactId>flink-cdc-pipeline-connector-iceberg${pipeline.fatjar.suffix}</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>
             <scope>test</scope>
@@ -169,7 +169,7 @@ limitations under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-cdc-pipeline-connector-kafka</artifactId>
+            <artifactId>flink-cdc-pipeline-connector-kafka${pipeline.fatjar.suffix}</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>
             <scope>test</scope>
@@ -207,7 +207,7 @@ limitations under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-cdc-pipeline-connector-elasticsearch</artifactId>
+            <artifactId>flink-cdc-pipeline-connector-elasticsearch${pipeline.fatjar.suffix}</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
@@ -666,7 +666,9 @@ limitations under the License.
 
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-cdc-pipeline-connector-kafka</artifactId>
+                            <!-- Per-version fat jar (the thin code module GAV would
+                                 resolve without the shaded external connector). -->
+                            <artifactId>flink-cdc-pipeline-connector-kafka${pipeline.fatjar.suffix}</artifactId>
                             <version>${project.version}</version>
                             <destFileName>kafka-cdc-pipeline-connector.jar</destFileName>
                             <type>jar</type>
@@ -705,7 +707,9 @@ limitations under the License.
                         </artifactItem>
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-cdc-pipeline-connector-paimon</artifactId>
+                            <!-- Per-version fat jar (the thin code module GAV would
+                                 resolve without the shaded external connector). -->
+                            <artifactId>flink-cdc-pipeline-connector-paimon${pipeline.fatjar.suffix}</artifactId>
                             <version>${project.version}</version>
                             <destFileName>paimon-cdc-pipeline-connector.jar</destFileName>
                             <type>jar</type>
@@ -714,7 +718,9 @@ limitations under the License.
                         </artifactItem>
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-cdc-pipeline-connector-iceberg</artifactId>
+                            <!-- Per-version fat jar (the thin code module GAV would
+                                 resolve without the shaded external connector). -->
+                            <artifactId>flink-cdc-pipeline-connector-iceberg${pipeline.fatjar.suffix}</artifactId>
                             <version>${project.version}</version>
                             <destFileName>iceberg-cdc-pipeline-connector.jar</destFileName>
                             <type>jar</type>
@@ -777,7 +783,9 @@ limitations under the License.
                         </artifactItem>
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-cdc-pipeline-connector-elasticsearch</artifactId>
+                            <!-- Per-version fat jar (the thin code module GAV would
+                                 resolve without the shaded external connector). -->
+                            <artifactId>flink-cdc-pipeline-connector-elasticsearch${pipeline.fatjar.suffix}</artifactId>
                             <version>${project.version}</version>
                             <destFileName>elasticsearch-cdc-pipeline-connector.jar</destFileName>
                             <type>jar</type>

@@ -27,8 +27,16 @@ limitations under the License.
         <version>${revision}</version>
     </parent>
 
-    <artifactId>flink-cdc-pipeline-connector-elasticsearch</artifactId>
+    <artifactId>flink-cdc-pipeline-connector-elasticsearch${pipeline.fatjar.suffix}</artifactId>
     <packaging>jar</packaging>
+
+    <!--
+      Pipeline connector module of Flink CDC. The shaded external connector line forks
+      across Flink generations, so the artifactId carries the Flink line of the build
+      (flink-cdc-pipeline-connector-elasticsearch-flink-<ver>); the fat jar bundles the connector
+      together with its external dependency line and is therefore bound to the Flink
+      generation it was built against.
+    -->
 
     <name>flink-cdc-pipeline-connector-elasticsearch</name>
     <url>http://maven.apache.org</url>
@@ -188,6 +196,7 @@ limitations under the License.
                     </execution>
                 </executions>
             </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
