@@ -17,8 +17,13 @@
 
 package org.apache.flink.cdc.connectors.fluss.source.metrics;
 
+import org.apache.flink.cdc.connectors.fluss.sink.v2.metrics.WrapperFlussMetricRegistry;
 import org.apache.flink.metrics.groups.SourceReaderMetricGroup;
 import org.apache.flink.runtime.metrics.MetricNames;
+
+import javax.annotation.Nullable;
+
+import java.util.Collections;
 
 /** A collection class for handling metrics in the Fluss CDC source reader. */
 public class FlussSourceReaderMetrics {
@@ -28,11 +33,29 @@ public class FlussSourceReaderMetrics {
     // Source reader metric group
     private final SourceReaderMetricGroup sourceReaderMetricGroup;
 
+    @Nullable private WrapperFlussMetricRegistry splitReaderMetricRegistry;
+
     // For currentFetchEventTimeLag metric
     private volatile long currentFetchEventTimeLag = UNINITIALIZED;
 
     public FlussSourceReaderMetrics(SourceReaderMetricGroup sourceReaderMetricGroup) {
         this.sourceReaderMetricGroup = sourceReaderMetricGroup;
+    }
+
+    public WrapperFlussMetricRegistry createSplitReaderMetricRegistry() {
+        // Flink reuses open subgroups by name. Close the old group first so a retiring
+        // connection cannot unregister its successor's metrics.
+        closeSplitReaderMetricRegistry();
+        splitReaderMetricRegistry =
+                new WrapperFlussMetricRegistry(sourceReaderMetricGroup, Collections.emptySet());
+        return splitReaderMetricRegistry;
+    }
+
+    public void closeSplitReaderMetricRegistry() {
+        if (splitReaderMetricRegistry != null) {
+            splitReaderMetricRegistry.closeAsync().join();
+            splitReaderMetricRegistry = null;
+        }
     }
 
     public void reportRecordEventTime(long lag) {

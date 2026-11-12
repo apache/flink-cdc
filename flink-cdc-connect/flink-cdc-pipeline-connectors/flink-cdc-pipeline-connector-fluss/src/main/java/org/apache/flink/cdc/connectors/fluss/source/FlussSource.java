@@ -26,7 +26,6 @@ import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.api.connector.source.util.ratelimit.RateLimiterStrategy;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.source.discover.TableDiscoverer;
-import org.apache.flink.cdc.connectors.fluss.sink.v2.metrics.WrapperFlussMetricRegistry;
 import org.apache.flink.cdc.connectors.fluss.source.deserializer.FlussDeserializer;
 import org.apache.flink.cdc.connectors.fluss.source.enumerator.FlussSourceEnumState;
 import org.apache.flink.cdc.connectors.fluss.source.enumerator.FlussSourceEnumStateSerializer;
@@ -158,8 +157,6 @@ public class FlussSource<T> implements Source<T, FlussSplitBase, FlussSourceEnum
     public SourceReader<T, FlussSplitBase> createReader(SourceReaderContext readerContext) {
         FlussSourceReaderMetrics sourceReaderMetrics =
                 new FlussSourceReaderMetrics(readerContext.metricGroup());
-        WrapperFlussMetricRegistry metricRegistry =
-                new WrapperFlussMetricRegistry(readerContext.metricGroup(), Collections.emptySet());
 
         FlussRecordEmitter<T> recordEmitter = new FlussRecordEmitter<>(deserializer);
         FutureCompletingBlockingQueue<RecordsWithSplitIds<FlussSourceRecord>> elementsQueue =
@@ -174,7 +171,6 @@ public class FlussSource<T> implements Source<T, FlussSplitBase, FlussSourceEnum
                 elementsQueue,
                 readerContext,
                 flussConfig,
-                metricRegistry,
                 sourceReaderMetrics,
                 recordEmitter,
                 rateLimiterStrategy);

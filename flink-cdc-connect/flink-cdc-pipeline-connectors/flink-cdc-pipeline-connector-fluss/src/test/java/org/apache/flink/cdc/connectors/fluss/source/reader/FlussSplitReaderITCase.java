@@ -21,7 +21,6 @@ import org.apache.flink.api.common.eventtime.Watermark;
 import org.apache.flink.api.connector.source.ReaderOutput;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.api.connector.source.SourceReaderContext;
-import org.apache.flink.cdc.connectors.fluss.sink.v2.metrics.WrapperFlussMetricRegistry;
 import org.apache.flink.cdc.connectors.fluss.source.event.TableSubscriptionEvent;
 import org.apache.flink.cdc.connectors.fluss.source.metrics.FlussSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussHybridSnapshotLogSplit;
@@ -31,9 +30,11 @@ import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.splitreader.SplitsAddition;
 import org.apache.flink.connector.base.source.reader.splitreader.SplitsChange;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
+import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.groups.SourceReaderMetricGroup;
-import org.apache.flink.metrics.testutils.MetricListener;
+import org.apache.flink.runtime.metrics.groups.GenericMetricGroup;
 import org.apache.flink.runtime.metrics.groups.InternalSourceReaderMetricGroup;
+import org.apache.flink.runtime.metrics.util.TestingMetricRegistry;
 
 import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.ConnectionFactory;
@@ -52,6 +53,7 @@ import org.apache.fluss.metadata.Schema;
 import org.apache.fluss.metadata.TableBucket;
 import org.apache.fluss.metadata.TableDescriptor;
 import org.apache.fluss.metadata.TablePath;
+import org.apache.fluss.metrics.MetricNames;
 import org.apache.fluss.row.BinaryString;
 import org.apache.fluss.row.GenericRow;
 import org.apache.fluss.server.testutils.FlussClusterExtension;
@@ -63,6 +65,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -76,6 +79,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -95,14 +99,35 @@ class FlussSplitReaderITCase {
                     .setNumOfTabletServers(1)
                     .build();
 
+    private final Map<String, Gauge<?>> recordsLagGauges = new ConcurrentHashMap<>();
     private Connection connection;
-    private WrapperFlussMetricRegistry metricRegistry;
+    private FlussSourceReaderMetrics sourceReaderMetrics;
     private SourceReaderMetricGroup metricGroup;
 
     @BeforeEach
     void before() throws Exception {
-        metricGroup = InternalSourceReaderMetricGroup.mock(new MetricListener().getMetricGroup());
-        metricRegistry = new WrapperFlussMetricRegistry(metricGroup, Collections.emptySet());
+        metricGroup =
+                InternalSourceReaderMetricGroup.mock(
+                        new GenericMetricGroup(
+                                TestingMetricRegistry.builder()
+                                        .setRegisterConsumer(
+                                                (metric, name, group) -> {
+                                                    if (MetricNames.SCANNER_RECORDS_LAG.equals(
+                                                            name)) {
+                                                        recordsLagGauges.put(
+                                                                group.getMetricIdentifier(name),
+                                                                (Gauge<?>) metric);
+                                                    }
+                                                })
+                                        .setUnregisterConsumer(
+                                                (metric, name, group) ->
+                                                        recordsLagGauges.remove(
+                                                                group.getMetricIdentifier(name),
+                                                                metric))
+                                        .build(),
+                                null,
+                                "source"));
+        sourceReaderMetrics = new FlussSourceReaderMetrics(metricGroup);
         connection = ConnectionFactory.createConnection(FLUSS_CLUSTER_EXTENSION.getClientConfig());
         connection.getAdmin().createDatabase(DATABASE, DatabaseDescriptor.EMPTY, false).get();
     }
@@ -118,9 +143,57 @@ class FlussSplitReaderITCase {
                 }
             }
         } finally {
-            if (metricRegistry != null) {
-                metricRegistry.closeAsync().get(10, TimeUnit.SECONDS);
+            sourceReaderMetrics.closeSplitReaderMetricRegistry();
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @Timeout(60)
+    void testRecordsLagAfterResubscription(boolean closeOldReaderFirst) throws Exception {
+        TablePath tablePath = createPartitionedTable("resubscribe_metrics", false);
+        FlussLogSplit split =
+                new FlussLogSplit(
+                        PhysicalTablePath.of(tablePath, "retained"),
+                        tableBucket(tablePath, "retained"),
+                        0L);
+        SplitsAddition<FlussSplitBase> assignment =
+                new SplitsAddition<>(Collections.singletonList(split));
+        Configuration config = FLUSS_CLUSTER_EXTENSION.getClientConfig();
+        config.set(ConfigOptions.CLIENT_SCANNER_LOG_MAX_POLL_RECORDS, 1);
+        config.set(ConfigOptions.CLIENT_ID, "resubscribed-reader");
+        try (Table table = connection.getTable(tablePath);
+                FlussSplitReader oldReader = newReader(config)) {
+            AppendWriter writer = table.newAppend().createWriter();
+            for (int i = 0; i < 3; i++) {
+                append(writer, i, "retained", "row-" + i);
             }
+            oldReader.handleSplitsChanges(assignment);
+            assertThat(awaitPayloads(oldReader, "row-0")).containsExactly("row-0");
+            assertThat(recordsLagGauges).hasSize(1);
+            String metricId = recordsLagGauges.keySet().iterator().next();
+            Gauge<?> oldGauge = recordsLagGauges.get(metricId);
+            oldReader.removeTables(Collections.singleton(tablePath));
+            assertFinishedSplit(oldReader, split);
+            if (closeOldReaderFirst) {
+                oldReader.close();
+            }
+
+            try (FlussSplitReader newReader = newReader(config)) {
+                newReader.handleSplitsChanges(assignment);
+                assertThat(awaitPayloads(newReader, "row-0")).containsExactly("row-0");
+                if (!closeOldReaderFirst) {
+                    oldReader.close();
+                }
+                assertThat(recordsLagGauges).containsOnlyKeys(metricId);
+                Gauge<?> newGauge = recordsLagGauges.get(metricId);
+                assertThat(newGauge).isNotSameAs(oldGauge);
+                assertThat(newGauge.getValue()).isEqualTo(2L);
+                assertThat(awaitPayloads(newReader, "row-1")).containsExactly("row-1");
+                assertThat(recordsLagGauges.get(metricId)).isSameAs(newGauge);
+                assertThat(newGauge.getValue()).isEqualTo(1L);
+            }
+            assertThat(recordsLagGauges).isEmpty();
         }
     }
 
@@ -301,9 +374,7 @@ class FlussSplitReaderITCase {
         CountDownLatch allowSubscribe = new CountDownLatch(1);
         FlussSplitReader splitReader =
                 new FlussSplitReader(
-                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
-                        metricRegistry,
-                        new FlussSourceReaderMetrics(metricGroup)) {
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(), sourceReaderMetrics) {
                     @Override
                     public void handleSplitsChanges(SplitsChange<FlussSplitBase> changes) {
                         assignmentReachedFetcher.countDown();
@@ -406,7 +477,7 @@ class FlussSplitReaderITCase {
                                 });
         return new FlussSourceReader<>(
                 context,
-                new WrapperFlussMetricRegistry(metricGroup, Collections.emptySet()),
+                sourceReaderMetrics,
                 new FlussRecordEmitter<>(
                         (record, tablePath) ->
                                 Collections.singletonList(
@@ -475,10 +546,11 @@ class FlussSplitReaderITCase {
     }
 
     private FlussSplitReader newReader() {
-        return new FlussSplitReader(
-                FLUSS_CLUSTER_EXTENSION.getClientConfig(),
-                metricRegistry,
-                new FlussSourceReaderMetrics(metricGroup));
+        return newReader(FLUSS_CLUSTER_EXTENSION.getClientConfig());
+    }
+
+    private FlussSplitReader newReader(Configuration config) {
+        return new FlussSplitReader(config, sourceReaderMetrics);
     }
 
     private TablePath createPartitionedTable(String name, boolean primaryKey) throws Exception {
