@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.postgres.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.cdc.common.configuration.ConfigOptions;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -28,6 +29,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.OperationType;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
@@ -43,6 +45,7 @@ import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
 import org.apache.flink.cdc.connectors.postgres.factory.PostgresDataSourceFactory;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
+import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.configuration.StateRecoveryOptions;
@@ -94,6 +97,11 @@ import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 /** Integration tests for Postgres source. */
 public class PostgresPipelineITCase extends PostgresTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(PostgresPipelineITCase.class);
+    private static final String SERIES = "generate_series(1, 1000) AS i";
+    private static final String LARGE_TEXT =
+            "(SELECT string_agg(md5(i::text), '') FROM " + SERIES + ")";
+    private static final String LARGE_BYTEA =
+            "(SELECT decode(string_agg(md5(i::text), ''), 'hex') FROM " + SERIES + ")";
 
     private final UniqueDatabase inventoryDatabase =
             new UniqueDatabase(
@@ -1293,5 +1301,257 @@ public class PostgresPipelineITCase extends PostgresTestBase {
                         })
                 .hasStackTraceContaining("Before data is null")
                 .hasStackTraceContaining("REPLICA IDENTITY FULL");
+    }
+
+    @Test
+    void testUpsertModeWithReplicaIdentityDefault() throws Exception {
+        String dbName = "upsert_mode_test";
+        String jdbcUrl =
+                createReplicaIdentityDefaultTable(
+                        dbName,
+                        "CREATE TABLE products (id INT PRIMARY KEY, name VARCHAR(100), counter INT)",
+                        "INSERT INTO products VALUES (1, 'a', 0), (2, 'b', 0)");
+        CloseableIterator<Event> events = createUpsertModeSource(dbName);
+
+        TableId tableId = TableId.tableId("public", "products");
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        RowType.of(
+                                DataTypes.INT().notNull(),
+                                DataTypes.VARCHAR(100),
+                                DataTypes.INT()));
+        assertThat(fetchEvent(events, 2, event -> event instanceof DataChangeEvent))
+                .containsExactlyInAnyOrder(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generator.generate(
+                                        new Object[] {1, BinaryStringData.fromString("a"), 0})),
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generator.generate(
+                                        new Object[] {2, BinaryStringData.fromString("b"), 0})));
+
+        try (Connection connection =
+                        java.sql.DriverManager.getConnection(jdbcUrl, TEST_USER, TEST_PASSWORD);
+                Statement statement = connection.createStatement()) {
+            statement.execute("INSERT INTO products VALUES (3, 'c', 0)");
+            statement.execute("UPDATE products SET counter = 1 WHERE id = 1");
+            statement.execute("UPDATE products SET id = 4 WHERE id = 2");
+            statement.execute("DELETE FROM products WHERE id = 3");
+        }
+
+        // Under REPLICA IDENTITY DEFAULT, the before images of DELETE events carry the key only.
+        assertThat(fetchEvent(events, 5, event -> event instanceof DataChangeEvent))
+                .containsExactly(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generator.generate(
+                                        new Object[] {3, BinaryStringData.fromString("c"), 0})),
+                        DataChangeEvent.replaceEvent(
+                                tableId,
+                                generator.generate(
+                                        new Object[] {1, BinaryStringData.fromString("a"), 1})),
+                        DataChangeEvent.deleteEvent(
+                                tableId, generator.generate(new Object[] {2, null, null})),
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generator.generate(
+                                        new Object[] {4, BinaryStringData.fromString("b"), 0})),
+                        DataChangeEvent.deleteEvent(
+                                tableId, generator.generate(new Object[] {3, null, null})));
+        events.close();
+    }
+
+    static Stream<Arguments> unchangedToastedValuesWithPlaceholder() {
+        return Stream.of(
+                Arguments.of("TEXT", LARGE_TEXT, null),
+                Arguments.of("JSONB", "(SELECT jsonb_agg(md5(i::text)) FROM " + SERIES + ")", null),
+                Arguments.of(
+                        "HSTORE",
+                        "hstore(ARRAY(SELECT md5(i::text) FROM "
+                                + SERIES
+                                + "), ARRAY(SELECT md5((i + 1000)::text) FROM "
+                                + SERIES
+                                + "))",
+                        null),
+                Arguments.of("BYTEA", LARGE_BYTEA, "bytes"));
+    }
+
+    @ParameterizedTest(name = "{0}, binary.handling.mode={2}")
+    @MethodSource("unchangedToastedValuesWithPlaceholder")
+    void testUpsertModeFailsOnUnchangedToastedValue(
+            String type, String valueSql, String binaryHandlingMode) throws Exception {
+        CloseableIterator<Event> events =
+                updateRowWithUnchangedToastedValue(
+                        type,
+                        valueSql,
+                        binaryHandlingMode,
+                        "UPDATE products SET counter = 1 WHERE id = 1");
+
+        assertThatThrownBy(
+                        () -> {
+                            while (events.hasNext()) {
+                                events.next();
+                            }
+                        })
+                .hasStackTraceContaining("column 'payload'")
+                .hasStackTraceContaining("REPLICA IDENTITY FULL");
+    }
+
+    @Test
+    void testUpsertModeFailsOnUnchangedToastedValueWithPrimaryKeyChange() throws Exception {
+        CloseableIterator<Event> events =
+                updateRowWithUnchangedToastedValue(
+                        "TEXT", LARGE_TEXT, null, "UPDATE products SET id = 2 WHERE id = 1");
+
+        assertThatThrownBy(
+                        () -> {
+                            while (events.hasNext()) {
+                                events.next();
+                            }
+                        })
+                .hasStackTraceContaining("column 'payload'")
+                .hasStackTraceContaining("REPLICA IDENTITY FULL");
+    }
+
+    static Stream<Arguments> unchangedToastedValuesWithoutPlaceholder() {
+        return Stream.of(
+                Arguments.of("TEXT[]", "ARRAY(SELECT md5(i::text) FROM " + SERIES + ")", null),
+                Arguments.of(
+                        "INT[]",
+                        "ARRAY(SELECT (random() * 2000000000)::int FROM generate_series(1, 10000))",
+                        null),
+                Arguments.of("BYTEA", LARGE_BYTEA, "base64"),
+                Arguments.of("BYTEA", LARGE_BYTEA, "hex"));
+    }
+
+    /**
+     * Known limitation: Debezium 1.9 converts these unchanged TOASTed values to null instead of the
+     * unavailable value placeholder, so they cannot be told apart from an actual null and overwrite
+     * the stored value. Newer Debezium versions emit type-specific placeholders for them.
+     */
+    @ParameterizedTest(name = "{0}, binary.handling.mode={2}")
+    @MethodSource("unchangedToastedValuesWithoutPlaceholder")
+    void testUpsertModeEmitsNullForUnchangedToastedValueWithoutPlaceholder(
+            String type, String valueSql, String binaryHandlingMode) throws Exception {
+        CloseableIterator<Event> events =
+                updateRowWithUnchangedToastedValue(
+                        type,
+                        valueSql,
+                        binaryHandlingMode,
+                        "UPDATE products SET counter = 1 WHERE id = 1");
+
+        DataChangeEvent event =
+                (DataChangeEvent) fetchEvent(events, 1, e -> e instanceof DataChangeEvent).get(0);
+        assertThat(event.op()).isEqualTo(OperationType.REPLACE);
+        assertThat(event.after().getInt(0)).isEqualTo(1);
+        assertThat(event.after().getInt(1)).isEqualTo(1);
+        assertThat(event.after().isNullAt(2)).isTrue();
+        events.close();
+    }
+
+    private CloseableIterator<Event> updateRowWithUnchangedToastedValue(
+            String type, String valueSql, String binaryHandlingMode, String updateSql)
+            throws Exception {
+        String dbName =
+                ("upsert_mode_toast_"
+                                + type
+                                + "_"
+                                + binaryHandlingMode
+                                + "_"
+                                + updateSql.hashCode())
+                        .toLowerCase()
+                        .replaceAll("\\W", "_");
+        String createTableSql =
+                "CREATE TABLE products (id INT PRIMARY KEY, counter INT, payload " + type + ")";
+        if ("HSTORE".equals(type)) {
+            createTableSql = "CREATE EXTENSION IF NOT EXISTS hstore; " + createTableSql;
+        }
+        String jdbcUrl =
+                createReplicaIdentityDefaultTable(
+                        dbName, createTableSql, "INSERT INTO products SELECT 1, 0, " + valueSql);
+        CloseableIterator<Event> events = createUpsertModeSource(dbName, binaryHandlingMode);
+        assertThat(fetchEvent(events, 1, event -> event instanceof DataChangeEvent)).hasSize(1);
+
+        try (Connection connection =
+                        java.sql.DriverManager.getConnection(jdbcUrl, TEST_USER, TEST_PASSWORD);
+                Statement statement = connection.createStatement()) {
+            statement.execute(updateSql);
+        }
+        return events;
+    }
+
+    private String createReplicaIdentityDefaultTable(
+            String dbName, String createTableSql, String insertSql) throws SQLException {
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute("DROP DATABASE IF EXISTS \"" + dbName + "\"");
+            statement.execute("CREATE DATABASE \"" + dbName + "\"");
+        }
+        String jdbcUrl =
+                String.format(
+                        "jdbc:postgresql://%s:%d/%s",
+                        POSTGRES_CONTAINER.getHost(),
+                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        dbName);
+        try (Connection connection =
+                        java.sql.DriverManager.getConnection(jdbcUrl, TEST_USER, TEST_PASSWORD);
+                Statement statement = connection.createStatement()) {
+            statement.execute(createTableSql);
+            statement.execute("ALTER TABLE products REPLICA IDENTITY DEFAULT");
+            statement.execute(insertSql);
+        }
+        return jdbcUrl;
+    }
+
+    private CloseableIterator<Event> createUpsertModeSource(String dbName) throws Exception {
+        return createUpsertModeSource(dbName, null);
+    }
+
+    private CloseableIterator<Event> createUpsertModeSource(
+            String dbName, String binaryHandlingMode) throws Exception {
+        org.apache.flink.cdc.common.configuration.Configuration sourceConfiguration =
+                new org.apache.flink.cdc.common.configuration.Configuration();
+        sourceConfiguration.set(PostgresDataSourceOptions.HOSTNAME, POSTGRES_CONTAINER.getHost());
+        sourceConfiguration.set(
+                PostgresDataSourceOptions.PG_PORT,
+                POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT));
+        sourceConfiguration.set(PostgresDataSourceOptions.USERNAME, TEST_USER);
+        sourceConfiguration.set(PostgresDataSourceOptions.PASSWORD, TEST_PASSWORD);
+        sourceConfiguration.set(PostgresDataSourceOptions.SLOT_NAME, slotName);
+        sourceConfiguration.set(PostgresDataSourceOptions.DECODING_PLUGIN_NAME, "pgoutput");
+        sourceConfiguration.set(PostgresDataSourceOptions.TABLES, dbName + ".public.products");
+        sourceConfiguration.set(PostgresDataSourceOptions.SERVER_TIME_ZONE, "UTC");
+        sourceConfiguration.set(
+                PostgresDataSourceOptions.CHANGELOG_MODE, DebeziumChangelogMode.UPSERT);
+        if (binaryHandlingMode != null) {
+            sourceConfiguration.set(
+                    ConfigOptions.key("debezium.binary.handling.mode")
+                            .stringType()
+                            .noDefaultValue(),
+                    binaryHandlingMode);
+        }
+
+        Factory.Context context =
+                new FactoryHelper.DefaultContext(
+                        sourceConfiguration,
+                        new org.apache.flink.cdc.common.configuration.Configuration(),
+                        this.getClass().getClassLoader());
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider)
+                        new PostgresDataSourceFactory()
+                                .createDataSource(context)
+                                .getEventSourceProvider();
+
+        StreamExecutionEnvironment testEnv = StreamExecutionEnvironment.getExecutionEnvironment();
+        testEnv.setParallelism(1);
+        testEnv.enableCheckpointing(1000);
+        RestartStrategyUtils.configureNoRestartStrategy(testEnv);
+        return testEnv.fromSource(
+                        sourceProvider.getSource(),
+                        WatermarkStrategy.noWatermarks(),
+                        PostgresDataSourceFactory.IDENTIFIER,
+                        new EventTypeInfo())
+                .executeAndCollect();
     }
 }
