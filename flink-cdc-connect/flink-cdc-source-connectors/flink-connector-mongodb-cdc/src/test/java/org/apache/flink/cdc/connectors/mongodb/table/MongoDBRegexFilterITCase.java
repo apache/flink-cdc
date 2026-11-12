@@ -49,6 +49,7 @@ class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
 
     void setup(boolean parallelismSnapshot) {
         TestValuesTableFactory.clearAllData();
+        tEnv.getConfig().set("table.exec.sink.require-on-conflict", "false");
         if (parallelismSnapshot) {
             env.setParallelism(DEFAULT_PARALLELISM);
             env.enableCheckpointing(200);
