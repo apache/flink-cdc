@@ -329,6 +329,18 @@ pipeline:
         警告：增量/二进制日志阶段：速率限制可能导致连接器落后于上游变更流，在连接器赶上之前，二进制日志/WAL 可能会被清除（MySQL 数据丢失，PostgreSQL 复制槽问题）。
       </td>
     </tr>
+    <tr>
+      <td>changelog-mode</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">all</td>
+      <td>String</td>
+      <td>
+        用于编码流式变更的 changelog 模式。<br>
+        <code>all</code>：发送同时携带变更前镜像和变更后镜像的 UPDATE 事件。这是默认模式，要求表的 <code>REPLICA IDENTITY</code> 为 <code>FULL</code>。<br>
+        <code>upsert</code>：发送仅携带变更后镜像的 REPLACE 事件，描述基于主键的幂等更新。适用于无法开启 <code>REPLICA IDENTITY FULL</code> 的主键表。未开启 <code>REPLICA IDENTITY FULL</code> 时，PostgreSQL 不会发送未变更的 TOAST 列的值。对于字符串、JSON 和二进制（bytes 模式）列，source 会在此类 UPDATE 事件上失败；而数组等其他类型的列会被输出为 null。<br>
+        实验性选项，默认值为 all。
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

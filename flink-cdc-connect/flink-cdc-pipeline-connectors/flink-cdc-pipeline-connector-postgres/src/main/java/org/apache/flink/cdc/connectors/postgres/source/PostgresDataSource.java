@@ -51,17 +51,26 @@ public class PostgresDataSource implements DataSource {
     private final PostgresSourceConfig postgresSourceConfig;
 
     private final List<PostgreSQLReadableMetadata> readableMetadataList;
+    private final DebeziumChangelogMode changelogMode;
 
     public PostgresDataSource(PostgresSourceConfigFactory configFactory) {
-        this(configFactory, new ArrayList<>());
+        this(configFactory, new ArrayList<>(), DebeziumChangelogMode.ALL);
     }
 
     public PostgresDataSource(
             PostgresSourceConfigFactory configFactory,
             List<PostgreSQLReadableMetadata> readableMetadataList) {
+        this(configFactory, readableMetadataList, DebeziumChangelogMode.ALL);
+    }
+
+    public PostgresDataSource(
+            PostgresSourceConfigFactory configFactory,
+            List<PostgreSQLReadableMetadata> readableMetadataList,
+            DebeziumChangelogMode changelogMode) {
         this.configFactory = configFactory;
         this.postgresSourceConfig = configFactory.create(0);
         this.readableMetadataList = readableMetadataList;
+        this.changelogMode = changelogMode;
     }
 
     @Override
@@ -70,10 +79,14 @@ public class PostgresDataSource implements DataSource {
         boolean includeDatabaseInTableId = postgresSourceConfig.isIncludeDatabaseInTableId();
         DebeziumEventDeserializationSchema deserializer =
                 new PostgresEventDeserializer(
-                        DebeziumChangelogMode.ALL,
+                        changelogMode,
                         readableMetadataList,
                         includeDatabaseInTableId,
-                        databaseName);
+                        databaseName,
+                        new String(
+                                postgresSourceConfig
+                                        .getDbzConnectorConfig()
+                                        .getUnavailableValuePlaceholder()));
 
         PostgresOffsetFactory postgresOffsetFactory = new PostgresOffsetFactory();
         PostgresDialect postgresDialect = new PostgresDialect(postgresSourceConfig);
@@ -97,6 +110,11 @@ public class PostgresDataSource implements DataSource {
     @VisibleForTesting
     public PostgresSourceConfig getPostgresSourceConfig() {
         return postgresSourceConfig;
+    }
+
+    @VisibleForTesting
+    public DebeziumChangelogMode getChangelogMode() {
+        return changelogMode;
     }
 
     @Override

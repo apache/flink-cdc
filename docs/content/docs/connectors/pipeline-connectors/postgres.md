@@ -324,6 +324,18 @@ pipeline:
         WARNING: Incremental/binlog phase: Rate limiting can cause the connector to fall behind the upstream change stream, risking binlog/WAL purging before the connector catches up (data loss for MySQL, replication slot issues for PostgreSQL).
       </td>
     </tr>
+    <tr>
+      <td>changelog-mode</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">all</td>
+      <td>String</td>
+      <td>
+        The changelog mode used for encoding streaming changes.<br>
+        <code>all</code>: Emits UPDATE events carrying both the before and the after image. This is the default mode and requires the table's <code>REPLICA IDENTITY</code> to be <code>FULL</code>.<br>
+        <code>upsert</code>: Emits REPLACE events carrying only the after image, describing idempotent updates on a key. It can be used for tables with primary keys when <code>REPLICA IDENTITY FULL</code> is not an option. Without <code>REPLICA IDENTITY FULL</code>, PostgreSQL does not send the values of unchanged TOASTed columns. The source fails on such an UPDATE event for string, JSON and binary (bytes mode) columns, while other types such as arrays are emitted as null.<br>
+        Experimental option, defaults to all.
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

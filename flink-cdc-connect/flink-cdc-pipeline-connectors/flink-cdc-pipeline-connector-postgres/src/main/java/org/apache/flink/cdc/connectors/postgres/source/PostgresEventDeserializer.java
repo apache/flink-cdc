@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.postgres.source;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.connectors.postgres.table.PostgreSQLReadableMetadata;
@@ -33,13 +34,17 @@ import io.debezium.data.Envelope;
 import io.debezium.data.geometry.Geography;
 import io.debezium.data.geometry.Geometry;
 import io.debezium.data.geometry.Point;
+import io.debezium.relational.RelationalDatabaseConnectorConfig;
+import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.io.WKBReader;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -54,6 +59,8 @@ public class PostgresEventDeserializer extends DebeziumEventDeserializationSchem
     private List<PostgreSQLReadableMetadata> readableMetadataList;
     private final boolean includeDatabaseInTableId;
     private final String databaseName;
+    private final String unavailableValuePlaceholder;
+    private final byte[] unavailableValuePlaceholderBytes;
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -79,10 +86,74 @@ public class PostgresEventDeserializer extends DebeziumEventDeserializationSchem
             List<PostgreSQLReadableMetadata> readableMetadataList,
             boolean includeDatabaseInTableId,
             String databaseName) {
+        this(
+                changelogMode,
+                readableMetadataList,
+                includeDatabaseInTableId,
+                databaseName,
+                RelationalDatabaseConnectorConfig.DEFAULT_UNAVAILABLE_VALUE_PLACEHOLDER);
+    }
+
+    public PostgresEventDeserializer(
+            DebeziumChangelogMode changelogMode,
+            List<PostgreSQLReadableMetadata> readableMetadataList,
+            boolean includeDatabaseInTableId,
+            String databaseName,
+            String unavailableValuePlaceholder) {
         super(new PostgresSchemaDataTypeInference(), changelogMode);
         this.readableMetadataList = readableMetadataList;
         this.includeDatabaseInTableId = includeDatabaseInTableId;
         this.databaseName = databaseName;
+        this.unavailableValuePlaceholder = unavailableValuePlaceholder;
+        // Debezium encodes the placeholder of binary columns with the platform charset
+        this.unavailableValuePlaceholderBytes = unavailableValuePlaceholder.getBytes();
+    }
+
+    @Override
+    public List<DataChangeEvent> deserializeDataChangeRecord(SourceRecord record) throws Exception {
+        if (changelogMode == DebeziumChangelogMode.UPSERT) {
+            Envelope.Operation op = Envelope.operationFor(record);
+            // A primary key change is emitted as a DELETE and a CREATE carrying the new row.
+            if (op == Envelope.Operation.UPDATE || op == Envelope.Operation.CREATE) {
+                checkAfterValuesAvailable(record);
+            }
+        }
+        return super.deserializeDataChangeRecord(record);
+    }
+
+    /**
+     * A REPLACE or INSERT event overwrites the whole row, so an unchanged TOASTed column that
+     * PostgreSQL does not send under REPLICA IDENTITY DEFAULT must not be emitted as its
+     * placeholder.
+     */
+    private void checkAfterValuesAvailable(SourceRecord record) {
+        Struct after = fieldStruct((Struct) record.value(), Envelope.FieldName.AFTER);
+        if (after == null) {
+            return;
+        }
+        for (Field field : after.schema().fields()) {
+            Preconditions.checkState(
+                    !isUnavailableValue(after.get(field)),
+                    "The value of column '%s' in table %s is unavailable in upsert changelog "
+                            + "mode. This happens when a TOASTed column is unchanged by an UPDATE "
+                            + "while the table is not configured with REPLICA IDENTITY FULL. "
+                            + "Configure REPLICA IDENTITY FULL for the table.",
+                    field.name(),
+                    getTableId(record));
+        }
+    }
+
+    private boolean isUnavailableValue(Object value) {
+        if (value instanceof String) {
+            return unavailableValuePlaceholder.equals(value);
+        }
+        if (value instanceof byte[]) {
+            return Arrays.equals(unavailableValuePlaceholderBytes, (byte[]) value);
+        }
+        if (value instanceof ByteBuffer) {
+            return ByteBuffer.wrap(unavailableValuePlaceholderBytes).equals(value);
+        }
+        return false;
     }
 
     @Override
