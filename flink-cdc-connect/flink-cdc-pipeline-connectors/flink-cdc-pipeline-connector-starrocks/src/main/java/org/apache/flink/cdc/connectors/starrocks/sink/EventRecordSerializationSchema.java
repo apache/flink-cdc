@@ -50,6 +50,14 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
      */
     private final ZoneId zoneId;
 
+    /**
+     * Whether multi-table transaction stream load is enabled. When enabled, every row is marked
+     * with a fixed source partition and a transaction-end flag, so that all tables written by the
+     * same sink subtask within the same flush cycle share one StarRocks transaction label and
+     * become visible atomically.
+     */
+    private transient boolean multiTableTransactionEnabled;
+
     /** keep the relationship of TableId and table information. */
     private transient Map<TableId, TableInfo> tableInfoMap;
 
@@ -63,6 +71,8 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
     @Override
     public void open(
             SerializationSchema.InitializationContext context, StarRocksSinkContext sinkContext) {
+        this.multiTableTransactionEnabled =
+                sinkContext.getSinkOptions().isMultiTableTransactionEnabled();
         this.tableInfoMap = new HashMap<>();
         this.reusableRowData = new DefaultStarRocksRowData();
         this.jsonWrapper = new JsonWrapper();
@@ -108,6 +118,12 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
         Preconditions.checkNotNull(tableInfo, event.tableId() + " is not existed");
         reusableRowData.setDatabase(event.tableId().getSchemaName());
         reusableRowData.setTable(event.tableId().getTableName());
+        if (multiTableTransactionEnabled) {
+            // A fixed source partition makes all tables in this subtask share one transaction,
+            // and marking every row as a transaction end keeps the at-least-once flush cadence.
+            reusableRowData.setSourcePartition(0);
+            reusableRowData.setTransactionEnd(true);
+        }
         String value;
         switch (event.op()) {
             case INSERT:

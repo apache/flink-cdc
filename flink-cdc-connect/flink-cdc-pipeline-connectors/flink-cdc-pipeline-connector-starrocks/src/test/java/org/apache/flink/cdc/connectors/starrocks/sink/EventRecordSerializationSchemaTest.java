@@ -111,6 +111,48 @@ class EventRecordSerializationSchemaTest {
     }
 
     @Test
+    void testMultiTableTransactionMarksWhenEnabled() throws Exception {
+        org.apache.flink.configuration.Configuration sinkConfig =
+                new org.apache.flink.configuration.Configuration();
+        sinkConfig.set(StarRocksSinkOptions.SINK_MULTI_TABLE_TXN_ENABLED, true);
+        EventRecordSerializationSchema multiTableSerializer =
+                new EventRecordSerializationSchema(ZoneId.of("+08"));
+        multiTableSerializer.open(
+                new MockInitializationContext(),
+                new DefaultStarRocksSinkContext(
+                        new MockInitContext(),
+                        new StarRocksSinkOptions(sinkConfig, new HashMap<>())));
+
+        StarRocksRowData rowData = serializeSimpleInsert(multiTableSerializer);
+        Assertions.assertThat(rowData.getSourcePartition()).isEqualTo(0);
+        Assertions.assertThat(rowData.isTransactionEnd()).isTrue();
+    }
+
+    @Test
+    void testDefaultMarksWhenMultiTableTransactionDisabled() throws Exception {
+        StarRocksRowData rowData = serializeSimpleInsert(serializer);
+        Assertions.assertThat(rowData.getSourcePartition()).isEqualTo(-1);
+        Assertions.assertThat(rowData.isTransactionEnd()).isFalse();
+    }
+
+    private StarRocksRowData serializeSimpleInsert(EventRecordSerializationSchema schema) {
+        TableId tableId = TableId.parse("test.tbl");
+        Schema schema1 =
+                Schema.newBuilder()
+                        .physicalColumn("col1", new IntType())
+                        .primaryKey("col1")
+                        .build();
+        schema.serialize(new CreateTableEvent(tableId, schema1));
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        schema1.getColumnDataTypes().toArray(new DataType[0]));
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(tableId, generator.generate(new Object[] {1}));
+        return schema.serialize(insertEvent);
+    }
+
+    @Test
     void testMixedSchemaAndDataChanges() throws Exception {
         // 1. create table1, and insert/delete/update data
         TableId table1 = TableId.parse("test.tbl1");
