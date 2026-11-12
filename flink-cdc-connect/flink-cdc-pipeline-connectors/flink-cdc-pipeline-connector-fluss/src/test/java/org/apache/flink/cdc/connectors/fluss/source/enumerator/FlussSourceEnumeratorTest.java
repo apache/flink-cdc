@@ -44,6 +44,8 @@ import org.apache.fluss.client.table.scanner.batch.BatchScanUtils;
 import org.apache.fluss.client.table.scanner.batch.BatchScanner;
 import org.apache.fluss.config.ConfigOptions;
 import org.apache.fluss.metadata.PartitionSpec;
+import org.apache.fluss.metadata.PhysicalTablePath;
+import org.apache.fluss.metadata.TableChange;
 import org.apache.fluss.metadata.TableDescriptor;
 import org.apache.fluss.metadata.TablePath;
 import org.apache.fluss.row.InternalRow;
@@ -53,15 +55,19 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -445,10 +451,27 @@ class FlussSourceEnumeratorTest {
                             fqnRegex(DATABASE_NAME, tableName));
             try {
                 enumerator.start();
-                registerAllReaders(context, enumerator);
                 runDiscoveryCycle(context);
+                FlussSourceEnumStateSerializer serializer = new FlussSourceEnumStateSerializer();
+                assertThat(enumerator.snapshotState(0L).getRemainingSplits()).isNotEmpty();
+                byte[] pendingCheckpoint = serializer.serialize(enumerator.snapshotState(0L));
+                registerAllReaders(context, enumerator);
 
                 TablePath tablePath = TablePath.of(DATABASE_NAME, tableName);
+                PhysicalTablePath droppedPartition = PhysicalTablePath.of(tablePath, "20260904");
+                PhysicalTablePath retainedPartition = PhysicalTablePath.of(tablePath, "20260905");
+                assertThat(enumerator.snapshotState(0L).getAssignedPhysicalTablePaths())
+                        .containsExactlyInAnyOrder(droppedPartition, retainedPartition);
+                byte[] beforeDropCheckpoint = serializer.serialize(enumerator.snapshotState(0L));
+                List<FlussSplitBase> droppedSplits =
+                        context.getSplitsAssignmentSequence().stream()
+                                .flatMap(assignment -> assignment.assignment().values().stream())
+                                .flatMap(List::stream)
+                                .filter(
+                                        split ->
+                                                split.getPhysicalTablePath()
+                                                        .equals(droppedPartition))
+                                .collect(Collectors.toList());
                 connection
                         .getAdmin()
                         .dropPartition(
@@ -458,18 +481,628 @@ class FlussSourceEnumeratorTest {
                         .get();
                 runDiscoveryCycle(context);
 
+                assertThat(enumerator.snapshotState(1L).getAssignedPhysicalTablePaths())
+                        .containsExactly(retainedPartition);
                 assertThat(enumerator.snapshotState(1L).getPendingRemovalTablePaths()).isEmpty();
+                assertThat(enumerator.snapshotState(1L).getPendingRemovalPartitionPaths())
+                        .containsExactly(droppedPartition);
                 TableSubscriptionEvent subscription = latestSubscriptionEvent(context, 0);
                 assertThat(subscription.getSubscribedTablePaths()).containsExactly(tablePath);
                 assertThat(subscription.getPendingRemovalRequests()).isEmpty();
+                assertThat(subscription.getPendingPartitionRemovalRequests())
+                        .containsOnlyKeys(droppedPartition);
+                assertThat(subscription.getSubscribedPhysicalTablePaths())
+                        .containsExactly(retainedPartition);
+                int assignmentCount = context.getSplitsAssignmentSequence().size();
+                enumerator.addSplitsBack(droppedSplits, 0);
+                assertThat(context.getSplitsAssignmentSequence()).hasSize(assignmentCount);
+
+                for (byte[] checkpointBytes :
+                        List.of(
+                                pendingCheckpoint,
+                                beforeDropCheckpoint,
+                                serializer.serialize(enumerator.snapshotState(2L)))) {
+                    FlussSourceEnumState checkpoint =
+                            serializer.deserialize(serializer.getVersion(), checkpointBytes);
+                    try (MockSplitEnumeratorContext<FlussSplitBase> restoredContext =
+                            new MockSplitEnumeratorContext<>(NUM_READERS)) {
+                        FlussSourceEnumerator restored =
+                                new FlussSourceEnumerator(
+                                        restoredContext,
+                                        new FlussDefaultDiscoverer(),
+                                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                                        buildSourceConfig(
+                                                FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                                                fqnRegex(DATABASE_NAME, tableName)),
+                                        OffsetsInitializer.earliest(),
+                                        DISCOVERY_INTERVAL_MS,
+                                        checkpoint,
+                                        LeaseContext.fromConf(
+                                                new org.apache.flink.configuration
+                                                        .Configuration()));
+                        try {
+                            restored.start();
+                            if (checkpoint.getRemainingSplits().isEmpty()) {
+                                registerAllReaders(restoredContext, restored);
+                                runDiscoveryCycle(restoredContext);
+                            } else {
+                                runDiscoveryCycle(restoredContext);
+                                assertThat(restored.snapshotState(1L).getRemainingSplits())
+                                        .extracting(FlussSplitBase::getPhysicalTablePath)
+                                        .containsOnly(retainedPartition);
+                                registerAllReaders(restoredContext, restored);
+                            }
+                            assertThat(restored.snapshotState(1L).getAssignedPhysicalTablePaths())
+                                    .containsExactly(retainedPartition);
+                            if (checkpoint
+                                            .getAssignedPhysicalTablePaths()
+                                            .contains(droppedPartition)
+                                    || checkpoint
+                                            .getPendingRemovalPartitionPaths()
+                                            .contains(droppedPartition)
+                                    || checkpoint.getRemainingSplits().stream()
+                                            .anyMatch(
+                                                    split ->
+                                                            split.getPhysicalTablePath()
+                                                                    .equals(droppedPartition))) {
+                                assertThat(
+                                                latestSubscriptionEvent(restoredContext, 0)
+                                                        .getPendingPartitionRemovalRequests())
+                                        .containsOnlyKeys(droppedPartition);
+                            }
+                            assertThat(
+                                            latestSubscriptionEvent(restoredContext, 0)
+                                                    .getSubscribedPhysicalTablePaths())
+                                    .containsExactly(retainedPartition);
+                            restored.addReader(0);
+                            assertThat(
+                                            latestSubscriptionEvent(restoredContext, 0)
+                                                    .getSubscribedPhysicalTablePaths())
+                                    .containsExactly(retainedPartition);
+                        } finally {
+                            restored.close();
+                        }
+                    }
+                }
+
+                connection
+                        .getAdmin()
+                        .dropPartition(
+                                tablePath,
+                                new PartitionSpec(Collections.singletonMap("ds", "20260905")),
+                                false)
+                        .get();
+                runDiscoveryCycle(context);
+                assertThat(enumerator.snapshotState(3L).getAssignedPhysicalTablePaths()).isEmpty();
+                assertThat(latestSubscriptionEvent(context, 0).getSubscribedTablePaths())
+                        .containsExactly(tablePath);
+                assertThat(latestSubscriptionEvent(context, 0).getSubscribedPhysicalTablePaths())
+                        .isEmpty();
 
                 tBatchEnv.executeSql(String.format("DROP TABLE %s", tableName)).await();
                 runDiscoveryCycle(context);
 
                 TableSubscriptionEvent removal = latestSubscriptionEvent(context, 0);
-                assertThat(enumerator.snapshotState(2L).getPendingRemovalTablePaths())
+                assertThat(enumerator.snapshotState(4L).getPendingRemovalTablePaths())
                         .containsExactly(tablePath);
                 assertThat(removal.getPendingRemovalRequests()).containsKey(tablePath);
+                assertThat(removal.getPendingPartitionRemovalRequests()).isEmpty();
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @Test
+    void testPartitionRemovalWaitsForRegisteredReadersAndFreshAcknowledgements() throws Throwable {
+        String tableName = "partition_ack_restart";
+        createPartitionedPkTable(tableName, 1);
+        insertPartitionRow(tableName, 1, "expired", "first");
+        insertPartitionRow(tableName, 2, "live", "second");
+        TablePath tablePath = TablePath.of(DATABASE_NAME, tableName);
+        PhysicalTablePath expired = PhysicalTablePath.of(tablePath, "expired");
+        PhysicalTablePath live = PhysicalTablePath.of(tablePath, "live");
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                        new MockSplitEnumeratorContext<>(NUM_READERS);
+                Connection connection =
+                        ConnectionFactory.createConnection(
+                                FLUSS_CLUSTER_EXTENSION.getClientConfig())) {
+            FlussSourceEnumerator enumerator =
+                    newEnumerator(
+                            context,
+                            new FlussDefaultDiscoverer(),
+                            fqnRegex(DATABASE_NAME, tableName));
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+                runDiscoveryCycle(context);
+                FlussSplitBase expiredSplit =
+                        context.getSplitsAssignmentSequence().stream()
+                                .flatMap(assignment -> assignment.assignment().values().stream())
+                                .flatMap(List::stream)
+                                .filter(split -> split.getPhysicalTablePath().equals(expired))
+                                .findFirst()
+                                .orElseThrow(AssertionError::new);
+
+                connection
+                        .getAdmin()
+                        .dropPartition(
+                                tablePath,
+                                new PartitionSpec(Collections.singletonMap("ds", "expired")),
+                                false)
+                        .get();
+                runDiscoveryCycle(context);
+                TableSubscriptionEvent removal = latestSubscriptionEvent(context, 0);
+                assertThat(removal.getPendingPartitionRemovalRequests()).containsOnlyKeys(expired);
+                long firstRequestId = removal.getPendingPartitionRemovalRequests().get(expired);
+                assertThat(removal.getPendingRemovalRequests()).isEmpty();
+                assertThat(enumerator.snapshotState(1L).getAssignedPhysicalTablePaths())
+                        .containsExactly(live);
+
+                acknowledgePartitionRemoval(enumerator, expired, firstRequestId - 1);
+                assertThat(latestSubscriptionEvent(context, 0).getPendingPartitionRemovalRequests())
+                        .containsEntry(expired, firstRequestId);
+                enumerator.handleSourceEvent(
+                        0,
+                        new TableRemovalAckEvent(
+                                Collections.emptyMap(),
+                                Collections.singletonMap(expired, firstRequestId)));
+                assertThat(latestSubscriptionEvent(context, 0).getPendingPartitionRemovalRequests())
+                        .containsEntry(expired, firstRequestId);
+                context.unregisterReader(0);
+                enumerator.handleSourceEvent(
+                        1,
+                        new TableRemovalAckEvent(
+                                Collections.emptyMap(),
+                                Collections.singletonMap(expired, firstRequestId)));
+                assertThat(latestSubscriptionEvent(context, 1).getPendingPartitionRemovalRequests())
+                        .containsEntry(expired, firstRequestId);
+
+                context.registerReader(new ReaderInfo(0, "restarted_0"));
+                enumerator.addReader(0);
+                long restartedRequestId =
+                        latestSubscriptionEvent(context, 0)
+                                .getPendingPartitionRemovalRequests()
+                                .get(expired);
+                assertThat(restartedRequestId).isNotEqualTo(firstRequestId);
+                acknowledgePartitionRemoval(enumerator, expired, firstRequestId);
+                assertThat(latestSubscriptionEvent(context, 0).getPendingPartitionRemovalRequests())
+                        .containsEntry(expired, restartedRequestId);
+                enumerator.handleSourceEvent(
+                        0,
+                        new TableRemovalAckEvent(
+                                Collections.emptyMap(),
+                                Collections.singletonMap(expired, restartedRequestId)));
+                assertThat(latestSubscriptionEvent(context, 0).getPendingPartitionRemovalRequests())
+                        .containsEntry(expired, restartedRequestId);
+                enumerator.handleSourceEvent(
+                        1,
+                        new TableRemovalAckEvent(
+                                Collections.emptyMap(),
+                                Collections.singletonMap(expired, restartedRequestId)));
+                assertThat(latestSubscriptionEvent(context, 0).getPendingPartitionRemovalRequests())
+                        .isEmpty();
+                assertThat(latestSubscriptionEvent(context, 0).getFencedPartitionPaths())
+                        .containsExactly(expired);
+
+                int assignmentCount = context.getSplitsAssignmentSequence().size();
+                enumerator.addSplitsBack(
+                        Collections.singletonList(expiredSplit),
+                        FlussSourceEnumerator.getSplitOwner(
+                                expiredSplit.getTableBucket(), NUM_READERS));
+                assertThat(context.getSplitsAssignmentSequence()).hasSize(assignmentCount);
+                assertThat(enumerator.snapshotState(20L).getRemainingSplits()).isEmpty();
+                enumerator.notifyCheckpointComplete(19L);
+                enumerator.addReader(0);
+                assertThat(latestSubscriptionEvent(context, 0).getFencedPartitionPaths())
+                        .containsExactly(expired);
+                enumerator.notifyCheckpointComplete(20L);
+                enumerator.addReader(0);
+                assertThat(latestSubscriptionEvent(context, 0).getFencedPartitionPaths()).isEmpty();
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @Test
+    void testTableRemovalSupersedesPendingPartitionRemoval() throws Throwable {
+        String tableName = "partition_then_table_removal";
+        createPartitionedPkTable(tableName, 1);
+        insertPartitionRow(tableName, 1, "expired", "first");
+        insertPartitionRow(tableName, 2, "live", "second");
+        TablePath tablePath = TablePath.of(DATABASE_NAME, tableName);
+        PhysicalTablePath expired = PhysicalTablePath.of(tablePath, "expired");
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                        new MockSplitEnumeratorContext<>(NUM_READERS);
+                Connection connection =
+                        ConnectionFactory.createConnection(
+                                FLUSS_CLUSTER_EXTENSION.getClientConfig())) {
+            FlussSourceEnumerator enumerator =
+                    newEnumerator(
+                            context,
+                            new FlussDefaultDiscoverer(),
+                            fqnRegex(DATABASE_NAME, tableName));
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+                runDiscoveryCycle(context);
+                connection
+                        .getAdmin()
+                        .dropPartition(
+                                tablePath,
+                                new PartitionSpec(Collections.singletonMap("ds", "expired")),
+                                false)
+                        .get();
+                runDiscoveryCycle(context);
+                long partitionRequestId =
+                        latestSubscriptionEvent(context, 0)
+                                .getPendingPartitionRemovalRequests()
+                                .get(expired);
+
+                tBatchEnv.executeSql(String.format("DROP TABLE %s", tableName)).await();
+                runDiscoveryCycle(context);
+                TableSubscriptionEvent removal = latestSubscriptionEvent(context, 0);
+                assertThat(removal.getPendingPartitionRemovalRequests()).isEmpty();
+                assertThat(removal.getFencedPartitionPaths()).isEmpty();
+                assertThat(removal.getPendingRemovalRequests()).containsOnlyKeys(tablePath);
+                long tableRequestId = removal.getPendingRemovalRequests().get(tablePath);
+
+                acknowledgePartitionRemoval(enumerator, expired, partitionRequestId);
+                assertThat(enumerator.snapshotState(1L).getPendingRemovalTablePaths())
+                        .containsExactly(tablePath);
+                acknowledgeRemoval(enumerator, tablePath, tableRequestId);
+                assertThat(enumerator.snapshotState(2L).getPendingRemovalTablePaths()).isEmpty();
+                assertThat(latestSubscriptionEvent(context, 0).getFencedTablePaths())
+                        .containsExactly(tablePath);
+                assertThat(latestSubscriptionEvent(context, 0).getFencedPartitionPaths()).isEmpty();
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testRestorePendingPartitionRemovalRegeneratesRequestId(boolean registerBeforeDiscovery)
+            throws Throwable {
+        String tableName = "partition_ack_restore";
+        createPartitionedPkTable(tableName, 1);
+        insertPartitionRow(tableName, 1, "expired", "first");
+        insertPartitionRow(tableName, 2, "live", "second");
+        TablePath tablePath = TablePath.of(DATABASE_NAME, tableName);
+        PhysicalTablePath expired = PhysicalTablePath.of(tablePath, "expired");
+        FlussSourceEnumStateSerializer serializer = new FlussSourceEnumStateSerializer();
+        byte[] checkpoint;
+        long oldRequestId;
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                        new MockSplitEnumeratorContext<>(NUM_READERS);
+                Connection connection =
+                        ConnectionFactory.createConnection(
+                                FLUSS_CLUSTER_EXTENSION.getClientConfig())) {
+            FlussSourceEnumerator enumerator =
+                    newEnumerator(
+                            context,
+                            new FlussDefaultDiscoverer(),
+                            fqnRegex(DATABASE_NAME, tableName));
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+                runDiscoveryCycle(context);
+                connection
+                        .getAdmin()
+                        .dropPartition(
+                                tablePath,
+                                new PartitionSpec(Collections.singletonMap("ds", "expired")),
+                                false)
+                        .get();
+                runDiscoveryCycle(context);
+                oldRequestId =
+                        latestSubscriptionEvent(context, 0)
+                                .getPendingPartitionRemovalRequests()
+                                .get(expired);
+                FlussSourceEnumState state = enumerator.snapshotState(1L);
+                assertThat(state.getAssignedPhysicalTablePaths()).doesNotContain(expired);
+                assertThat(state.getRemainingSplits()).isEmpty();
+                assertThat(state.getPendingRemovalPartitionPaths()).containsExactly(expired);
+                checkpoint = serializer.serialize(state);
+            } finally {
+                enumerator.close();
+            }
+        }
+
+        FlussSourceEnumState restoredState =
+                serializer.deserialize(serializer.getVersion(), checkpoint);
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator =
+                    new FlussSourceEnumerator(
+                            context,
+                            new FlussDefaultDiscoverer(),
+                            FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                            buildSourceConfig(
+                                    FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                                    fqnRegex(DATABASE_NAME, tableName)),
+                            OffsetsInitializer.earliest(),
+                            DISCOVERY_INTERVAL_MS,
+                            restoredState,
+                            LeaseContext.fromConf(
+                                    new org.apache.flink.configuration.Configuration()));
+            try {
+                enumerator.start();
+                if (registerBeforeDiscovery) {
+                    registerAllReaders(context, enumerator);
+                    assertThat(context.getSentSourceEvent()).isEmpty();
+                    runDiscoveryCycle(context);
+                } else {
+                    runDiscoveryCycle(context);
+                    registerAllReaders(context, enumerator);
+                }
+
+                long requestId =
+                        latestSubscriptionEvent(context, 0)
+                                .getPendingPartitionRemovalRequests()
+                                .get(expired);
+                assertThat(requestId).isNotEqualTo(oldRequestId);
+                acknowledgePartitionRemoval(enumerator, expired, oldRequestId);
+                assertThat(enumerator.snapshotState(2L).getPendingRemovalPartitionPaths())
+                        .containsExactly(expired);
+
+                acknowledgePartitionRemoval(enumerator, expired, requestId);
+                assertThat(enumerator.snapshotState(3L).getPendingRemovalPartitionPaths())
+                        .isEmpty();
+                assertThat(latestSubscriptionEvent(context, 0).getPendingPartitionRemovalRequests())
+                        .isEmpty();
+                assertThat(latestSubscriptionEvent(context, 0).getFencedPartitionPaths())
+                        .containsExactly(expired);
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @Test
+    void testExpiredPendingPartitionIsNotAssignedToLateReaders() throws Throwable {
+        String tableName = "expired_pending_partition";
+        createPartitionedPkTable(tableName, 1);
+        insertPartitionRow(tableName, 1, "expired", "first");
+        insertPartitionRow(tableName, 2, "live", "second");
+        TablePath tablePath = TablePath.of(DATABASE_NAME, tableName);
+        PhysicalTablePath livePath = PhysicalTablePath.of(tablePath, "live");
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                        new MockSplitEnumeratorContext<>(NUM_READERS);
+                Connection connection =
+                        ConnectionFactory.createConnection(
+                                FLUSS_CLUSTER_EXTENSION.getClientConfig())) {
+            FlussSourceEnumerator enumerator =
+                    newEnumerator(
+                            context,
+                            new FlussDefaultDiscoverer(),
+                            fqnRegex(DATABASE_NAME, tableName));
+            try {
+                enumerator.start();
+                runDiscoveryCycle(context);
+                assertThat(enumerator.snapshotState(0L).getRemainingSplits()).hasSize(2);
+                connection
+                        .getAdmin()
+                        .dropPartition(
+                                tablePath,
+                                new PartitionSpec(Collections.singletonMap("ds", "expired")),
+                                false)
+                        .get();
+                runDiscoveryCycle(context);
+                assertThat(enumerator.snapshotState(1L).getRemainingSplits())
+                        .hasSize(1)
+                        .allSatisfy(
+                                split ->
+                                        assertThat(split.getPhysicalTablePath())
+                                                .isEqualTo(livePath));
+                registerAllReaders(context, enumerator);
+                assertThat(enumerator.snapshotState(2L).getAssignedPhysicalTablePaths())
+                        .containsExactly(livePath);
+                for (int readerId = 0; readerId < NUM_READERS; readerId++) {
+                    assertThat(
+                                    latestSubscriptionEvent(context, readerId)
+                                            .getSubscribedPhysicalTablePaths())
+                            .containsExactly(livePath);
+                }
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @Test
+    void testMixedPartitionInitializationRetriesRetainedPartitionAfterRemoval() throws Throwable {
+        String tableName = "mixed_initializing_partitions";
+        createPartitionedPkTable(tableName, 1);
+        insertPartitionRow(tableName, 1, "expired", "first");
+        insertPartitionRow(tableName, 2, "retained", "second");
+        TablePath tablePath = TablePath.of(DATABASE_NAME, tableName);
+        PhysicalTablePath expiredPartition = PhysicalTablePath.of(tablePath, "expired");
+        PhysicalTablePath retainedPartition = PhysicalTablePath.of(tablePath, "retained");
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                        new MockSplitEnumeratorContext<>(NUM_READERS);
+                Connection connection =
+                        ConnectionFactory.createConnection(
+                                FLUSS_CLUSTER_EXTENSION.getClientConfig())) {
+            FlussSourceEnumerator enumerator =
+                    newEnumerator(
+                            context,
+                            new FlussDefaultDiscoverer(),
+                            fqnRegex(DATABASE_NAME, tableName),
+                            OffsetsInitializer.full(),
+                            DISCOVERY_INTERVAL_MS);
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                assertThat(context.getOneTimeCallables()).hasSize(1);
+
+                connection
+                        .getAdmin()
+                        .dropPartition(
+                                tablePath,
+                                new PartitionSpec(Collections.singletonMap("ds", "expired")),
+                                false)
+                        .get();
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                assertThat(latestSubscriptionEvent(context, 0).getPendingPartitionRemovalRequests())
+                        .containsOnlyKeys(expiredPartition);
+                assertThat(context.getOneTimeCallables()).hasSize(1);
+                assertThat(context.getSplitsAssignmentSequence()).isEmpty();
+
+                assertThatCode(context::runNextOneTimeCallable).doesNotThrowAnyException();
+                assertThat(context.getOneTimeCallables()).hasSize(1);
+                context.runNextOneTimeCallable();
+
+                assertThat(context.getOneTimeCallables()).isEmpty();
+                List<FlussSplitBase> assignedSplits =
+                        context.getSplitsAssignmentSequence().stream()
+                                .flatMap(assignment -> assignment.assignment().values().stream())
+                                .flatMap(List::stream)
+                                .collect(Collectors.toList());
+                assertThat(assignedSplits)
+                        .singleElement()
+                        .satisfies(
+                                split ->
+                                        assertThat(split.getPhysicalTablePath())
+                                                .isEqualTo(retainedPartition));
+                assertThat(enumerator.snapshotState(1L).getAssignedPhysicalTablePaths())
+                        .containsExactly(retainedPartition);
+
+                int assignmentCount = context.getSplitsAssignmentSequence().size();
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                assertThat(context.getOneTimeCallables()).isEmpty();
+                assertThat(context.getSplitsAssignmentSequence()).hasSize(assignmentCount);
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testLatePartitionInitializationCannotReviveExpiredPartition(boolean initializationFails)
+            throws Throwable {
+        String tableName = "expired_initializing_partition";
+        createPartitionedPkTable(tableName, 1);
+        insertPartitionRow(tableName, 1, "expired", "first");
+        OffsetsInitializer initializer =
+                (partitionName, bucketIds, retriever) -> {
+                    if (initializationFails) {
+                        throw new RuntimeException(
+                                "Injected expired partition initialization failure");
+                    }
+                    return bucketIds.stream()
+                            .collect(Collectors.toMap(bucket -> bucket, bucket -> 0L));
+                };
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                        new MockSplitEnumeratorContext<>(NUM_READERS);
+                Connection connection =
+                        ConnectionFactory.createConnection(
+                                FLUSS_CLUSTER_EXTENSION.getClientConfig())) {
+            FlussSourceEnumerator enumerator =
+                    newEnumerator(
+                            context,
+                            new FlussDefaultDiscoverer(),
+                            fqnRegex(DATABASE_NAME, tableName),
+                            initializer,
+                            DISCOVERY_INTERVAL_MS);
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                assertThat(context.getOneTimeCallables()).hasSize(1);
+                connection
+                        .getAdmin()
+                        .dropPartition(
+                                TablePath.of(DATABASE_NAME, tableName),
+                                new PartitionSpec(Collections.singletonMap("ds", "expired")),
+                                false)
+                        .get();
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                PhysicalTablePath expiredPartition =
+                        PhysicalTablePath.of(TablePath.of(DATABASE_NAME, tableName), "expired");
+                long requestId =
+                        latestSubscriptionEvent(context, 0)
+                                .getPendingPartitionRemovalRequests()
+                                .get(expiredPartition);
+                acknowledgePartitionRemoval(enumerator, expiredPartition, requestId);
+                assertThat(latestSubscriptionEvent(context, 0).getPendingPartitionRemovalRequests())
+                        .containsEntry(expiredPartition, requestId);
+                assertThatCode(context::runNextOneTimeCallable).doesNotThrowAnyException();
+                assertThat(context.getSplitsAssignmentSequence()).isEmpty();
+                assertThat(enumerator.snapshotState(1L).getAssignedPhysicalTablePaths()).isEmpty();
+                assertThat(latestSubscriptionEvent(context, 0).getSubscribedPhysicalTablePaths())
+                        .isEmpty();
+                assertThat(latestSubscriptionEvent(context, 0).getPendingPartitionRemovalRequests())
+                        .isEmpty();
+                assertThat(latestSubscriptionEvent(context, 0).getFencedPartitionPaths())
+                        .containsExactly(expiredPartition);
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @Test
+    void testIncompleteDiscoveryDoesNotRetirePartitions() throws Throwable {
+        String tableName = "incomplete_partition_discovery";
+        createPartitionedPkTable(tableName, 1);
+        insertPartitionRow(tableName, 1, "expired", "first");
+        AtomicBoolean failAfterTableMetadata = new AtomicBoolean();
+        TableDiscoverer discoverer =
+                new TableDiscoverer() {
+                    @Override
+                    public void open(Context context) {}
+
+                    @Override
+                    public Set<TableId> discover() {
+                        Set<TableId> tables = new LinkedHashSet<>();
+                        tables.add(TableId.tableId(DATABASE_NAME, tableName));
+                        if (failAfterTableMetadata.get()) {
+                            tables.add(TableId.tableId(DATABASE_NAME, "missing_table"));
+                        }
+                        return tables;
+                    }
+
+                    @Override
+                    public void close() {}
+                };
+        TablePath tablePath = TablePath.of(DATABASE_NAME, tableName);
+        PhysicalTablePath expired = PhysicalTablePath.of(tablePath, "expired");
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                        new MockSplitEnumeratorContext<>(NUM_READERS);
+                Connection connection =
+                        ConnectionFactory.createConnection(
+                                FLUSS_CLUSTER_EXTENSION.getClientConfig())) {
+            FlussSourceEnumerator enumerator = newEnumerator(context, discoverer, null);
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+                runDiscoveryCycle(context);
+                int eventCount = context.getSentSourceEvent().get(0).size();
+                connection
+                        .getAdmin()
+                        .dropPartition(
+                                tablePath,
+                                new PartitionSpec(Collections.singletonMap("ds", "expired")),
+                                false)
+                        .get();
+                failAfterTableMetadata.set(true);
+                assertThatThrownBy(() -> context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX))
+                        .isInstanceOf(FlinkRuntimeException.class)
+                        .hasMessage("Failed to discover subscribed table-buckets.");
+                assertThat(enumerator.snapshotState(1L).getAssignedPhysicalTablePaths())
+                        .containsExactly(expired);
+                assertThat(context.getSentSourceEvent().get(0)).hasSize(eventCount);
+                assertThat(latestSubscriptionEvent(context, 0).getSubscribedPhysicalTablePaths())
+                        .containsExactly(expired);
             } finally {
                 enumerator.close();
             }
@@ -580,6 +1213,78 @@ class FlussSourceEnumeratorTest {
                         .containsExactlyInAnyOrder(0, 1, 2);
             } finally {
                 enumerator.close();
+            }
+        }
+    }
+
+    @ParameterizedTest(name = "discoveryBeforeDefaultChange = {0}")
+    @ValueSource(booleans = {true, false})
+    void testPartitionBucketCountAfterTableDefaultChange(boolean discoveryBeforeDefaultChange)
+            throws Throwable {
+        String tableName = "partition_bucket_count_change";
+        createPartitionedPkTable(tableName, 4);
+        insertPartitionRow(tableName, 1, "existing", "first");
+        TablePath tablePath = TablePath.of(DATABASE_NAME, tableName);
+
+        try (Connection connection =
+                ConnectionFactory.createConnection(FLUSS_CLUSTER_EXTENSION.getClientConfig())) {
+            if (!discoveryBeforeDefaultChange) {
+                connection
+                        .getAdmin()
+                        .alterTable(
+                                tablePath,
+                                Collections.singletonList(TableChange.modifyBucketCount(2)),
+                                false)
+                        .get();
+            }
+            try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                    new MockSplitEnumeratorContext<>(NUM_READERS)) {
+                FlussSourceEnumerator enumerator =
+                        newEnumerator(
+                                context,
+                                new FlussDefaultDiscoverer(),
+                                fqnRegex(DATABASE_NAME, tableName));
+                try {
+                    enumerator.start();
+                    if (discoveryBeforeDefaultChange) {
+                        runDiscoveryCycle(context);
+                        assertThat(enumerator.snapshotState(1L).getRemainingSplits()).hasSize(4);
+                        connection
+                                .getAdmin()
+                                .alterTable(
+                                        tablePath,
+                                        Collections.singletonList(TableChange.modifyBucketCount(2)),
+                                        false)
+                                .get();
+                    }
+                    assertThat(connection.getAdmin().getTableInfo(tablePath).get().getNumBuckets())
+                            .isEqualTo(2);
+                    assertThat(connection.getAdmin().listPartitionInfos(tablePath).get())
+                            .singleElement()
+                            .satisfies(
+                                    partitionInfo -> {
+                                        assertThat(partitionInfo.getPartitionName())
+                                                .isEqualTo("existing");
+                                        assertThat(partitionInfo.getBucketCount()).isEqualTo(4);
+                                    });
+
+                    runDiscoveryCycle(context);
+                    assertThat(context.getSplitsAssignmentSequence()).isEmpty();
+                    registerAllReaders(context, enumerator);
+
+                    assertThat(assignedBucketIds(context, tableName))
+                            .containsExactlyInAnyOrder(0, 1, 2, 3);
+                    assertThat(
+                                    latestSubscriptionEvent(context, 0)
+                                            .getPendingPartitionRemovalRequests())
+                            .isEmpty();
+                    int assignmentCount = context.getSplitsAssignmentSequence().size();
+                    context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                    assertThat(context.getOneTimeCallables()).isEmpty();
+                    assertThat(context.getSplitsAssignmentSequence()).hasSize(assignmentCount);
+                } finally {
+                    enumerator.close();
+                }
             }
         }
     }
@@ -1842,6 +2547,17 @@ class FlussSourceEnumeratorTest {
             enumerator.handleSourceEvent(
                     readerId,
                     new TableRemovalAckEvent(Collections.singletonMap(tablePath, requestId)));
+        }
+    }
+
+    private static void acknowledgePartitionRemoval(
+            FlussSourceEnumerator enumerator, PhysicalTablePath partitionPath, long requestId) {
+        for (int readerId = 0; readerId < NUM_READERS; readerId++) {
+            enumerator.handleSourceEvent(
+                    readerId,
+                    new TableRemovalAckEvent(
+                            Collections.emptyMap(),
+                            Collections.singletonMap(partitionPath, requestId)));
         }
     }
 
