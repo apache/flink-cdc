@@ -49,6 +49,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils.unwrap;
@@ -192,9 +193,119 @@ class SchemaCoordinatorTest {
                                 + " does not support it.");
     }
 
+    @Test
+    void closeWaitsForSchemaChangeBeforeClosingMetadataApplier() throws Exception {
+        BlockingMetadataApplier metadataApplier = new BlockingMetadataApplier();
+        SchemaCoordinator coordinator =
+                new SchemaCoordinator(
+                        "regular-schema-coordinator",
+                        new MockedOperatorCoordinatorContext(
+                                new OperatorID(), Thread.currentThread().getContextClassLoader()),
+                        Executors.newSingleThreadExecutor(),
+                        metadataApplier,
+                        Collections.emptyList(),
+                        RouteMode.ALL_MATCH,
+                        SchemaChangeBehavior.LENIENT,
+                        Duration.ofSeconds(10));
+        coordinator.start();
+        try {
+            requestSchemaChange(coordinator, new CreateTableEvent(TABLE_ID, INITIAL_SCHEMA));
+            submitSchemaChange(coordinator, ADD_EXTRA_V2);
+            assertThat(metadataApplier.schemaChangeStarted.await(10, TimeUnit.SECONDS)).isTrue();
+
+            AtomicBoolean closeCompleted = new AtomicBoolean();
+            Thread closeThread =
+                    new Thread(
+                            () -> {
+                                try {
+                                    coordinator.close();
+                                    closeCompleted.set(true);
+                                } catch (Exception e) {
+                                    throw new RuntimeException(e);
+                                }
+                            });
+            closeThread.start();
+
+            assertThat(metadataApplier.schemaChangeInterrupted.await(10, TimeUnit.SECONDS))
+                    .isTrue();
+            assertThat(metadataApplier.closed.getCount()).isEqualTo(1);
+            assertThat(closeCompleted.get()).isFalse();
+
+            metadataApplier.releaseSchemaChange.countDown();
+            closeThread.join(10_000);
+            assertThat(closeThread.isAlive()).isFalse();
+            assertThat(closeCompleted.get()).isTrue();
+            assertThat(metadataApplier.closed.await(1, TimeUnit.SECONDS)).isTrue();
+        } finally {
+            metadataApplier.releaseSchemaChange.countDown();
+            if (metadataApplier.closed.getCount() > 0) {
+                coordinator.close();
+            }
+        }
+    }
+
+    @Test
+    void closeDefersMetadataApplierCleanupUntilUninterruptibleSchemaChangeStops() throws Exception {
+        BlockingMetadataApplier metadataApplier = new BlockingMetadataApplier();
+        SchemaCoordinator coordinator =
+                new SchemaCoordinator(
+                        "regular-schema-coordinator",
+                        new MockedOperatorCoordinatorContext(
+                                new OperatorID(), Thread.currentThread().getContextClassLoader()),
+                        Executors.newSingleThreadExecutor(),
+                        metadataApplier,
+                        Collections.emptyList(),
+                        RouteMode.ALL_MATCH,
+                        SchemaChangeBehavior.LENIENT,
+                        Duration.ofMillis(200));
+        coordinator.start();
+        try {
+            requestSchemaChange(coordinator, new CreateTableEvent(TABLE_ID, INITIAL_SCHEMA));
+            submitSchemaChange(coordinator, ADD_EXTRA_V2);
+            assertThat(metadataApplier.schemaChangeStarted.await(10, TimeUnit.SECONDS)).isTrue();
+
+            assertThatThrownBy(coordinator::close)
+                    .isInstanceOf(TimeoutException.class)
+                    .hasMessage("Schema change executor did not terminate during reset.");
+            assertThat(metadataApplier.closed.getCount()).isEqualTo(1);
+
+            metadataApplier.releaseSchemaChange.countDown();
+            assertThat(metadataApplier.closed.await(10, TimeUnit.SECONDS)).isTrue();
+        } finally {
+            metadataApplier.releaseSchemaChange.countDown();
+        }
+    }
+
     private static final class UnsupportedExpansionMetadataApplier implements MetadataApplier {
         @Override
         public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {}
+    }
+
+    private static final class BlockingMetadataApplier implements MetadataApplier {
+        private final CountDownLatch schemaChangeStarted = new CountDownLatch(1);
+        private final CountDownLatch schemaChangeInterrupted = new CountDownLatch(1);
+        private final CountDownLatch releaseSchemaChange = new CountDownLatch(1);
+        private final CountDownLatch closed = new CountDownLatch(1);
+
+        @Override
+        public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
+            if (schemaChangeEvent instanceof AddColumnEvent) {
+                schemaChangeStarted.countDown();
+                while (releaseSchemaChange.getCount() > 0) {
+                    try {
+                        releaseSchemaChange.await();
+                    } catch (InterruptedException ignored) {
+                        schemaChangeInterrupted.countDown();
+                        // Simulates an external DDL call that cannot be interrupted.
+                    }
+                }
+            }
+        }
+
+        @Override
+        public void close() {
+            closed.countDown();
+        }
     }
 
     private static final class ExpandingMetadataApplier

@@ -111,6 +111,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
 
     private final Object lifecycleLock = new Object();
     private volatile boolean resetting;
+    private volatile boolean closed;
     private volatile long generation;
 
     protected SchemaRegistry(
@@ -212,12 +213,46 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     @Override
     public void close() throws Exception {
         LOG.info("Closing SchemaRegistry - {}.", operatorName);
-        coordinatorExecutor.shutdown();
+        synchronized (lifecycleLock) {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            resetting = true;
+            generation++;
+        }
+
+        Exception closeFailure = null;
+        boolean interrupted = false;
         try {
-            metadataApplier.close();
+            awaitCoordinatorExecutor();
         } catch (Exception e) {
-            LOG.error("Failed to close metadata applier.", e);
-            throw new IOException("Failed to close metadata applier.", e);
+            closeFailure = e;
+            interrupted = e instanceof InterruptedException;
+        }
+        boolean schemaChangeWorkerStopped = false;
+        try {
+            shutdown(rpcTimeout.toMillis());
+            schemaChangeWorkerStopped = true;
+        } catch (Exception e) {
+            closeFailure = ExceptionUtils.firstOrSuppressed(e, closeFailure);
+            interrupted |= e instanceof InterruptedException;
+        }
+        coordinatorExecutor.shutdown();
+        if (schemaChangeWorkerStopped) {
+            try {
+                closeMetadataApplier();
+            } catch (IOException e) {
+                closeFailure = ExceptionUtils.firstOrSuppressed(e, closeFailure);
+            }
+        } else {
+            closeMetadataApplierAfterSchemaChangeWorkerStops();
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
+        }
+        if (closeFailure != null) {
+            throw closeFailure;
         }
     }
 
@@ -232,9 +267,9 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
 
     /**
      * Stops schema-change work from the previous coordinator generation. Implementations must block
-     * until the previous generation's worker has fully exited, within {@link #rpcTimeout}.
+     * until the previous generation's worker has fully exited, within the supplied timeout.
      */
-    protected abstract void shutdown() throws Exception;
+    protected abstract void shutdown(long timeoutMillis) throws Exception;
 
     /** (Re)initializes transient state, both on {@link #start()} and after a coordinator reset. */
     protected abstract void initialize();
@@ -419,7 +454,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
             generation++;
         }
         awaitCoordinatorExecutor();
-        shutdown();
+        shutdown(rpcTimeout.toMillis());
         if (checkpointData == null) {
             schemaManager = new SchemaManager();
         } else {
@@ -495,6 +530,43 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
             Thread.currentThread().interrupt();
             throw e;
         }
+    }
+
+    private void closeMetadataApplier() throws IOException {
+        try {
+            metadataApplier.close();
+        } catch (Exception e) {
+            LOG.error("Failed to close metadata applier.", e);
+            throw new IOException("Failed to close metadata applier.", e);
+        }
+    }
+
+    private void closeMetadataApplierAfterSchemaChangeWorkerStops() {
+        Thread cleanupThread =
+                new Thread(
+                        () -> {
+                            boolean interrupted = false;
+                            try {
+                                while (true) {
+                                    try {
+                                        shutdown(Long.MAX_VALUE);
+                                        closeMetadataApplier();
+                                        return;
+                                    } catch (InterruptedException e) {
+                                        interrupted = true;
+                                    }
+                                }
+                            } catch (Exception e) {
+                                LOG.error("Failed to clean up schema registry resources.", e);
+                            } finally {
+                                if (interrupted) {
+                                    Thread.currentThread().interrupt();
+                                }
+                            }
+                        },
+                        "schema-registry-cleanup-" + operatorName);
+        cleanupThread.setDaemon(true);
+        cleanupThread.start();
     }
 
     private void reject(@Nullable CompletableFuture<?> future) {
