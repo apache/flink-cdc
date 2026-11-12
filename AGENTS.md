@@ -76,7 +76,7 @@ Please verify your changes in both Flink 1.20 (LTS) and Flink 2.x (latest).
 
 Connectors are split into two categories:
 
-- Source Connectors (`flink-cdc-connect/flink-cdc-source-connectors/`) are CDC sources for DataStream and Flink SQL jobs.
+- Source Connectors (`flink-cdc-connect/flink-cdc-source-connectors/`) are CDC sources for DataStream and Flink SQL jobs. Each `flink-sql-connector-<X>-cdc` module produces one fat jar per build; its artifactId is line-parameterized (`flink-sql-connector-<X>-cdc${source.fatjar.suffix}`), so each Flink line build produces that line's fat jar from the single module.
 - Pipeline Connectors (`flink-cdc-connect/flink-cdc-pipeline-connectors/`) are Pipeline connectors for the YAML API.
 
 ### Tests

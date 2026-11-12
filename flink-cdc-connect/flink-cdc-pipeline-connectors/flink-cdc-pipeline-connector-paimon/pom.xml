@@ -26,7 +26,15 @@ limitations under the License.
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>flink-cdc-pipeline-connector-paimon</artifactId>
+    <artifactId>flink-cdc-pipeline-connector-paimon${pipeline.fatjar.suffix}</artifactId>
+
+    <!--
+      Pipeline connector module of Flink CDC. The shaded external connector line forks
+      across Flink generations, so the artifactId carries the Flink line of the build
+      (flink-cdc-pipeline-connector-paimon-flink-<ver>); the fat jar bundles the connector
+      together with its external dependency line and is therefore bound to the Flink
+      generation it was built against.
+    -->
 
     <properties>
         <paimon.version>2.1.0</paimon.version>

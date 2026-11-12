@@ -25,8 +25,16 @@ limitations under the License.
         <version>${revision}</version>
     </parent>
 
-    <artifactId>flink-cdc-pipeline-connector-iceberg</artifactId>
+    <artifactId>flink-cdc-pipeline-connector-iceberg${pipeline.fatjar.suffix}</artifactId>
     <packaging>jar</packaging>
+
+    <!--
+      Pipeline connector module of Flink CDC. The shaded external connector line forks
+      across Flink generations, so the artifactId carries the Flink line of the build
+      (flink-cdc-pipeline-connector-iceberg-flink-<ver>); the fat jar bundles the connector
+      together with its external dependency line and is therefore bound to the Flink
+      generation it was built against.
+    -->
 
     <name>flink-cdc-pipeline-connector-iceberg</name>
 
