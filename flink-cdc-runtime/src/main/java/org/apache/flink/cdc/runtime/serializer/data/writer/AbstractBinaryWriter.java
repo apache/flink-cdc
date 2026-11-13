@@ -236,7 +236,10 @@ abstract class AbstractBinaryWriter implements BinaryWriter {
 
     @Override
     public void writeTime(int pos, TimeData value, int precision) {
-        writeInt(pos, value.toMillisOfDay());
+        // All TIME precisions share the same eight-byte slot. The sign bit tags the nanosecond
+        // encoding so that readers can still recognize the pre-upgrade millisecond layout, exactly
+        // like writeTimestamp, whose precision does not influence the layout either.
+        writeLong(pos, Long.MIN_VALUE | value.toNanoOfDay());
     }
 
     @Override

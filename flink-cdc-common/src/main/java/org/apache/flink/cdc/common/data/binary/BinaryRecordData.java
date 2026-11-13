@@ -228,6 +228,22 @@ public final class BinaryRecordData extends BinarySection implements RecordData,
     @Override
     public TimeData getTime(int pos) {
         assertIndexIsValid(pos);
+        return decodeTime(pos);
+    }
+
+    /**
+     * Decodes a {@code TIME} slot that is always eight bytes wide.
+     *
+     * <p>Rows written by the current code carry {@code Long.MIN_VALUE | nanoOfDay}, so the sign bit
+     * marks the nanosecond encoding. Rows written before nanosecond {@code TIME} support stored the
+     * millisecond-of-day in the low four bytes of the same eight-byte slot, leaving the high four
+     * bytes zero; such a slot decodes to a non-negative long and is read as milliseconds.
+     */
+    private TimeData decodeTime(int pos) {
+        long encoded = getLong(pos);
+        if (encoded < 0) {
+            return TimeData.fromNanoOfDay(encoded & Long.MAX_VALUE);
+        }
         return TimeData.fromMillisOfDay(getInt(pos));
     }
 
