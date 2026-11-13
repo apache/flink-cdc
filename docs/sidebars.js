@@ -80,6 +80,7 @@ module.exports = {
             'docs/connectors/pipeline-connectors/oracle',
             'docs/connectors/pipeline-connectors/postgres',
             'docs/connectors/pipeline-connectors/sqlserver',
+            'docs/connectors/pipeline-connectors/db2',
             'docs/connectors/pipeline-connectors/paimon',
             'docs/connectors/pipeline-connectors/fluss',
             'docs/connectors/pipeline-connectors/kafka',
