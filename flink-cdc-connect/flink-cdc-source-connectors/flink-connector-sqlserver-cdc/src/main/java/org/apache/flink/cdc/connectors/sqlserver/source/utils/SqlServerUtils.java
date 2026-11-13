@@ -125,7 +125,7 @@ public class SqlServerUtils {
 
     public static Column getSplitColumn(Table table, @Nullable String chunkKeyColumn) {
         List<Column> primaryKeys = table.primaryKeyColumns();
-        if (primaryKeys.isEmpty()) {
+        if (primaryKeys.isEmpty() && chunkKeyColumn == null) {
             throw new ValidationException(
                     String.format(
                             "Incremental snapshot for tables requires primary key,"
@@ -134,18 +134,19 @@ public class SqlServerUtils {
         }
 
         if (chunkKeyColumn != null) {
-            Optional<Column> targetPkColumn =
-                    primaryKeys.stream()
+            List<Column> columns = table.columns();
+            Optional<Column> targetColumn =
+                    columns.stream()
                             .filter(col -> chunkKeyColumn.equals(col.name()))
                             .findFirst();
-            if (targetPkColumn.isPresent()) {
-                return targetPkColumn.get();
+            if (targetColumn.isPresent()) {
+                return targetColumn.get();
             }
             throw new ValidationException(
                     String.format(
-                            "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
+                            "Chunk key column '%s' doesn't exist in the columns [%s] of the table %s.",
                             chunkKeyColumn,
-                            primaryKeys.stream().map(Column::name).collect(Collectors.joining(",")),
+                            columns.stream().map(Column::name).collect(Collectors.joining(",")),
                             table.id()));
         }
 
