@@ -39,6 +39,61 @@ To describe a route, the follows are required:
 
 A route module can contain a list of source-table/sink-table rules.
 
+## Table ID Components
+
+For all route rules, the `sink-table` template determines the target table ID levels. The router
+splits the template on literal dots into one to three non-empty parts before replacement, replaces
+each part independently, and constructs the table ID without parsing the replacement result again:
+
+- One part represents the table name.
+- Two parts represent the schema and table names.
+- Three parts represent the namespace, schema, and table names.
+
+Dots introduced by replacement remain inside their respective fields and do not change the number
+of levels or their field mapping. Template separators are not subject to replacement. Each replaced
+part must also be non-empty. This does not introduce a new dot-escaping syntax for templates.
+In capturing-group replacements, existing Java replacement escapes are retained: for example,
+`sink-table: 'target_db\.$1'` has two components, just like `target_db.$1`. The backslash escapes
+are consumed according to Java replacement rules; they do not make template dots part of a field.
+With `replace-symbol`, backslashes remain literal.
+
+These rules apply to both `replace-symbol` and regular expression capturing-group replacements
+(`$N`). Capturing-group replacement does not require `replace-symbol`. Source matching, route order,
+and `route-mode` are unchanged.
+
+For example:
+
+```yaml
+route:
+  - source-table: source_db.\.*
+    sink-table: target_db.<>
+    replace-symbol: <>
+```
+
+For a source table whose schema name is `source_db` and table name is `daily.archive`, the result
+is `TableId.tableId("target_db", "daily.archive")`: the namespace is absent, the schema name is
+`target_db`, and the table name is `daily.archive`. Its string representation is
+`target_db.daily.archive`; the dots in that string alone do not identify the field boundaries.
+
+The same rule applies to cross-level captures. With `source-table: '(\.*)'` and
+`sink-table: target_db.$1`, a capture of `daily.archive` is kept as one table-name field, even if it
+spans schema and table names in the source ID. To generate a three-level target, explicitly declare
+three parts in the template and capture each field separately, for example
+`sink-table: target_ns.$1.$2`.
+
+:::info
+
+This behavior differs from earlier versions that replaced the entire template and then parsed the
+result. Upgrading may change structured target IDs when replacement values contain dots or rules
+previously replaced template separators. The target fields may differ even when their string
+representations stay the same. Before upgrading, verify the existing target tables and
+the table IDs stored in checkpoints/savepoints, plan any required table/data/state migration, and
+check recovery behavior. Existing target tables and state are not automatically migrated. The sink
+and its catalog must support the generated field values, including embedded dots; validate the
+selected sink's field mapping and final destination.
+
+:::
+
 ## Route Mode
 By default, all matching route rules are applied to a table. You can configure the `route-mode` option in the pipeline configuration to change this behavior:
 
