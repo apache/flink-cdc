@@ -783,10 +783,95 @@ public class JaninoCompiler {
                             context.supportedMetadataColumns,
                             context.decimalPrecisionMode);
             if (resultType.is(DataTypeRoot.DECIMAL)) {
-                return new Java.MethodInvocation(Location.NOWHERE, null, handler, atoms);
+                Java.Rvalue[] decimalAtoms = new Java.Rvalue[atoms.length];
+                for (int i = 0; i < atoms.length; i++) {
+                    decimalAtoms[i] =
+                            alignOperandToBigDecimal(
+                                    context,
+                                    sqlBasicCall.getOperandList().get(i),
+                                    atoms[i],
+                                    ((DecimalType) resultType).getScale(),
+                                    i == 0 && "/".equals(operator));
+                }
+                return new Java.MethodInvocation(Location.NOWHERE, null, handler, decimalAtoms);
             }
         }
         return new Java.BinaryOperation(Location.NOWHERE, atoms[0], operator, atoms[1]);
+    }
+
+    /**
+     * Arithmetic handlers such as {@code times} only accept {@link java.math.BigDecimal} pairs, so
+     * an operand of a DECIMAL-typed arithmetic expression must be a BigDecimal at runtime. Operands
+     * that are already DECIMAL (columns, sub-expressions) are returned untouched. Numeric literals
+     * would otherwise be parsed by Janino as primitives, and non-DECIMAL operands are boxed
+     * primitives, so both are converted through {@code castToBigDecimal}.
+     */
+    private static Java.Rvalue alignOperandToBigDecimal(
+            Context context,
+            SqlNode operand,
+            Java.Rvalue atom,
+            int resultScale,
+            boolean isDividend) {
+        boolean isNumericLiteral = operand instanceof SqlNumericLiteral;
+        DataType operandType =
+                TransformParser.deduceSubExpressionType(
+                        context.columns,
+                        operand,
+                        context.udfDescriptors,
+                        context.supportedMetadataColumns,
+                        context.decimalPrecisionMode);
+        if (operandType.is(DataTypeRoot.DECIMAL)) {
+            if (!isNumericLiteral) {
+                if (!isDividend) {
+                    return atom;
+                }
+                // ArithmeticFunctions.divides keeps the scale of its dividend, so widen it to the
+                // result scale or "decimalCol / 3" would be truncated to the column's scale.
+                return castToScale(atom, resultScale);
+            }
+            // Build the BigDecimal from the literal's text, never from a double, so the exact
+            // value (e.g. 1.13) survives.
+            DecimalType literalType = (DecimalType) operandType;
+            // ArithmeticFunctions.divides keeps the scale of its left operand, so widen the literal
+            // to the result scale; otherwise "1.5 / decimalCol" would truncate to one fractional
+            // digit.
+            int literalScale = Math.max(literalType.getScale(), resultScale);
+            int literalPrecision =
+                    Math.min(
+                            DecimalType.MAX_PRECISION,
+                            literalType.getPrecision() + literalScale - literalType.getScale());
+            return generateFunctionOperation(
+                    "castToBigDecimal",
+                    new Java.Rvalue[] {
+                        new Java.AmbiguousName(
+                                Location.NOWHERE,
+                                new String[] {
+                                    "\""
+                                            + ((SqlNumericLiteral) operand)
+                                                    .bigDecimalValue()
+                                                    .toPlainString()
+                                            + "\""
+                                }),
+                        new Java.AmbiguousName(
+                                Location.NOWHERE, new String[] {String.valueOf(literalPrecision)}),
+                        new Java.AmbiguousName(
+                                Location.NOWHERE, new String[] {String.valueOf(literalScale)})
+                    });
+        }
+        // Integral operand (TINYINT..BIGINT or an integer literal) combined with a DECIMAL operand.
+        return castToScale(atom, resultScale);
+    }
+
+    private static Java.Rvalue castToScale(Java.Rvalue atom, int scale) {
+        return generateFunctionOperation(
+                "castToBigDecimal",
+                new Java.Rvalue[] {
+                    atom,
+                    new Java.AmbiguousName(
+                            Location.NOWHERE,
+                            new String[] {String.valueOf(DecimalType.MAX_PRECISION)}),
+                    new Java.AmbiguousName(Location.NOWHERE, new String[] {String.valueOf(scale)})
+                });
     }
 
     private static Java.Rvalue generateEqualsOperation(
