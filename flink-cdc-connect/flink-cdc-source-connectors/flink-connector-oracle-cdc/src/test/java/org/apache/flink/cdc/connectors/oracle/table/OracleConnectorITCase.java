@@ -18,14 +18,13 @@
 package org.apache.flink.cdc.connectors.oracle.table;
 
 import org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.Lists;
+import org.apache.flink.cdc.shaded.guava.com.google.common.util.concurrent.RateLimiter;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
-import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.RateLimiter;
 
 import org.assertj.core.api.Assertions;
 import org.assertj.core.api.Assumptions;

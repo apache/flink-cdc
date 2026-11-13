@@ -34,16 +34,12 @@ import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
-import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 import org.apache.flink.streaming.api.watermark.Watermark;
+import org.apache.flink.streaming.runtime.operators.sink.SinkWriterOperatorAdapter;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.streaming.runtime.watermarkstatus.WatermarkStatus;
-
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 
 /**
  * An operator that processes records to be written into a {@link Sink} in batch mode.
@@ -66,11 +62,11 @@ public class BatchDataSinkWriterOperator<CommT>
     private final MailboxExecutor mailboxExecutor;
 
     /** Operator that actually execute sink logic. */
-    private Object flinkWriterOperator;
+    private AbstractStreamOperator<CommittableMessage<CommT>> flinkWriterOperator;
 
     /**
-     * The internal {@link SinkWriter} of flinkWriterOperator, obtained it through reflection to
-     * deal with {@link FlushEvent}.
+     * The internal {@link SinkWriter} of flinkWriterOperator, obtained through the compat layer
+     * adapter to deal with {@link FlushEvent}.
      */
     private SinkWriter<Event> copySinkWriter;
 
@@ -90,14 +86,17 @@ public class BatchDataSinkWriterOperator<CommT>
             StreamConfig config,
             Output<StreamRecord<CommittableMessage<CommT>>> output) {
         super.setup(containingTask, config, output);
-        flinkWriterOperator = createFlinkWriterOperator();
-        invokeSetup(flinkWriterOperator, containingTask, config, output);
+        flinkWriterOperator =
+                SinkWriterOperatorAdapter.createWriterOperator(
+                        sink, processingTimeService, mailboxExecutor);
+        SinkWriterOperatorAdapter.setupWriterOperator(
+                flinkWriterOperator, containingTask, config, output);
     }
 
     @Override
     public void open() throws Exception {
         this.<AbstractStreamOperator<CommittableMessage<CommT>>>getFlinkWriterOperator().open();
-        copySinkWriter = getFieldValue("sinkWriter");
+        copySinkWriter = SinkWriterOperatorAdapter.getSinkWriter(flinkWriterOperator);
     }
 
     @Override
@@ -161,83 +160,7 @@ public class BatchDataSinkWriterOperator<CommT>
         copySinkWriter.flush(false);
     }
 
-    // -------------------------- Reflection helper functions --------------------------
-
-    private void invokeSetup(
-            Object operator,
-            StreamTask<?, ?> containingTask,
-            StreamConfig config,
-            Output<?> output) {
-        try {
-            Method setupMethod =
-                    AbstractStreamOperator.class.getDeclaredMethod(
-                            "setup", StreamTask.class, StreamConfig.class, Output.class);
-            setupMethod.setAccessible(true);
-            setupMethod.invoke(operator, containingTask, config, output);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to invoke setup on flinkWriterOperator", e);
-        }
-    }
-
-    private Object createFlinkWriterOperator() {
-        Class<?> flinkWriterClass;
-        try {
-            flinkWriterClass =
-                    getRuntimeContext()
-                            .getUserCodeClassLoader()
-                            .loadClass(
-                                    "org.apache.flink.streaming.runtime.operators.sink.SinkWriterOperator");
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException("Failed to load SinkWriterOperator class", e);
-        }
-
-        try {
-            Constructor<?> constructor =
-                    flinkWriterClass.getDeclaredConstructor(
-                            Sink.class, ProcessingTimeService.class, MailboxExecutor.class);
-            constructor.setAccessible(true);
-            return constructor.newInstance(sink, processingTimeService, mailboxExecutor);
-        } catch (NoSuchMethodException e) {
-            // Constructor with 3 parameters not found, try the 4-parameter version
-            try {
-                Constructor<?> constructor =
-                        flinkWriterClass.getDeclaredConstructor(
-                                StreamOperatorParameters.class,
-                                Sink.class,
-                                ProcessingTimeService.class,
-                                MailboxExecutor.class);
-                constructor.setAccessible(true);
-                return constructor.newInstance(null, sink, processingTimeService, mailboxExecutor);
-            } catch (Exception ex) {
-                throw new RuntimeException("Failed to create SinkWriterOperator in Flink", ex);
-            }
-        } catch (Exception e) {
-            // Other exceptions (e.g., InvocationTargetException) indicate real failures
-            throw new RuntimeException("Failed to create SinkWriterOperator in Flink", e);
-        }
-    }
-
-    /**
-     * Finds a field by name from its declaring class. This also searches for the field in super
-     * classes.
-     *
-     * @param fieldName the name of the field to find.
-     * @return the Object value of this field.
-     */
-    @SuppressWarnings("unchecked")
-    private <T> T getFieldValue(String fieldName) throws IllegalAccessException {
-        Class<?> clazz = flinkWriterOperator.getClass();
-        while (clazz != null) {
-            try {
-                Field field = clazz.getDeclaredField(fieldName);
-                field.setAccessible(true);
-                return ((T) field.get(flinkWriterOperator));
-            } catch (NoSuchFieldException e) {
-                clazz = clazz.getSuperclass();
-            }
-        }
-        throw new RuntimeException("failed to get sinkWriter");
-    }
+    // -------------------------- Operator access helpers --------------------------
 
     @SuppressWarnings("unchecked")
     private <T> T getFlinkWriterOperator() {

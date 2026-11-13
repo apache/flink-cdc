@@ -47,9 +47,9 @@ TiDB CDC 连接器允许从 TiDB 数据库读取快照数据和增量数据。�
 
 ```下载链接仅适用于稳定版本。```
 
-下载 [flink-sql-connector-tidb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc) 到 `<FLINK_HOME>/lib/` 目录下。
+下载 [flink-sql-connector-tidb-cdc-flink-1.20](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc-flink-1.20) 到 `<FLINK_HOME>/lib/` 目录下。
 
-**注意：** 参考 [flink-sql-connector-tidb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
+**注意：** 参考 [flink-sql-connector-tidb-cdc-flink-1.20](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc-flink-1.20) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
 如何创建 TiDB CDC 表
 ----------------

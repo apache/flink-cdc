@@ -20,8 +20,7 @@ package org.apache.flink.cdc.composer.testsource.recovery;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.sink.DataSink;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.ImmutableSet;
 
 import java.util.Set;
 

@@ -44,40 +44,26 @@ function get_pom_version {
   set -u
 }
 
-function set_pom_version {
-  new_version=$1
-
-  ${MVN} org.codehaus.mojo:versions-maven-plugin:2.8.1:set -DnewVersion=${new_version} -DgenerateBackupPoms=false --quiet
-}
-
 ###########################
 
 cd ${PROJECT_ROOT}
 
-# Check if FLINK_VERSION is set
-if [ -z "${FLINK_VERSION:-}" ]; then
-    echo "Error: FLINK_VERSION environment variable is not set."
-    echo "Usage: FLINK_VERSION=1.20 $0"
+# Check if NEW_VERSION is set
+if [ -z "${NEW_VERSION:-}" ]; then
+    echo "Error: NEW_VERSION environment variable is not set."
+    echo "Usage: NEW_VERSION=3.8.0 $0"
     exit 1
 fi
 
-echo "FLINK_VERSION: ${FLINK_VERSION}"
-
-# Get current version
+# Update the project revision version. Per-version dist artifacts are
+# distinguished by artifactId (flink-cdc-dist-flink-<ver>), so the project
+# version no longer carries a Flink suffix.
 current_version=$(get_pom_version)
 echo "Current version: ${current_version}"
+echo "New version: ${NEW_VERSION}"
 
-# Extract base version (remove -SNAPSHOT suffix if present)
-base_version=${current_version%-SNAPSHOT}
-echo "Base version: ${base_version}"
+${MVN} org.codehaus.mojo:versions-maven-plugin:2.8.1:set-property -Dproperty=revision -DnewVersion=${NEW_VERSION} -DgenerateBackupPoms=false --quiet
 
-# Build new version: base_version-FLINK_VERSION
-new_version="${base_version}-${FLINK_VERSION}"
-echo "New version: ${new_version}"
-
-# Set new version
-set_pom_version "${new_version}"
-
-echo "Version updated successfully: ${current_version} -> ${new_version}"
+echo "Version updated successfully: ${current_version} -> ${NEW_VERSION}"
 
 cd ${CURR_DIR}

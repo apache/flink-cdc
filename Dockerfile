@@ -18,16 +18,17 @@
 FROM flink
 
 ARG FLINK_CDC_VERSION=3.8-SNAPSHOT
+ARG FLINK_VERSION=1.20
 ARG PIPELINE_DEFINITION_FILE
 
 RUN mkdir -p /opt/flink-cdc
 RUN mkdir -p /opt/flink/usrlib
 ENV FLINK_CDC_HOME /opt/flink-cdc
-COPY flink-cdc-dist/target/flink-cdc-${FLINK_CDC_VERSION}-bin.tar.gz /tmp/
-RUN tar -xzvf /tmp/flink-cdc-${FLINK_CDC_VERSION}-bin.tar.gz -C /tmp/ && \
-    mv /tmp/flink-cdc-${FLINK_CDC_VERSION}/* /opt/flink-cdc/ && \
-    mv /opt/flink-cdc/lib/flink-cdc-dist-${FLINK_CDC_VERSION}.jar /opt/flink-cdc/lib/flink-cdc-dist.jar && \
-    rm -rf /tmp/flink-cdc-${FLINK_CDC_VERSION} /tmp/flink-cdc-${FLINK_CDC_VERSION}-bin.tar.gz
+COPY flink-cdc-dist/flink-cdc-dist-flink-${FLINK_VERSION}/target/flink-cdc-${FLINK_CDC_VERSION}-flink-${FLINK_VERSION}-bin.tar.gz /tmp/
+RUN tar -xzvf /tmp/flink-cdc-${FLINK_CDC_VERSION}-flink-${FLINK_VERSION}-bin.tar.gz -C /tmp/ && \
+    mv /tmp/flink-cdc-${FLINK_CDC_VERSION}-flink-${FLINK_VERSION}/* /opt/flink-cdc/ && \
+    mv /opt/flink-cdc/lib/flink-cdc-dist-flink-${FLINK_VERSION}-${FLINK_CDC_VERSION}.jar /opt/flink-cdc/lib/flink-cdc-dist.jar && \
+    rm -rf /tmp/flink-cdc-${FLINK_CDC_VERSION}-flink-${FLINK_VERSION} /tmp/flink-cdc-${FLINK_CDC_VERSION}-flink-${FLINK_VERSION}-bin.tar.gz
 # copy jars to cdc libs
 COPY flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values/target/flink-cdc-pipeline-connector-values-${FLINK_CDC_VERSION}.jar /opt/flink/usrlib/flink-cdc-pipeline-connector-values-${FLINK_CDC_VERSION}.jar
 COPY flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql/target/flink-cdc-pipeline-connector-mysql-${FLINK_CDC_VERSION}.jar /opt/flink/usrlib/flink-cdc-pipeline-connector-mysql-${FLINK_CDC_VERSION}.jar

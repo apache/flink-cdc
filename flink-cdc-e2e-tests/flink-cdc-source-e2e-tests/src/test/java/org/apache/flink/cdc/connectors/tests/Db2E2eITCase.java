@@ -184,7 +184,7 @@ class Db2E2eITCase extends FlinkContainerTestEnvironment {
                         "INSERT INTO products_sink",
                         "SELECT * FROM products_source;");
 
-        submitSQLJob(sqlLines, db2CdcJar, jdbcJar, mysqlDriverJar, db2JccJar);
+        submitSQLJob(sqlLines, withJdbcJars(db2CdcJar, mysqlDriverJar, db2JccJar));
         waitUntilJobRunning(Duration.ofSeconds(30));
 
         try (Connection conn = getDb2Connection();

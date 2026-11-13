@@ -114,9 +114,9 @@ OceanBase CDC 源端读取方案：
 
 ### SQL Client JAR
 
-下载 [flink-sql-connector-oceanbase-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc)  到 `<FLINK_HOME>/lib/` 目录下。
+下载 [flink-sql-connector-oceanbase-cdc-flink-1.20](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc-flink-1.20)  到 `<FLINK_HOME>/lib/` 目录下。
 
-**注意：** 参考 [flink-sql-connector-oceanbase-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
+**注意：** 参考 [flink-sql-connector-oceanbase-cdc-flink-1.20](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc-flink-1.20) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
 由于 MySQL Driver 和 OceanBase Driver 使用的开源协议都与 Flink CDC 项目不兼容，我们无法在 jar 包中提供驱动。您可能需要手动配置以下依赖：
 

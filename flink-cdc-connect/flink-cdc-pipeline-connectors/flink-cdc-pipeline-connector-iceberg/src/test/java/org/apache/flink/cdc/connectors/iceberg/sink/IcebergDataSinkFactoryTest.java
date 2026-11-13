@@ -26,9 +26,8 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.ImmutableMap;
 import org.apache.flink.table.api.ValidationException;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.PartitionSpec;

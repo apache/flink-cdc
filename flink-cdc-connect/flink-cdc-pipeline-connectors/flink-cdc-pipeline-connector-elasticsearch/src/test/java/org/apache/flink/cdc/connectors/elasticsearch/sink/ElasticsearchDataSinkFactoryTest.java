@@ -25,9 +25,8 @@ import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.ImmutableMap;
 import org.apache.flink.table.api.ValidationException;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;

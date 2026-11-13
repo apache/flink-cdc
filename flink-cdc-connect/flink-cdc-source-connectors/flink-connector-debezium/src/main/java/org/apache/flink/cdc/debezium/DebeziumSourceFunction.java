@@ -36,6 +36,7 @@ import org.apache.flink.cdc.debezium.internal.FlinkDatabaseSchemaHistory;
 import org.apache.flink.cdc.debezium.internal.FlinkOffsetBackingStore;
 import org.apache.flink.cdc.debezium.internal.Handover;
 import org.apache.flink.cdc.debezium.internal.SchemaRecord;
+import org.apache.flink.cdc.shaded.guava.com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.groups.OperatorMetricGroup;
@@ -46,8 +47,6 @@ import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkRuntimeException;
-
-import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import io.debezium.document.DocumentReader;
 import io.debezium.document.DocumentWriter;

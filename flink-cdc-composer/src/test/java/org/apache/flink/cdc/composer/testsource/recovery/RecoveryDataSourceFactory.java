@@ -21,8 +21,7 @@ import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.ConfigOptions;
 import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.source.DataSource;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.ImmutableSet;
 
 import java.util.Set;
 

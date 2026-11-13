@@ -17,8 +17,8 @@
 
 package org.apache.flink.cdc.connectors.oceanbase.catalog;
 
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
-import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.ImmutableMap;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.Lists;
 
 import com.oceanbase.connector.flink.OceanBaseConnectorOptions;
 import org.assertj.core.api.Assertions;

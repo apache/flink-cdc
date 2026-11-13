@@ -25,9 +25,9 @@ under the License.
 -->
 ## 通用 FAQ
 
-### Q1：为啥没法下载 flink-sql-connector-mysql-cdc-2.2-SNAPSHOT.jar，maven 仓库为啥没有 xxx-SNAPSHOT 依赖？
+### Q1：为啥没法下载 flink-sql-connector-mysql-cdc-flink-1.20-2.2-SNAPSHOT.jar，maven 仓库为啥没有 xxx-SNAPSHOT 依赖？
 
-和主流的 maven 项目版本管理相同，xxx-SNAPSHOT 版本都是对应开发分支的代码，需要用户自己下载源码并编译对应的 jar，用户应该使用已经 release 过的版本，比如 flink-sql-connector-mysql-cdc-2.1.0.jar，release 过的版本 maven 中心仓库才会有。
+和主流的 maven 项目版本管理相同，xxx-SNAPSHOT 版本都是对应开发分支的代码，需要用户自己下载源码并编译对应的 jar，用户应该使用已经 release 过的版本，比如 flink-sql-connector-mysql-cdc-flink-1.20-3.8.0.jar，release 过的版本 maven 中心仓库才会有。
 
 ### Q2：什么时候使用 flink-sql-connector-xxx.jar，什么时候使用 flink-connector-xxx.jar，两者有啥区别？
 

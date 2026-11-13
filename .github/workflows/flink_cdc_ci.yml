@@ -84,7 +84,7 @@ jobs:
       java-versions: "[11]"
       flink-versions: "['2.2.0']"
       custom-maven-parameter: "-Pflink2"
-      modules: "['doris, elasticsearch, fluss, iceberg, kafka, maxcompute, mysql-pipeline, oceanbase-pipeline, paimon, postgres-pipeline, starrocks, oracle-pipeline']"
+      modules: "['doris, elasticsearch, fluss, iceberg, kafka, maxcompute, mysql-pipeline, oceanbase-pipeline, paimon, postgres-pipeline, oracle-pipeline']"
   source-ut:
     name: Source Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
@@ -123,3 +123,33 @@ jobs:
       java-versions: "[11]"
       flink-versions: "['1.20.3']"
       modules: "['source_e2e']"
+  source_e2e_2_x:
+    name: Source E2E Tests 2.x
+    uses: ./.github/workflows/flink_cdc_base.yml
+    with:
+      java-versions: "[11]"
+      flink-versions: "['2.2.0']"
+      custom-maven-parameter: "-Pflink2"
+      modules: "['source_e2e']"
+  shade_guards_2_x:
+    name: Shade Priority Guards 2.x
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Set JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: Build guard module dependency chain
+        run: >
+          mvn --no-snapshot-updates -B -Pflink2 clean install -DskipTests -Dfast
+          -pl 'flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mysql-cdc,flink-cdc-dist' -am
+      - name: Run shade priority guards on the Flink 2.x line
+        run: >
+          mvn --no-snapshot-updates -B -Pflink2 clean verify -DskipTests=false -Dfast
+          -pl 'flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mysql-cdc,flink-cdc-dist'

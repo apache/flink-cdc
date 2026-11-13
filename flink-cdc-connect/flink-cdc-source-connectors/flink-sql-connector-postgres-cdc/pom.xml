@@ -25,9 +25,31 @@ limitations under the License.
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>flink-sql-connector-postgres-cdc</artifactId>
+    <artifactId>flink-sql-connector-postgres-cdc${source.fatjar.suffix}</artifactId>
+
+    <!--
+      Fat jar module of this SQL connector. The Flink line of the build drives the
+      artifact coordinates (flink-sql-connector-postgres-cdc-flink-<ver>): the shaded
+      content bundles the connector together with its compatibility-layer
+      dependencies and is therefore bound to the Flink generation it was built
+      against.
+    -->
+    <packaging>jar</packaging>
+
+
+    <properties>
+        <japicmp.skip>true</japicmp.skip>
+    </properties>
 
     <dependencies>
+        <dependency>
+            <!-- Declared before the connector dependency so that the thin version
+                 module's compatibility classes win the shade priority over the ones
+                 pulled transitively. -->
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-flink-${flink.line}</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-postgres-cdc</artifactId>
@@ -60,15 +82,14 @@ limitations under the License.
                                     <include>org.apache.flink:flink-cdc-common</include>
                                     <include>org.apache.flink:flink-connector-debezium</include>
                                     <include>org.apache.flink:flink-connector-postgres-cdc</include>
-                                    <include>org.apache.flink:flink-cdc-flink*-compat</include>
+                                    <include>org.apache.flink:flink-cdc-flink*</include>
                                     <include>com.zaxxer:HikariCP</include>
                                     <include>com.google.protobuf:protobuf-java</include>
                                     <include>com.google.guava:*</include>
                                     <include>org.apache.kafka:*</include>
                                     <include>org.postgresql:postgresql</include>
                                     <include>com.fasterxml.*:*</include>
-                                    <!--  Include fixed version 30.1.1-jre-14.0 of flink shaded guava  -->
-                                    <include>org.apache.flink:flink-shaded-guava</include>
+                                    <include>org.apache.flink:flink-cdc-shaded-guava</include>
                                 </includes>
                             </artifactSet>
                             <filters>

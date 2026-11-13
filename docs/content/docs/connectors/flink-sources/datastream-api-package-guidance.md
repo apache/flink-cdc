@@ -29,6 +29,8 @@ under the License.
 
 This guide provides a simple `pom.xml` example for packaging DataStream job JARs with MySQL CDC source.
 
+Since Flink CDC 3.8, SQL connector fat jars are published per Flink version with an artifactId suffix: use `flink-sql-connector-<X>-cdc-flink-1.20` on the Flink 1.20 line and `flink-sql-connector-<X>-cdc-flink-2.2` on the Flink 2.2 line. The examples below target Flink 1.20.x.
+
 ## Example for `pom.xml` with Flink 1.20.x
 
 ```xml
@@ -102,18 +104,6 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
             <version>${flink.version}</version>
             <scope>provided</scope>
         </dependency>
-        <!-- Checked the dependencies of the Flink project and below is a feasible reference. -->
-        <!--  Use flink shaded guava  18.0-13.0 for flink 1.13   -->
-        <!--  Use flink shaded guava  30.1.1-jre-14.0 for flink-1.14  -->
-        <!--  Use flink shaded guava  30.1.1-jre-15.0 for flink-1.15  -->
-        <!--  Use flink shaded guava  30.1.1-jre-15.0 for flink-1.16  -->
-        <!--  Use flink shaded guava  30.1.1-jre-16.1 for flink-1.17  -->
-        <!--  Use flink shaded guava  31.1-jre-17.0   for flink-1.18  -->
-        <dependency>
-            <groupId>org.apache.flink</groupId>
-            <artifactId>flink-shaded-guava</artifactId>
-            <version>31.1-jre-17.0</version>
-        </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-base</artifactId>
@@ -181,7 +171,7 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
                                     <include>io.debezium:debezium-ddl-parser</include>
                                     <include>io.debezium:debezium-connector-mysql</include>
                                     <include>org.apache.flink:flink-connector-debezium</include>
-                                    <include>org.apache.flink:flink-sql-connector-mysql-cdc</include>
+                                    <include>org.apache.flink:flink-sql-connector-mysql-cdc-flink-1.20</include>
                                     <include>org.antlr:antlr4-runtime</include>
                                     <include>org.apache.kafka:*</include>
                                     <include>mysql:mysql-connector-java</include>
@@ -190,7 +180,7 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
                                     <include>com.google.guava:*</include>
                                     <include>com.esri.geometry:esri-geometry-api</include>
                                     <include>com.zaxxer:HikariCP</include>
-                                    <include>org.apache.flink:flink-shaded-guava</include>
+                                    <include>org.apache.flink:flink-cdc-shaded-guava</include>
                                 </includes>
                             </artifactSet>
                             <relocations>
@@ -318,23 +308,9 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
             <version>${log4j.version}</version>
             <scope>provided</scope>
         </dependency>
-        <!-- Checked the dependencies of the Flink project and below is a feasible reference. -->
-        <!-- Checked the dependencies of the Flink project and below is a feasible reference. -->
-        <!--  Use flink shaded guava  18.0-13.0 for flink 1.13   -->
-        <!--  Use flink shaded guava  30.1.1-jre-14.0 for flink-1.14  -->
-        <!--  Use flink shaded guava  30.1.1-jre-15.0 for flink-1.15  -->
-        <!--  Use flink shaded guava  30.1.1-jre-15.0 for flink-1.16  -->
-        <!--  Use flink shaded guava  30.1.1-jre-16.1 for flink-1.17  -->
-        <!--  Use flink shaded guava  31.1-jre-17.0   for flink-1.18  -->
-        <!--  Use flink shaded guava  33.4.0-jre-20.0   for flink-2.2  -->
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-shaded-guava</artifactId>
-            <version>33.4.0-jre-20.0</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.flink</groupId>
-            <artifactId>flink-sql-connector-mysql-cdc</artifactId>
+            <artifactId>flink-sql-connector-mysql-cdc-flink-1.20</artifactId>
             <version>${flink.cdc.version}</version>
         </dependency>
         <dependency>
@@ -385,7 +361,7 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
                                     <include>io.debezium:debezium-ddl-parser</include>
                                     <include>io.debezium:debezium-connector-mysql</include>
                                     <include>org.apache.flink:flink-connector-debezium</include>
-                                    <include>org.apache.flink:flink-sql-connector-mysql-cdc</include>
+                                    <include>org.apache.flink:flink-sql-connector-mysql-cdc-flink-1.20</include>
                                     <include>org.antlr:antlr4-runtime</include>
                                     <include>org.apache.kafka:*</include>
                                     <include>mysql:mysql-connector-java</include>
@@ -394,8 +370,7 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
                                     <include>com.google.guava:*</include>
                                     <include>com.esri.geometry:esri-geometry-api</include>
                                     <include>com.zaxxer:HikariCP</include>
-                                    <!--  Include fixed version 30.1.1-jre-16.0 of flink shaded guava  -->
-                                    <include>org.apache.flink:flink-shaded-guava</include>
+                                    <include>org.apache.flink:flink-cdc-shaded-guava</include>
                                 </includes>
                             </artifactSet>
                             <relocations>

@@ -44,8 +44,10 @@ mvn clean install -B -DskipTests -Dfast
 # build java/scala docs
 mkdir -p docs/target/api
 # Compatibility modules target different Flink versions and cannot share a Javadoc classpath.
+# The short -pl form only matches top-level modules; these two live under the
+# flink-cdc-flink aggregate, so use their relative paths.
 mvn javadoc:aggregate -B \
-    -pl '!flink-cdc-flink1-compat,!flink-cdc-flink2-compat' \
+    -pl '!flink-cdc-flink/flink-cdc-flink1-common,!flink-cdc-flink/flink-cdc-flink2-common' \
     -DadditionalJOption="-Xdoclint:none --allow-script-in-comments" \
     -Dmaven.javadoc.failOnError=true \
     -Dcheckstyle.skip=true \

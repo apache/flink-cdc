@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Licensed to the Apache Software Foundation (ASF) under one or more
-contributor license agreements.  See the NOTICE file distributed with
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file distributed with
 this work for additional information regarding copyright ownership.
 The ASF licenses this file to You under the Apache License, Version 2.0
 (the "License"); you may not use this file except in compliance with
 the License.  You may obtain a copy of the License at
 
-     http://www.apache.org/licenses/LICENSE-2.0
+  http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,13 +25,33 @@ limitations under the License.
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>flink-cdc-dist</artifactId>
+    <artifactId>flink-cdc-dist-flink-${flink.line}</artifactId>
+
+    <!--
+      Distribution module of Flink CDC: shades the pipeline core together with the
+      Flink compatibility layer into the dist jar and assembles the bin tarball.
+      The Flink line of the build drives the artifact coordinates
+      (flink-cdc-dist-flink-<ver>), so every supported Flink version gets its own
+      distribution from this single module.
+    -->
 
     <properties>
         <japicmp.skip>true</japicmp.skip>
     </properties>
 
     <dependencies>
+        <!-- Declared before the generation common layer so the thin module's
+             compatibility classes win the shade priority on same-FQCN conflicts. -->
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-flink-${flink.line}</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>${flink.compat.artifactId}</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-common</artifactId>
@@ -58,42 +78,6 @@ limitations under the License.
             <version>${project.version}</version>
         </dependency>
     </dependencies>
-
-    <profiles>
-        <profile>
-            <id>flink2</id>
-            <dependencies>
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink2-compat</artifactId>
-                    <version>${project.version}</version>
-                </dependency>
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-shaded-guava</artifactId>
-                    <version>${flink.2.x.shaded.guava.version}</version>
-                </dependency>
-            </dependencies>
-        </profile>
-        <profile>
-            <id>flink1</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <dependencies>
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink1-compat</artifactId>
-                    <version>${project.version}</version>
-                </dependency>
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-shaded-guava</artifactId>
-                    <version>${flink.1.x.shaded.guava.version}</version>
-                </dependency>
-            </dependencies>
-        </profile>
-    </profiles>
 
     <build>
         <plugins>
@@ -152,7 +136,7 @@ limitations under the License.
                             <tarLongFileMode>gnu</tarLongFileMode>
                             <appendAssemblyId>false</appendAssemblyId>
                             <attach>false</attach>
-                            <finalName>flink-cdc-${project.version}-bin</finalName>
+                            <finalName>flink-cdc-${revision}-flink-${flink.line}-bin</finalName>
                             <descriptors>
                                 <descriptor>${basedir}/src/main/assembly/assembly.xml</descriptor>
                             </descriptors>

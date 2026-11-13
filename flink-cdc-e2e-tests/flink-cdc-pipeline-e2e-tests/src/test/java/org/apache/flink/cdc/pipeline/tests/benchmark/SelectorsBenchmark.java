@@ -19,8 +19,7 @@ package org.apache.flink.cdc.pipeline.tests.benchmark;
 
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Selectors;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.ImmutableList;
 
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;

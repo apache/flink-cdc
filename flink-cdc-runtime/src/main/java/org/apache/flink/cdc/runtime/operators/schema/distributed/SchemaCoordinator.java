@@ -37,16 +37,15 @@ import org.apache.flink.cdc.runtime.operators.schema.common.event.FlushSuccessEv
 import org.apache.flink.cdc.runtime.operators.schema.common.event.GetOriginalSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.schema.distributed.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.distributed.event.SchemaChangeResponse;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.HashBasedTable;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.HashMultimap;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.Multimap;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.Table;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkRuntimeException;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.HashBasedTable;
-import org.apache.flink.shaded.guava31.com.google.common.collect.HashMultimap;
-import org.apache.flink.shaded.guava31.com.google.common.collect.Multimap;
-import org.apache.flink.shaded.guava31.com.google.common.collect.Table;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

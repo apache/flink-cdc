@@ -23,8 +23,7 @@ import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.composer.testsource.source.DistributedDataSource;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.ImmutableSet;
 
 import java.util.HashSet;
 import java.util.Set;

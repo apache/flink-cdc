@@ -224,7 +224,7 @@ This file is based on the checkstyle file of Apache Beam.
         </module>
         <module name="IllegalImport">
             <property name="illegalPkgs" value="com.google.common"/>
-            <message key="import.illegal" value="{0}; Use flink-shaded-guava instead."/>
+            <message key="import.illegal" value="{0}; Use flink-cdc-shaded-guava instead."/>
         </module>
         <module name="IllegalImport">
             <property name="regexp" value="true"/>

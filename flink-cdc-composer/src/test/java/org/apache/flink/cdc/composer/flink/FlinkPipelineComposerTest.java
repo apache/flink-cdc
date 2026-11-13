@@ -41,11 +41,10 @@ import org.apache.flink.cdc.composer.utils.factory.DataSinkFactory1;
 import org.apache.flink.cdc.connectors.values.factory.ValuesDataFactory;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSource;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.ImmutableMap;
 import org.apache.flink.configuration.DeploymentOptions;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.core.fs.Path;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
