@@ -32,6 +32,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
 import org.apache.flink.cdc.runtime.testutils.operators.RegularEventOperatorTestHarness;
@@ -44,6 +45,8 @@ import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.validate.SqlValidatorException;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.math.BigDecimal;
 import java.util.Collections;
@@ -654,6 +657,78 @@ class PostTransformOperatorTest {
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEvent));
         transformFunctionEventEventOperatorTestHarness.close();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        // DECIMAL column with a decimal literal, an integer literal, and all four operators.
+        "colDecimal * 1.13, 3.5482",
+        "colDecimal * 2, 6.28",
+        "colDecimal + 1.5, 4.64",
+        "colDecimal - 1.5, 1.64",
+        "colDecimal / 2, 1.57",
+        // Integer column with a decimal literal: the derived type is DECIMAL.
+        "colInt * 1.5, 1.5",
+        // Literal on the left-hand side.
+        "1.13 * colDecimal, 3.5482",
+        // Negative literal, nested arithmetic and two DECIMAL operands (already worked before).
+        "colDecimal * -1.5, -4.71",
+        "(colDecimal + 1.5) * 2, 9.28",
+        "colDecimal * colDecimal, 9.8596"
+    })
+    void testDecimalArithmeticWithNumericLiteral(String projection, String expected)
+            throws Exception {
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                DATATYPE_TABLEID.identifier(),
+                                "colString, " + projection + " AS calc_col",
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                new SupportedMetadataColumn[0])
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        harness.open();
+        transform.processElement(
+                new StreamRecord<>(new CreateTableEvent(DATATYPE_TABLEID, DATATYPE_SCHEMA)));
+        CreateTableEvent outputCreateTable =
+                (CreateTableEvent) harness.getOutputRecords().poll().getValue();
+        DecimalType resultType =
+                (DecimalType) outputCreateTable.getSchema().getColumn("calc_col").get().getType();
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(((RowType) DATATYPE_SCHEMA.toRowDataType()));
+        transform.processElement(
+                new StreamRecord<>(
+                        DataChangeEvent.insertEvent(
+                                DATATYPE_TABLEID,
+                                generator.generate(
+                                        new Object[] {
+                                            BinaryStringData.fromString("3.14"),
+                                            true,
+                                            (byte) 1,
+                                            (short) 1,
+                                            1,
+                                            1L,
+                                            DateData.fromEpochDay(1704471599),
+                                            TimeData.fromMillisOfDay(1704471),
+                                            TimestampData.fromMillis(1704471599),
+                                            3.14f,
+                                            3.14d,
+                                            DecimalData.fromBigDecimal(
+                                                    new BigDecimal("3.14"), 6, 2),
+                                        }))));
+        DataChangeEvent output = (DataChangeEvent) harness.getOutputRecords().poll().getValue();
+        BigDecimal actual =
+                output.after()
+                        .getDecimal(1, resultType.getPrecision(), resultType.getScale())
+                        .toBigDecimal();
+        Assertions.assertThat(actual).isEqualByComparingTo(new BigDecimal(expected));
+        harness.close();
     }
 
     @Test
