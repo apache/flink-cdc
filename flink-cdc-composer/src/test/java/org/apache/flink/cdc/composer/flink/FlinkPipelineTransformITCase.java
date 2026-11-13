@@ -68,6 +68,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -2180,7 +2181,67 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, Derrida, 25, student, Derrida, 26, extras], after=[], op=DELETE, meta=()}");
     }
 
+    @ParameterizedTest
+    @CsvSource(
+            delimiter = '|',
+            value = {
+                "decimal_c * 1.13 | 3.5482",
+                "decimal_c * 2 | 6.28",
+                "decimal_c - 1.5 | 1.64",
+                "int_c * 1.5 | 1.5",
+                "int_c / 1.5 | 0.666666",
+                "int_c / decimal_c | 0.3184713",
+                "1 / decimal_c | 0.3184713",
+                "1.5 / decimal_c | 0.47770700",
+                "decimal_c / 3 | 1.0466666666666",
+                "tiny_c + 1.5 | 2.5"
+            })
+    void testDecimalArithmeticWithNumericLiteral(String expression, String expected)
+            throws Exception {
+        TableId tableId = TableId.tableId("ns", "scm", "tbl");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT())
+                        .physicalColumn("tiny_c", DataTypes.TINYINT())
+                        .physicalColumn("int_c", DataTypes.INT())
+                        .physicalColumn("decimal_c", DataTypes.DECIMAL(6, 2))
+                        .primaryKey("id")
+                        .build();
+        List<Event> events =
+                Arrays.asList(
+                        new CreateTableEvent(tableId, schema),
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generate(
+                                        schema,
+                                        1L,
+                                        (byte) 1,
+                                        1,
+                                        DecimalData.fromBigDecimal(new BigDecimal("3.14"), 6, 2))));
+
+        String[] output = runPipelineWith(events, "id, " + expression + " AS r");
+
+        assertThat(output[output.length - 1])
+                .isEqualTo(
+                        "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[1, "
+                                + expected
+                                + "], op=INSERT, meta=()}");
+    }
+
     String[] runNumericCastingWith(DecimalPrecisionMode decimalPrecisionMode, String expression)
+            throws Exception {
+        return runPipelineWith(
+                generateNumericCastingEvents(TableId.tableId("ns", "scm", "tbl")),
+                decimalPrecisionMode,
+                expression);
+    }
+
+    String[] runPipelineWith(List<Event> events, String expression) throws Exception {
+        return runPipelineWith(events, DecimalPrecisionMode.UP_TO_19, expression);
+    }
+
+    String[] runPipelineWith(
+            List<Event> events, DecimalPrecisionMode decimalPrecisionMode, String expression)
             throws Exception {
         try {
             FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
@@ -2191,9 +2252,6 @@ class FlinkPipelineTransformITCase {
             sourceConfig.set(
                     ValuesDataSourceOptions.EVENT_SET_ID,
                     ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
-
-            TableId tableId = TableId.tableId("ns", "scm", "tbl");
-            List<Event> events = generateNumericCastingEvents(tableId);
 
             ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
 

@@ -853,8 +853,7 @@ public class JaninoCompiler {
                                             + "\""
                                 }),
                         new Java.AmbiguousName(
-                                Location.NOWHERE,
-                                new String[] {String.valueOf(literalPrecision)}),
+                                Location.NOWHERE, new String[] {String.valueOf(literalPrecision)}),
                         new Java.AmbiguousName(
                                 Location.NOWHERE, new String[] {String.valueOf(literalScale)})
                     });
