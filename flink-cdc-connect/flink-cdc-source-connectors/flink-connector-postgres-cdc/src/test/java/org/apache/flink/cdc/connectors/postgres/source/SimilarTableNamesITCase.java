@@ -224,6 +224,55 @@ class SimilarTableNamesITCase extends PostgresTestBase {
         }
     }
 
+    /**
+     * Test that when capturing CDC events for table 'cross_schema_tbl' in schema 'sch_test', we
+     * don't accidentally capture columns/events from the same-named table in schema 'schxtest'. The
+     * schema name is also passed to {@code DatabaseMetaData#getColumns} as a LIKE pattern, so the
+     * underscore '_' in 'sch_test' matches the 'x' in 'schxtest'. Since both schemas contain a
+     * table named 'cross_schema_tbl', a TABLE_NAME-only filter cannot tell them apart.
+     *
+     * <p>Before adding the schema-name check, this test would fail during the snapshot phase with:
+     * "java.lang.IllegalStateException: Duplicate key Optional.empty".
+     */
+    @Test
+    void testReadTableWithSimilarSchemaNameUnderscore() throws Exception {
+        StreamTableEnvironment tEnv = createTableEnv();
+
+        // Only capture events from 'sch_test.cross_schema_tbl'
+        tEnv.executeSql(createSourceDDL("cross_schema_table", "sch_test", "cross_schema_tbl"));
+
+        TableResult result = tEnv.executeSql("SELECT * FROM cross_schema_table");
+        CloseableIterator<Row> iterator = result.collect();
+
+        try {
+            // Verify snapshot data (3 rows from sch_test.cross_schema_tbl only)
+            List<String> expectedSnapshotData =
+                    Arrays.asList(
+                            "+I[1001, sch_test_1, Shanghai]",
+                            "+I[1002, sch_test_2, Beijing]",
+                            "+I[1003, sch_test_3, Hangzhou]");
+            assertRowsEquals(collectRows(iterator, 3), expectedSnapshotData);
+
+            try (Connection conn =
+                            getJdbcConnection(
+                                    POSTGRES_CONTAINER, similarNamesDatabase.getDatabaseName());
+                    Statement stmt = conn.createStatement()) {
+                // Insert into the look-alike schema - should NOT be captured
+                stmt.execute(
+                        "INSERT INTO schxtest.cross_schema_tbl VALUES (2004, 'schxtest_4', 'Wuhan')");
+                // Insert into the target schema - SHOULD be captured
+                stmt.execute(
+                        "INSERT INTO sch_test.cross_schema_tbl VALUES (1004, 'sch_test_4', 'Suzhou')");
+            }
+
+            // Should only see the insert from sch_test, not schxtest
+            List<String> expectedStreamData = Arrays.asList("+I[1004, sch_test_4, Suzhou]");
+            assertRowsEquals(collectRows(iterator, 1), expectedStreamData);
+        } finally {
+            closeResourcesAndWaitForJobTermination(iterator, result);
+        }
+    }
+
     // ==================== Helper Methods ====================
 
     /** Creates and configures the StreamTableEnvironment. */
@@ -234,8 +283,14 @@ class SimilarTableNamesITCase extends PostgresTestBase {
         return StreamTableEnvironment.create(env);
     }
 
-    /** Creates the source DDL for the given table name pattern. */
+    /** Creates the source DDL for the given table name pattern in the default schema. */
     private String createSourceDDL(String flinkTableName, String pgTablePattern) {
+        return createSourceDDL(flinkTableName, SCHEMA_NAME, pgTablePattern);
+    }
+
+    /** Creates the source DDL for the given schema name and table name pattern. */
+    private String createSourceDDL(
+            String flinkTableName, String pgSchemaName, String pgTablePattern) {
         return format(
                 "CREATE TABLE %s ("
                         + " id INT NOT NULL,"
@@ -264,7 +319,7 @@ class SimilarTableNamesITCase extends PostgresTestBase {
                 similarNamesDatabase.getUsername(),
                 similarNamesDatabase.getPassword(),
                 similarNamesDatabase.getDatabaseName(),
-                SCHEMA_NAME,
+                pgSchemaName,
                 pgTablePattern,
                 slotName);
     }
