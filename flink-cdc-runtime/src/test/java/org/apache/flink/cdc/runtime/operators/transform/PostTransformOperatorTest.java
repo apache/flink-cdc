@@ -674,7 +674,16 @@ class PostTransformOperatorTest {
         // Negative literal, nested arithmetic and two DECIMAL operands (already worked before).
         "colDecimal * -1.5, -4.71",
         "(colDecimal + 1.5) * 2, 9.28",
-        "colDecimal * colDecimal, 9.8596"
+        "colDecimal * colDecimal, 9.8596",
+        "colInt / 1.5, 0.666666",
+        "colInt / colDecimal, 0.3184713",
+        "1 / colDecimal, 0.3184713",
+        "1.5 / colDecimal, 0.4777070",
+        "colDecimal / colDecimal, 1",
+        "colBigint * 0.001, 0.001",
+        "colTinyint + 1.5, 2.5",
+        "colDecimal / 3, 1.0466666666666",
+        "colDecimal / 3.0, 1.046666"
     })
     void testDecimalArithmeticWithNumericLiteral(String projection, String expected)
             throws Exception {

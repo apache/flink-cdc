@@ -787,7 +787,11 @@ public class JaninoCompiler {
                 for (int i = 0; i < atoms.length; i++) {
                     decimalAtoms[i] =
                             alignOperandToBigDecimal(
-                                    context, sqlBasicCall.getOperandList().get(i), atoms[i]);
+                                    context,
+                                    sqlBasicCall.getOperandList().get(i),
+                                    atoms[i],
+                                    ((DecimalType) resultType).getScale(),
+                                    i == 0 && "/".equals(operator));
                 }
                 return new Java.MethodInvocation(Location.NOWHERE, null, handler, decimalAtoms);
             }
@@ -803,7 +807,11 @@ public class JaninoCompiler {
      * primitives, so both are converted through {@code castToBigDecimal}.
      */
     private static Java.Rvalue alignOperandToBigDecimal(
-            Context context, SqlNode operand, Java.Rvalue atom) {
+            Context context,
+            SqlNode operand,
+            Java.Rvalue atom,
+            int resultScale,
+            boolean isDividend) {
         boolean isNumericLiteral = operand instanceof SqlNumericLiteral;
         DataType operandType =
                 TransformParser.deduceSubExpressionType(
@@ -814,11 +822,24 @@ public class JaninoCompiler {
                         context.decimalPrecisionMode);
         if (operandType.is(DataTypeRoot.DECIMAL)) {
             if (!isNumericLiteral) {
-                return atom;
+                if (!isDividend) {
+                    return atom;
+                }
+                // ArithmeticFunctions.divides keeps the scale of its dividend, so widen it to the
+                // result scale or "decimalCol / 3" would be truncated to the column's scale.
+                return castToScale(atom, resultScale);
             }
             // Build the BigDecimal from the literal's text, never from a double, so the exact
             // value (e.g. 1.13) survives.
             DecimalType literalType = (DecimalType) operandType;
+            // ArithmeticFunctions.divides keeps the scale of its left operand, so widen the literal
+            // to the result scale; otherwise "1.5 / decimalCol" would truncate to one fractional
+            // digit.
+            int literalScale = Math.max(literalType.getScale(), resultScale);
+            int literalPrecision =
+                    Math.min(
+                            DecimalType.MAX_PRECISION,
+                            literalType.getPrecision() + literalScale - literalType.getScale());
             return generateFunctionOperation(
                     "castToBigDecimal",
                     new Java.Rvalue[] {
@@ -833,13 +854,16 @@ public class JaninoCompiler {
                                 }),
                         new Java.AmbiguousName(
                                 Location.NOWHERE,
-                                new String[] {String.valueOf(literalType.getPrecision())}),
+                                new String[] {String.valueOf(literalPrecision)}),
                         new Java.AmbiguousName(
-                                Location.NOWHERE,
-                                new String[] {String.valueOf(literalType.getScale())})
+                                Location.NOWHERE, new String[] {String.valueOf(literalScale)})
                     });
         }
         // Integral operand (TINYINT..BIGINT or an integer literal) combined with a DECIMAL operand.
+        return castToScale(atom, resultScale);
+    }
+
+    private static Java.Rvalue castToScale(Java.Rvalue atom, int scale) {
         return generateFunctionOperation(
                 "castToBigDecimal",
                 new Java.Rvalue[] {
@@ -847,7 +871,7 @@ public class JaninoCompiler {
                     new Java.AmbiguousName(
                             Location.NOWHERE,
                             new String[] {String.valueOf(DecimalType.MAX_PRECISION)}),
-                    new Java.AmbiguousName(Location.NOWHERE, new String[] {"0"})
+                    new Java.AmbiguousName(Location.NOWHERE, new String[] {String.valueOf(scale)})
                 });
     }
 
