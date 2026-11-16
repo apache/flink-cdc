@@ -116,8 +116,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
 
     /**
      * Creates a state with the snapshot metadata already released (FLINK-39775) and no
-     * checkpointIdToFinish set. Kept so callers that only care about the released flag do not
-     * need to pass the checkpoint field explicitly.
+     * checkpointIdToFinish set. Kept so callers that only care about the released flag do not need
+     * to pass the checkpoint field explicitly.
      */
     public SnapshotPendingSplitsState(
             List<TableId> alreadyProcessedTables,
@@ -148,8 +148,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
 
     /**
      * Creates a state with a checkpointIdToFinish (FLINK-39478) and the snapshot metadata not
-     * released. Kept so callers that only care about the checkpoint field do not need to pass
-     * the released flag explicitly.
+     * released. Kept so callers that only care about the checkpoint field do not need to pass the
+     * released flag explicitly.
      */
     public SnapshotPendingSplitsState(
             List<TableId> alreadyProcessedTables,
