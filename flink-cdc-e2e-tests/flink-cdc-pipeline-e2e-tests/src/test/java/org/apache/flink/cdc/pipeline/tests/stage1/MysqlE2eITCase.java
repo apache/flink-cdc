@@ -642,8 +642,9 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
         waitUntilStreamSplitReady(jobId, parallelism);
 
         String databaseName = mysqlInventoryDatabase.getDatabaseName();
-        waitUntilSpecificEvent(
-                String.format("CreateTableEvent{tableId=%s.reorder_probe", databaseName));
+        waitUntilLogContains(
+                taskManagerConsumer,
+                String.format("CreateTableEvent{tableId=%s.reorder_probe,", databaseName));
 
         executeReorderSql(
                 "INSERT INTO reorder_probe (id, label, amount, priority) "
@@ -750,7 +751,8 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
 
         String databaseName = mysqlInventoryDatabase.getDatabaseName();
         String tableId = databaseName + ".excluded_reorder_probe";
-        waitUntilSpecificEvent(String.format("CreateTableEvent{tableId=%s", tableId));
+        waitUntilLogContains(
+                taskManagerConsumer, String.format("CreateTableEvent{tableId=%s,", tableId));
 
         String moveLabelFirst =
                 String.format(

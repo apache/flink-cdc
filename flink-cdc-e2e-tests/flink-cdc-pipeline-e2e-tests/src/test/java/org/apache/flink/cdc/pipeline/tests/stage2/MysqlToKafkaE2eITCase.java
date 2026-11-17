@@ -490,18 +490,18 @@ class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
                 List.of(
                         "{\"before\":null,\"after\":{\"id\":110,\"name\":\"pre-reorder\",\"description\":\"before\",\"weight\":1.5,\"enum_c\":\"red\",\"json_c\":null,\"point_c\":null},\"op\":\"c\",\"source\":{\"db\":\""
                                 + databaseName
-                                + "\",\"table\":\"products\",\"ts_ms\":0}}",
+                                + "\",\"table\":\"products\"}}",
                         "{\"before\":{\"id\":110,\"name\":\"pre-reorder\",\"description\":\"before\",\"weight\":1.5,\"enum_c\":\"red\",\"json_c\":null,\"point_c\":null},\"after\":{\"id\":110,\"name\":\"pre-reorder\",\"description\":\"before-update\",\"weight\":1.5,\"enum_c\":\"red\",\"json_c\":null,\"point_c\":null},\"op\":\"u\",\"source\":{\"db\":\""
                                 + databaseName
-                                + "\",\"table\":\"products\",\"ts_ms\":0}}");
+                                + "\",\"table\":\"products\"}}");
         List<String> expectedPostReorderRecords =
                 List.of(
                         "{\"before\":null,\"after\":{\"description\":\"after\",\"weight\":2.5,\"id\":111,\"name\":\"post-reorder\",\"enum_c\":\"red\",\"json_c\":null,\"point_c\":null},\"op\":\"c\",\"source\":{\"db\":\""
                                 + databaseName
-                                + "\",\"table\":\"products\",\"ts_ms\":0}}",
+                                + "\",\"table\":\"products\"}}",
                         "{\"before\":{\"description\":\"after\",\"weight\":2.5,\"id\":111,\"name\":\"post-reorder\",\"enum_c\":\"red\",\"json_c\":null,\"point_c\":null},\"after\":{\"description\":\"after\",\"weight\":3.5,\"id\":111,\"name\":\"post-reorder\",\"enum_c\":\"red\",\"json_c\":null,\"point_c\":null},\"op\":\"u\",\"source\":{\"db\":\""
                                 + databaseName
-                                + "\",\"table\":\"products\",\"ts_ms\":0}}");
+                                + "\",\"table\":\"products\"}}");
         try (Connection conn =
                         DriverManager.getConnection(
                                 mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
