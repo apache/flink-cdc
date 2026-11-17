@@ -607,7 +607,7 @@ class DebeziumJsonSerializationSchemaTest {
                 Schema.newBuilder()
                         .physicalColumn("id", DataTypes.INT())
                         .physicalColumn("name", DataTypes.STRING())
-                        .physicalColumn("age", DataTypes.INT())
+                        .physicalColumn("city", DataTypes.STRING())
                         .primaryKey("id")
                         .build();
         assertThat(serializationSchema.serialize(new CreateTableEvent(TABLE_1, schema))).isNull();
@@ -617,24 +617,26 @@ class DebeziumJsonSerializationSchemaTest {
                                         TABLE_1,
                                         Collections.singletonList(
                                                 new ReorderColumnEvent.ColumnMove(
-                                                        "name", ColumnPosition.FIRST, null)))))
+                                                        "city", ColumnPosition.AFTER, "id")))))
                 .isNull();
 
         BinaryRecordDataGenerator generator =
                 new BinaryRecordDataGenerator(
-                        RowType.of(DataTypes.STRING(), DataTypes.INT(), DataTypes.INT()));
+                        RowType.of(DataTypes.INT(), DataTypes.STRING(), DataTypes.STRING()));
         byte[] bytes =
                 serializationSchema.serialize(
                         DataChangeEvent.insertEvent(
                                 TABLE_1,
                                 generator.generate(
                                         new Object[] {
-                                            BinaryStringData.fromString("Alice"), 7, 31
+                                            7,
+                                            BinaryStringData.fromString("Hangzhou"),
+                                            BinaryStringData.fromString("Alice")
                                         })));
 
         JsonNode after = mapper.readTree(bytes).path("after");
         assertThat(after.path("name").asText()).isEqualTo("Alice");
         assertThat(after.path("id").asInt()).isEqualTo(7);
-        assertThat(after.path("age").asInt()).isEqualTo(31);
+        assertThat(after.path("city").asText()).isEqualTo("Hangzhou");
     }
 }
