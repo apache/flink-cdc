@@ -201,7 +201,7 @@ pipeline:
       <td>Integer</td>
       <td>Number of buckets when creating a StarRocks table automatically. For StarRocks 2.5 or later, it's not required
             to set the option because StarRocks can 
-            <a href="https://docs.starrocks.io/docs/table_design/Data_distribution/#set-the-number-of-buckets">
+            <a href="https://docs.starrocks.io/docs/table_design/data_distribution/#set-the-number-of-buckets">
             determine the number of buckets automatically</a>. For StarRocks prior to 2.5, you must set this option. </td>
     </tr>
     <tr>
@@ -251,7 +251,7 @@ pipeline:
   * the distribution keys are the same as the primary keys
   * there is no partition key
   * the number of buckets is controlled by `table.create.num-buckets`. If you are using StarRocks 2.5 or later,
-    it's not required to set the option because StarRocks can [determine the number of buckets automatically](https://docs.starrocks.io/docs/table_design/Data_distribution/#set-the-number-of-buckets),
+    it's not required to set the option because StarRocks can [determine the number of buckets automatically](https://docs.starrocks.io/docs/table_design/data_distribution/#set-the-number-of-buckets),
     otherwise you must set the option.
 
 * For schema change synchronization

@@ -268,7 +268,7 @@ their existing expiry and close handling remain in effect.
 
   To enable schema change synchronization, configure the pipeline with `schema.change.behavior: lenient`. If you want to ignore all schema changes, use `schema.change.behavior: IGNORE`.
 
-* For data synchronization, the pipeline connector uses [Fluss Java Client](https://fluss.apache.org/docs/apis/java-client/)
+* For data synchronization, the pipeline connector uses [Fluss Java Client](https://fluss.apache.org/docs/apis/java/)
   to write data to Fluss.
 
 Data Type Mapping

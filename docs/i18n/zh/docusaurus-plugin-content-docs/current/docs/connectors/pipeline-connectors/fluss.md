@@ -255,7 +255,7 @@ Flink CDC 允许支持的数据湖前缀下的任意参数名和值，由 Fluss 
 
   要启用 Schema 变更同步，请在 pipeline 中配置 `schema.change.behavior: lenient`。如果想要忽略所有 Schema 变更，使用 `schema.change.behavior: IGNORE`。
 
-* 关于数据同步，Pipeline 连接器使用 [Fluss Java Client](https://fluss.apache.org/docs/apis/java-client/) 向 Fluss 写入数据。
+* 关于数据同步，Pipeline 连接器使用 [Fluss Java Client](https://fluss.apache.org/docs/apis/java/) 向 Fluss 写入数据。
 
 Data Type Mapping
 ----------------
