@@ -103,7 +103,7 @@ public class PostgresObjectUtils {
     public static PostgresConnection.PostgresValueConverterBuilder newPostgresValueConverterBuilder(
             PostgresConnectorConfig config) {
         return typeRegistry ->
-                CustomPostgresValueConverter.of(config, StandardCharsets.UTF_8, typeRegistry);
+                PostgresValueConverter.of(config, StandardCharsets.UTF_8, typeRegistry);
     }
 
     // modified from
