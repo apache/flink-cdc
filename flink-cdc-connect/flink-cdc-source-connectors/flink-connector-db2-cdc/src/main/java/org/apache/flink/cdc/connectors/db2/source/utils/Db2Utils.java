@@ -22,19 +22,21 @@ import org.apache.flink.cdc.connectors.db2.source.offset.LsnOffset;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
+import org.apache.flink.util.TemporaryClassLoaderContext;
 
+import io.debezium.config.CommonConnectorConfig;
 import io.debezium.connector.db2.Db2Connection;
 import io.debezium.connector.db2.Db2ConnectorConfig;
 import io.debezium.connector.db2.Db2DatabaseSchema;
-import io.debezium.connector.db2.Db2TopicSelector;
+import io.debezium.connector.db2.Db2ValueConverters;
 import io.debezium.connector.db2.Lsn;
 import io.debezium.connector.db2.SourceInfo;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
-import io.debezium.schema.TopicSelector;
-import io.debezium.util.SchemaNameAdjuster;
+import io.debezium.schema.SchemaNameAdjuster;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import javax.annotation.Nullable;
@@ -229,11 +231,24 @@ public class Db2Utils {
 
     public static Db2DatabaseSchema createDb2DatabaseSchema(
             Db2ConnectorConfig connectorConfig, Db2Connection connection) {
-        TopicSelector<TableId> topicSelector = Db2TopicSelector.defaultSelector(connectorConfig);
+        TopicNamingStrategy<TableId> topicSelector;
+        // Debezium 2.0 resolves classes through the thread context class loader; pin it to the
+        // loader that loaded Debezium so a stale/closed Flink user class loader cannot break it.
+        try (TemporaryClassLoaderContext ignored =
+                TemporaryClassLoaderContext.of(CommonConnectorConfig.class.getClassLoader())) {
+            topicSelector =
+                    connectorConfig.getTopicNamingStrategy(
+                            CommonConnectorConfig.TOPIC_NAMING_STRATEGY);
+        }
         SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
+        // Debezium 2.0 Db2DatabaseSchema requires the value converters explicitly.
+        Db2ValueConverters valueConverters =
+                new Db2ValueConverters(
+                        connectorConfig.getDecimalMode(),
+                        connectorConfig.getTemporalPrecisionMode());
 
         return new Db2DatabaseSchema(
-                connectorConfig, schemaNameAdjuster, topicSelector, connection);
+                connectorConfig, valueConverters, schemaNameAdjuster, topicSelector, connection);
     }
 
     // --------------------------private method-------------------------------

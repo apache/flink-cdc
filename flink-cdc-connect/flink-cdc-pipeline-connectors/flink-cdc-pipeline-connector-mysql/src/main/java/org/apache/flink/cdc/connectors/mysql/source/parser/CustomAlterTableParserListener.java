@@ -96,7 +96,8 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                             tableId,
                             original.columns(),
                             original.primaryKeyColumnNames(),
-                            original.defaultCharsetName());
+                            original.defaultCharsetName(),
+                            Collections.emptyList());
             parser.signalCreateTable(tableId, ctx);
             Schema.Builder builder = Schema.newBuilder();
             original.columns().forEach(column -> builder.column(toCdcColumn(column)));
@@ -170,7 +171,9 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
     public void enterColumnDeclaration(MySqlParser.ColumnDeclarationContext ctx) {
         parser.runIfNotNull(
                 () -> {
-                    String columnName = parser.parseName(ctx.uid());
+                    // Debezium 2.1 changed the MySQL grammar: columnDeclaration now exposes the
+                    // column name via fullColumnName() instead of uid().
+                    String columnName = parser.parseName(ctx.fullColumnName().uid());
                     ColumnEditor columnEditor = Column.editor().name(columnName);
                     if (columnDefinitionListener == null) {
                         columnDefinitionListener =

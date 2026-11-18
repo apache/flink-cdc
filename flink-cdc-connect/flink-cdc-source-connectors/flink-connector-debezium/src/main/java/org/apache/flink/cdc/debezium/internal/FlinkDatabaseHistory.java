@@ -18,11 +18,11 @@
 package org.apache.flink.cdc.debezium.internal;
 
 import io.debezium.config.Configuration;
-import io.debezium.relational.history.AbstractDatabaseHistory;
-import io.debezium.relational.history.DatabaseHistoryException;
-import io.debezium.relational.history.DatabaseHistoryListener;
+import io.debezium.relational.history.AbstractSchemaHistory;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.HistoryRecordComparator;
+import io.debezium.relational.history.SchemaHistoryException;
+import io.debezium.relational.history.SchemaHistoryListener;
 
 import java.util.Collection;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -40,9 +40,10 @@ import static org.apache.flink.cdc.debezium.utils.DatabaseHistoryUtil.retrieveHi
  * records will be stored in state (grow infinitely). We may need to come up with a
  * FileSystemDatabaseHistory in the future to store history in HDFS.
  */
-public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
+public class FlinkDatabaseHistory extends AbstractSchemaHistory {
 
-    public static final String DATABASE_HISTORY_INSTANCE_NAME = "database.history.instance.name";
+    public static final String DATABASE_HISTORY_INSTANCE_NAME =
+            "schema.history.internal.instance.name";
 
     private ConcurrentLinkedQueue<SchemaRecord> schemaRecords;
     private String instanceName;
@@ -57,7 +58,7 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
     public void configure(
             Configuration config,
             HistoryRecordComparator comparator,
-            DatabaseHistoryListener listener,
+            SchemaHistoryListener listener,
             boolean useCatalogBeforeSchema) {
         super.configure(config, comparator, listener, useCatalogBeforeSchema);
         this.instanceName = config.getString(DATABASE_HISTORY_INSTANCE_NAME);
@@ -68,6 +69,16 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
         registerHistory(instanceName, schemaRecords);
     }
 
+    // Debezium 2.0 wires SchemaHistoryMetrics in as the schema history listener, and
+    // AbstractSchemaHistory#start does nothing but hand it a started() callback. That callback
+    // registers a JMX MBean named only after the connector context and the topic prefix, so
+    // every parallel subtask sharing a TaskManager JVM asks for the very same name. Debezium
+    // answers a name clash by sleeping 5 seconds and retrying, twelve times. Flink CDC
+    // publishes its own metrics and never reads these MBeans, and Debezium 1.9 did not
+    // register them either, so skip the registration.
+    @Override
+    public void start() {}
+
     @Override
     public void stop() {
         super.stop();
@@ -75,7 +86,7 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
     }
 
     @Override
-    protected void storeRecord(HistoryRecord record) throws DatabaseHistoryException {
+    protected void storeRecord(HistoryRecord record) throws SchemaHistoryException {
         this.schemaRecords.add(new SchemaRecord(record));
     }
 

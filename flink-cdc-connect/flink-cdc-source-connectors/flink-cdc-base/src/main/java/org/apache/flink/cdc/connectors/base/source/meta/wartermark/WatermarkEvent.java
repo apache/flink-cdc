@@ -19,7 +19,7 @@ package org.apache.flink.cdc.connectors.base.source.meta.wartermark;
 
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 
-import io.debezium.util.SchemaNameAdjuster;
+import io.debezium.schema.SchemaNameAdjuster;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;

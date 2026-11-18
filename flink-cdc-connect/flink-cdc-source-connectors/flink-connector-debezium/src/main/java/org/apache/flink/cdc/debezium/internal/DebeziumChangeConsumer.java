@@ -28,6 +28,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -78,8 +79,9 @@ public class DebeziumChangeConsumer
                         "DUMMY",
                         Schema.BOOLEAN_SCHEMA,
                         true);
-        EmbeddedEngineChangeEvent<SourceRecord, SourceRecord> changeEvent =
-                new EmbeddedEngineChangeEvent<>(null, recordWrapper, recordWrapper);
+        EmbeddedEngineChangeEvent<SourceRecord, SourceRecord, Object> changeEvent =
+                new EmbeddedEngineChangeEvent<>(
+                        null, recordWrapper, Collections.emptyList(), recordWrapper);
         currentCommitter.markProcessed(changeEvent);
         currentCommitter.markBatchFinished();
     }

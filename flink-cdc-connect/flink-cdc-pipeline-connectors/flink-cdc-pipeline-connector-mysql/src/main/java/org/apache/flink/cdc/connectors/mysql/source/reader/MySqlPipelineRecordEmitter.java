@@ -37,6 +37,7 @@ import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
+import io.debezium.connector.mysql.charset.MySqlCharsetRegistry;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
 import io.debezium.relational.RelationalDatabaseConnectorConfig;
@@ -315,7 +316,14 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                                     false);
             mySqlAntlrDdlParser =
                     new MySqlAntlrDdlParser(
-                            true, false, includeComments, null, Tables.TableFilter.includeAll());
+                            true,
+                            false,
+                            includeComments,
+                            null,
+                            Tables.TableFilter.includeAll(),
+                            // Debezium 2.7 added the BinlogCharsetRegistry argument; it is
+                            // dereferenced when parsing a COLLATE clause, so it must not be null.
+                            new MySqlCharsetRegistry());
         }
         return mySqlAntlrDdlParser;
     }

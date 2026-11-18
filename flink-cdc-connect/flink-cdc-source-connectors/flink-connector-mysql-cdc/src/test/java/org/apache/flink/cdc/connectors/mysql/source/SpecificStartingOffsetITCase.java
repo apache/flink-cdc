@@ -44,7 +44,7 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.test.junit5.MiniClusterExtension;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.connector.mysql.jdbc.MySqlConnection;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import io.debezium.antlr.AntlrDdlParserListener;
 import io.debezium.antlr.DataTypeResolver;
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
+import io.debezium.connector.mysql.charset.MySqlCharsetRegistry;
 import io.debezium.ddl.parser.mysql.generated.MySqlParser;
 import io.debezium.relational.Tables;
 
@@ -40,7 +41,17 @@ public class CustomMySqlAntlrDdlParser extends MySqlAntlrDdlParser {
 
     public CustomMySqlAntlrDdlParser(
             boolean includeComments, boolean tinyInt1isBit, boolean isTableIdCaseInsensitive) {
-        super(true, false, includeComments, null, Tables.TableFilter.includeAll());
+        // Debezium 2.7 added the BinlogCharsetRegistry argument. It must not be null: the
+        // parser dereferences it in extractCharset() whenever a COLLATE clause appears without
+        // an accompanying CHARACTER SET, which is how MySQL renders a collation. This is the
+        // same implementation Debezium's own MySqlDatabaseSchema resolves from its registry.
+        super(
+                true,
+                false,
+                includeComments,
+                null,
+                Tables.TableFilter.includeAll(),
+                new MySqlCharsetRegistry());
         this.parsedEvents = new LinkedList<>();
         this.tinyInt1isBit = tinyInt1isBit;
         this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;

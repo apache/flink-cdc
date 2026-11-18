@@ -104,7 +104,8 @@ public class CustomPostgresSchema {
         final PostgresOffsetContext offsetContext =
                 PostgresOffsetContext.initialContext(dbzConfig, jdbcConnection, Clock.SYSTEM);
 
-        PostgresPartition partition = new PostgresPartition(dbzConfig.getLogicalName());
+        PostgresPartition partition =
+                new PostgresPartition(dbzConfig.getLogicalName(), dbzConfig.databaseName());
 
         Tables tables = new Tables();
         try {

@@ -19,7 +19,12 @@ package io.debezium.connector.mysql.util;
 
 import java.util.regex.Pattern;
 
-/** This util tries to optimize error message for some exceptions. */
+/**
+ * This util tries to optimize error message for some exceptions. *
+ *
+ * <p>This is a Flink CDC owned class (not a Debezium fork), placed in the {@code io.debezium}
+ * package for access to package-private Debezium members.
+ */
 public class ErrorMessageUtils {
     private static final Pattern SERVER_ID_CONFLICT =
             Pattern.compile(

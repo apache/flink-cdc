@@ -22,8 +22,12 @@ import org.junit.jupiter.api.Test;
 
 /** Unit test for {@link BinlogOffset}. */
 public class BinlogOffsetTest {
-    public static final String PART_OF_GTID_SET_1 = "abcd:1-4";
-    public static final String PART_OF_GTID_SET_2 = "efgh:1-10";
+    // Real server UUIDs: since mysql-binlog-connector-java 0.28 (Debezium 2.4) GtidSet parses the
+    // source id with UUID.fromString, so placeholder ids are rejected.
+    public static final String SERVER_UUID_1 = "24bc7850-2c16-11e6-a073-0242ac110002";
+    public static final String SERVER_UUID_2 = "24bc7850-2c16-11e6-a073-0242ac110003";
+    public static final String PART_OF_GTID_SET_1 = SERVER_UUID_1 + ":1-4";
+    public static final String PART_OF_GTID_SET_2 = SERVER_UUID_2 + ":1-10";
     public static final String FULL_GTID_SET =
             String.join(",", PART_OF_GTID_SET_1, PART_OF_GTID_SET_2);
 
@@ -54,7 +58,7 @@ public class BinlogOffsetTest {
         BinlogOffset offset3 = BinlogOffset.builder().setGtidSet(PART_OF_GTID_SET_1).build();
         BinlogOffset offset4 =
                 BinlogOffset.builder()
-                        .setGtidSet("abcd:1-5") // Contains offset3's GTID set
+                        .setGtidSet(SERVER_UUID_1 + ":1-5") // Contains offset3's GTID set
                         .build();
 
         // offset3 should be before offset4
@@ -69,7 +73,7 @@ public class BinlogOffsetTest {
                         .build();
         offset4 =
                 BinlogOffset.builder()
-                        .setGtidSet("abcd:1-5") // Contains offset3's GTID set
+                        .setGtidSet(SERVER_UUID_1 + ":1-5") // Contains offset3's GTID set
                         .setBinlogFilePosition("binlog.001", 23)
                         .build();
         assertCompareTo(offset3, offset4, -1);

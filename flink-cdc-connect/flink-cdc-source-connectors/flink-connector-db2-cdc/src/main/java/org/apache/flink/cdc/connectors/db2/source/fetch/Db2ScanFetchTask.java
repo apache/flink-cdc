@@ -21,17 +21,22 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
 import org.apache.flink.cdc.connectors.db2.source.fetch.Db2StreamFetchTask.StreamSplitReadTask;
+import org.apache.flink.cdc.debezium.internal.SnapshotterServiceFactory;
 
 import io.debezium.DebeziumException;
 import io.debezium.config.Configuration;
 import io.debezium.connector.db2.Db2Connection;
+import io.debezium.connector.db2.Db2Connector;
 import io.debezium.connector.db2.Db2ConnectorConfig;
 import io.debezium.connector.db2.Db2DatabaseSchema;
 import io.debezium.connector.db2.Db2OffsetContext;
 import io.debezium.connector.db2.Db2Partition;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.EventDispatcher;
+import io.debezium.pipeline.notification.NotificationService;
+import io.debezium.pipeline.signal.actions.snapshotting.SnapshotConfiguration;
 import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
+import io.debezium.pipeline.source.SnapshottingTask;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.pipeline.source.spi.SnapshotProgressListener;
 import io.debezium.pipeline.spi.ChangeRecordEmitter;
@@ -40,6 +45,7 @@ import io.debezium.relational.RelationalSnapshotChangeEventSource;
 import io.debezium.relational.SnapshotChangeRecordEmitter;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
+import io.debezium.schema.SchemaFactory;
 import io.debezium.util.Clock;
 import io.debezium.util.ColumnUtils;
 import io.debezium.util.Strings;
@@ -52,6 +58,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.Collections;
 
 import static org.apache.flink.cdc.connectors.db2.source.utils.Db2Utils.buildSplitScanQuery;
 import static org.apache.flink.cdc.connectors.db2.source.utils.Db2Utils.readTableSplitDataStatement;
@@ -82,7 +89,10 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
                 snapshotSplitReadTask.execute(
                         changeEventSourceContext,
                         sourceFetchContext.getPartition(),
-                        sourceFetchContext.getOffsetContext());
+                        sourceFetchContext.getOffsetContext(),
+                        snapshotSplitReadTask.getSnapshottingTask(
+                                sourceFetchContext.getPartition(),
+                                sourceFetchContext.getOffsetContext()));
         // execute stream read task
         if (!snapshotResult.isCompletedOrSkipped()) {
             taskRunning = false;
@@ -127,14 +137,16 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
                         .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
                         .build();
         // task to read wal and backfill for current split
+        Db2ConnectorConfig backfillConnectorConfig = new Db2ConnectorConfig(dezConf);
         return new StreamSplitReadTask(
-                new Db2ConnectorConfig(dezConf),
+                backfillConnectorConfig,
                 context.getConnection(),
                 context.getMetaDataConnection(),
                 context.getEventDispatcher(),
                 context.getWaterMarkDispatcher(),
                 context.getErrorHandler(),
                 context.getDatabaseSchema(),
+                SnapshotterServiceFactory.create(backfillConnectorConfig, Db2Connector.class),
                 backfillBinlogSplit);
     }
 
@@ -166,7 +178,14 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
                 EventDispatcher<Db2Partition, TableId> dispatcher,
                 EventDispatcher.SnapshotReceiver<Db2Partition> snapshotReceiver,
                 SnapshotSplit snapshotSplit) {
-            super(connectorConfig, snapshotProgressListener);
+            super(
+                    connectorConfig,
+                    snapshotProgressListener,
+                    new NotificationService<>(
+                            Collections.emptyList(),
+                            connectorConfig,
+                            SchemaFactory.get(),
+                            notification -> {}));
             this.offsetContext = previousOffset;
             this.connectorConfig = connectorConfig;
             this.databaseSchema = databaseSchema;
@@ -182,12 +201,12 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
         public SnapshotResult<Db2OffsetContext> execute(
                 ChangeEventSourceContext context,
                 Db2Partition partition,
-                Db2OffsetContext previousOffset)
+                Db2OffsetContext previousOffset,
+                SnapshottingTask snapshottingTask)
                 throws InterruptedException {
-            SnapshottingTask snapshottingTask = getSnapshottingTask(partition, previousOffset);
             final Db2SnapshotContext ctx;
             try {
-                ctx = prepare(partition);
+                ctx = prepare(partition, false);
             } catch (Exception e) {
                 LOG.error("Failed to initialize snapshot context.", e);
                 throw new RuntimeException(e);
@@ -218,14 +237,26 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
         }
 
         @Override
-        protected SnapshottingTask getSnapshottingTask(
+        public SnapshottingTask getSnapshottingTask(
                 Db2Partition partition, Db2OffsetContext previousOffset) {
-            return new SnapshottingTask(false, true);
+            return new SnapshottingTask(
+                    false, true, Collections.emptyList(), Collections.emptyMap(), false);
         }
 
         @Override
-        protected Db2SnapshotContext prepare(Db2Partition partition) throws Exception {
-            return new Db2SnapshotContext(partition);
+        public SnapshottingTask getBlockingSnapshottingTask(
+                Db2Partition partition,
+                Db2OffsetContext previousOffset,
+                SnapshotConfiguration snapshotConfiguration) {
+            // Debezium 2.6 made this abstract. Flink CDC drives its own split snapshot and never
+            // runs Debezium's signal-based blocking snapshot, so it behaves like the regular one.
+            return getSnapshottingTask(partition, previousOffset);
+        }
+
+        @Override
+        protected Db2SnapshotContext prepare(Db2Partition partition, boolean onDemand)
+                throws Exception {
+            return new Db2SnapshotContext(partition, onDemand);
         }
 
         private void createDataEvents(Db2SnapshotContext snapshotContext, TableId tableId)
@@ -279,8 +310,7 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
 
                 while (rs.next()) {
                     rows++;
-                    final Object[] row =
-                            jdbcConnection.rowToArray(table, databaseSchema, rs, columnArray);
+                    final Object[] row = jdbcConnection.rowToArray(table, rs, columnArray);
                     if (logTimer.expired()) {
                         long stop = clock.currentTimeInMillis();
                         LOG.info(
@@ -312,7 +342,7 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
                 Db2SnapshotContext snapshotContext, TableId tableId, Object[] row) {
             snapshotContext.offset.event(tableId, clock.currentTime());
             return new SnapshotChangeRecordEmitter<>(
-                    snapshotContext.partition, snapshotContext.offset, row, clock);
+                    snapshotContext.partition, snapshotContext.offset, row, clock, connectorConfig);
         }
 
         private Threads.Timer getTableScanLogTimer() {
@@ -323,8 +353,9 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
                 extends RelationalSnapshotChangeEventSource.RelationalSnapshotContext<
                         Db2Partition, Db2OffsetContext> {
 
-            public Db2SnapshotContext(Db2Partition partition) throws SQLException {
-                super(partition, "");
+            public Db2SnapshotContext(Db2Partition partition, boolean onDemand)
+                    throws SQLException {
+                super(partition, "", onDemand);
             }
         }
     }
@@ -344,5 +375,25 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
         public boolean isRunning() {
             return taskRunning;
         }
+
+        // The following methods are only used by Debezium's signal-based blocking snapshot,
+        // which Flink CDC does not use, so they are no-ops here.
+
+        @Override
+        public boolean isPaused() {
+            return false;
+        }
+
+        @Override
+        public void resumeStreaming() throws InterruptedException {}
+
+        @Override
+        public void waitSnapshotCompletion() throws InterruptedException {}
+
+        @Override
+        public void streamingPaused() {}
+
+        @Override
+        public void waitStreamingPaused() throws InterruptedException {}
     }
 }

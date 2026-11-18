@@ -185,7 +185,14 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.chunkSplitter =
                 createChunkSplitter(sourceConfig, isTableIdCaseSensitive, chunkSplitterState);
         this.partition =
-                new MySqlPartition(sourceConfig.getMySqlConnectorConfig().getLogicalName());
+                new MySqlPartition(
+                        sourceConfig.getMySqlConnectorConfig().getLogicalName(),
+                        sourceConfig
+                                .getMySqlConnectorConfig()
+                                .getConfig()
+                                .getString(
+                                        io.debezium.relational.RelationalDatabaseConnectorConfig
+                                                .DATABASE_NAME));
         this.enumeratorContext = enumeratorContext;
         // The released flag is persisted in the checkpoint (PendingSplitsStateSerializer v6), so
         // restore it directly rather than inferring it from the state shape.

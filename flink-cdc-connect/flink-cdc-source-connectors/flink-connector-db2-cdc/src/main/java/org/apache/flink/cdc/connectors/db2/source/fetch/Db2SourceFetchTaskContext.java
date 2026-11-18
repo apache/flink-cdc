@@ -31,6 +31,7 @@ import org.apache.flink.cdc.connectors.db2.source.offset.LsnOffset;
 import org.apache.flink.cdc.connectors.db2.source.utils.Db2Utils;
 import org.apache.flink.table.types.logical.RowType;
 
+import io.debezium.config.CommonConnectorConfig;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.base.ChangeEventQueue.Builder;
 import io.debezium.connector.db2.Db2Connection;
@@ -41,7 +42,6 @@ import io.debezium.connector.db2.Db2OffsetContext;
 import io.debezium.connector.db2.Db2OffsetContext.Loader;
 import io.debezium.connector.db2.Db2Partition;
 import io.debezium.connector.db2.Db2TaskContext;
-import io.debezium.connector.db2.Db2TopicSelector;
 import io.debezium.connector.db2.SourceInfo;
 import io.debezium.data.Envelope.FieldName;
 import io.debezium.pipeline.DataChangeEvent;
@@ -56,10 +56,10 @@ import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables.TableFilter;
-import io.debezium.schema.DataCollectionId;
-import io.debezium.schema.TopicSelector;
+import io.debezium.schema.SchemaNameAdjuster;
+import io.debezium.spi.schema.DataCollectionId;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import io.debezium.util.Collect;
-import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
@@ -82,7 +82,7 @@ public class Db2SourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     private ErrorHandler errorHandler;
     private ChangeEventQueue<DataChangeEvent> queue;
     private Db2TaskContext taskContext;
-    private TopicSelector<TableId> topicSelector;
+    private TopicNamingStrategy<TableId> topicSelector;
     private EventDispatcher.SnapshotReceiver<Db2Partition> snapshotReceiver;
     private SnapshotChangeEventSourceMetrics<Db2Partition> snapshotChangeEventSourceMetrics;
     private StreamingChangeEventSourceMetrics<Db2Partition> streamingChangeEventSourceMetrics;
@@ -102,7 +102,8 @@ public class Db2SourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     public void configure(SourceSplitBase sourceSplitBase) {
         // initial stateful objects
         final Db2ConnectorConfig connectorConfig = getDbzConnectorConfig();
-        this.topicSelector = Db2TopicSelector.defaultSelector(connectorConfig);
+        this.topicSelector =
+                connectorConfig.getTopicNamingStrategy(CommonConnectorConfig.TOPIC_NAMING_STRATEGY);
         EmbeddedFlinkDatabaseHistory.registerHistory(
                 sourceConfig
                         .getDbzConfiguration()
@@ -156,7 +157,7 @@ public class Db2SourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         this.streamingChangeEventSourceMetrics =
                 changeEventSourceMetricsFactory.getStreamingMetrics(
                         taskContext, queue, metadataProvider);
-        this.errorHandler = new ErrorHandler(Db2Connector.class, connectorConfig, queue);
+        this.errorHandler = new ErrorHandler(Db2Connector.class, connectorConfig, queue, null);
     }
 
     /** Loads the connector's persistent offset (if present) via the given loader. */

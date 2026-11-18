@@ -28,10 +28,6 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -55,10 +51,17 @@ public class OnlineSchemaChangeUtils {
     private static final Pattern OSC_TABLE_ID_PATTERN = Pattern.compile("^_(.*)_(gho|new)$");
 
     /**
-     * Pattern matching gh-ost delete table ({@code _<name>_del}) and pt-osc old table ({@code
-     * _<name>_old}), which are the temporary backup tables created during an online schema change.
+     * Pattern matching the {@code RENAME TABLE} statement both tools use to swap the shadow table
+     * in, tolerating the {@code /* gh-ost *&#47;} marker comment gh-ost inserts.
      */
-    private static final Pattern OSC_TEMP_TABLE_ID_PATTERN = Pattern.compile("^_(.*)_(del|old)$");
+    private static final Pattern RENAME_STATEMENT_PATTERN =
+            Pattern.compile(
+                    "^rename\\s+(?:/\\*.*?\\*/\\s*)?table\\s+(.+)$",
+                    Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+
+    /** Pattern matching a single {@code <from> TO <to>} pair inside a rename statement. */
+    private static final Pattern RENAME_PAIR_PATTERN =
+            Pattern.compile("^(\\S+)\\s+to\\s+(\\S+)$", Pattern.CASE_INSENSITIVE);
 
     /**
      * Checks whether the given source record is a gh-ost/pt-osc initiated schema change event by
@@ -144,51 +147,47 @@ public class OnlineSchemaChangeUtils {
                     OBJECT_MAPPER
                             .readTree(value.getString(HISTORY_RECORD_FIELD))
                             .get(HistoryRecord.Fields.DDL_STATEMENTS)
-                            .asText()
-                            .toLowerCase();
-            if (ddl.startsWith("rename table") || ddl.startsWith("rename /* gh-ost */ table")) {
-                LOG.info("Checking if DDL might be an OSC renaming event... {}", ddl);
-                List<String> tableNames =
-                        Arrays.asList(
-                                value.getStruct(Envelope.FieldName.SOURCE)
-                                        .getString(TABLE_NAME_KEY)
-                                        .split(","));
-                if (tableNames.size() != 2) {
-                    LOG.info(
-                            "Table name {} is malformed, skip it.",
-                            value.getStruct(Envelope.FieldName.SOURCE).getString(TABLE_NAME_KEY));
-                    return Optional.empty();
-                }
-
-                String renamedFromTableName =
-                        Collections.min(tableNames, Comparator.comparingInt(String::length));
-                String renamedToTableName =
-                        Collections.max(tableNames, Comparator.comparingInt(String::length));
-
-                LOG.info(
-                        "Determined the shorter TableId {} is the renaming source.",
-                        renamedFromTableName);
-                LOG.info(
-                        "Determined the longer TableId {} is the renaming target.",
-                        renamedToTableName);
-
-                if (OSC_TEMP_TABLE_ID_PATTERN.matcher(renamedToTableName).matches()) {
-                    LOG.info(
-                            "Renamed to TableId name {} matches OSC temporary TableId pattern, yield {}.",
-                            renamedToTableName,
-                            renamedFromTableName);
-                    return Optional.of(renamedFromTableName);
-                }
-
-                LOG.info(
-                        "Renamed to TableId {} does not match any RegEx pattern, skip it.",
-                        renamedToTableName);
+                            .asText();
+            Matcher statement = RENAME_STATEMENT_PATTERN.matcher(ddl.trim());
+            if (!statement.matches()) {
+                return Optional.empty();
             }
+            LOG.info("Checking if DDL might be an OSC renaming event... {}", ddl);
+            // Both tools finish with an atomic
+            // "RENAME TABLE tbl TO _tbl_del, _tbl_gho TO tbl". Debezium reports that as one
+            // schema change event per renamed table, so "source.table" carries a single name
+            // and the pair has to be read back out of the DDL text instead. Keying off the
+            // shadow table being promoted (_tbl_gho -> tbl) also means this fires exactly
+            // once, at the point the altered schema becomes the live one.
+            for (String renaming : statement.group(1).split(",")) {
+                Matcher pair = RENAME_PAIR_PATTERN.matcher(renaming.trim());
+                if (!pair.matches()) {
+                    continue;
+                }
+                String renamedFrom = tableName(pair.group(1));
+                String renamedTo = tableName(pair.group(2));
+                Matcher shadowTable = OSC_TABLE_ID_PATTERN.matcher(renamedFrom);
+                if (shadowTable.matches() && shadowTable.group(1).equals(renamedTo)) {
+                    LOG.info(
+                            "Shadow table {} was promoted to {}, online schema change is complete.",
+                            renamedFrom,
+                            renamedTo);
+                    return Optional.of(renamedTo);
+                }
+            }
+            LOG.info("DDL {} is not an OSC completion renaming, skip it.", ddl);
             return Optional.empty();
         } catch (JsonProcessingException e) {
             LOG.warn("Failed to parse schema change event {}", value, e);
             return Optional.empty();
         }
+    }
+
+    /** Strips the optional database qualifier and back quotes from a table reference. */
+    private static String tableName(String tableReference) {
+        String unquoted = tableReference.replace("`", "").trim();
+        int separator = unquoted.lastIndexOf('.');
+        return separator < 0 ? unquoted : unquoted.substring(separator + 1);
     }
 
     /**

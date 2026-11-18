@@ -11,13 +11,17 @@ import org.postgresql.replication.LogSequenceNumber;
 import java.nio.ByteBuffer;
 
 /**
- * Copied from Debezium 1.9.8.final without changes due to the NoSuchMethodError, caused by the fact
- * that current Debezium release java version is 11, so we need to compile this file by java 8
- * compiler. <a
- * href="https://www.morling.dev/blog/bytebuffer-and-the-dreaded-nosuchmethoderror/">More info</a>.
- * Abstraction of PostgreSQL log sequence number, adapted from {@link LogSequenceNumber}.
+ * Abstraction of PostgreSQL log sequence number, adapted from {@link
+ * org.postgresql.replication.LogSequenceNumber}.
  *
- * <p>Line 32: add NO_STOPPING_LSN
+ * <p>Copied from Debezium project(2.7.4.Final)..
+ *
+ * <p>Change 1: add {@code NO_STOPPING_LSN} and {@code isNonStopping()} — the sentinel used by Flink
+ * CDC's unbounded stream splits as the "never stop" high watermark.
+ *
+ * <p>Change 2: {@code valueOf(ByteBuffer)} resets the buffer position through {@code
+ * java.nio.Buffer} so the class links on Java 8 runtimes (newer JDKs give {@code
+ * ByteBuffer.position(int)} a covariant return type).
  */
 public class Lsn implements Comparable<Lsn> {
 
@@ -27,7 +31,6 @@ public class Lsn implements Comparable<Lsn> {
      */
     public static final Lsn INVALID_LSN = new Lsn(0);
 
-    /** The max lsn for the wal file. */
     public static final Lsn NO_STOPPING_LSN = Lsn.valueOf("FFFFFFFF/FFFFFFFF");
 
     private final long value;
@@ -85,6 +88,8 @@ public class Lsn implements Comparable<Lsn> {
         final ByteBuffer buf = ByteBuffer.allocate(8);
         buf.putInt(logicalXlog);
         buf.putInt(segment);
+        // Cast through Buffer: compiled against newer JDKs, ByteBuffer.position(int) has a
+        // covariant ByteBuffer return type that does not exist on Java 8 runtimes.
         ((java.nio.Buffer) buf).position(0);
         final long value = buf.getLong();
 
@@ -113,6 +118,8 @@ public class Lsn implements Comparable<Lsn> {
     public String asString() {
         final ByteBuffer buf = ByteBuffer.allocate(8);
         buf.putLong(value);
+        // Cast through Buffer: compiled against newer JDKs, ByteBuffer.position(int) has a
+        // covariant ByteBuffer return type that does not exist on Java 8 runtimes.
         ((java.nio.Buffer) buf).position(0);
 
         final int logicalXlog = buf.getInt();
@@ -143,13 +150,14 @@ public class Lsn implements Comparable<Lsn> {
         return this != INVALID_LSN;
     }
 
-    public boolean isNonStopping() {
-        return this == NO_STOPPING_LSN;
-    }
-
     @Override
     public String toString() {
         return "LSN{" + asString() + '}';
+    }
+
+    /** Whether this is the {@link #NO_STOPPING_LSN} sentinel. */
+    public boolean isNonStopping() {
+        return this == NO_STOPPING_LSN;
     }
 
     @Override

@@ -25,10 +25,12 @@ import org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkKind
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
 import org.apache.flink.cdc.connectors.sqlserver.source.offset.LsnOffset;
 import org.apache.flink.cdc.connectors.sqlserver.source.reader.fetch.SqlServerScanFetchTask.SqlServerSnapshotSplitChangeEventSourceContext;
+import org.apache.flink.cdc.debezium.internal.SnapshotterServiceFactory;
 
 import io.debezium.DebeziumException;
 import io.debezium.connector.sqlserver.Lsn;
 import io.debezium.connector.sqlserver.SqlServerConnection;
+import io.debezium.connector.sqlserver.SqlServerConnector;
 import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
 import io.debezium.connector.sqlserver.SqlServerDatabaseSchema;
 import io.debezium.connector.sqlserver.SqlServerOffsetContext;
@@ -36,11 +38,15 @@ import io.debezium.connector.sqlserver.SqlServerPartition;
 import io.debezium.connector.sqlserver.SqlServerStreamingChangeEventSource;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.EventDispatcher;
+import io.debezium.pipeline.notification.NotificationService;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.relational.TableId;
+import io.debezium.schema.SchemaFactory;
 import io.debezium.util.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Collections;
 
 import static org.apache.flink.cdc.connectors.sqlserver.source.offset.LsnOffset.NO_STOPPING_OFFSET;
 
@@ -123,7 +129,13 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
                     eventDispatcher,
                     errorHandler,
                     Clock.system(),
-                    schema);
+                    schema,
+                    new NotificationService<>(
+                            Collections.emptyList(),
+                            connectorConfig,
+                            SchemaFactory.get(),
+                            notification -> {}),
+                    SnapshotterServiceFactory.create(connectorConfig, SqlServerConnector.class));
             this.lsnSplit = lsnSplit;
             this.watermarkDispatcher = watermarkDispatcher;
             this.errorHandler = errorHandler;
@@ -178,5 +190,25 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
         public boolean isRunning() {
             return taskRunning;
         }
+
+        // The following methods are only used by Debezium's signal-based blocking snapshot,
+        // which Flink CDC does not use, so they are no-ops here.
+
+        @Override
+        public boolean isPaused() {
+            return false;
+        }
+
+        @Override
+        public void resumeStreaming() throws InterruptedException {}
+
+        @Override
+        public void waitSnapshotCompletion() throws InterruptedException {}
+
+        @Override
+        public void streamingPaused() {}
+
+        @Override
+        public void waitStreamingPaused() throws InterruptedException {}
     }
 }

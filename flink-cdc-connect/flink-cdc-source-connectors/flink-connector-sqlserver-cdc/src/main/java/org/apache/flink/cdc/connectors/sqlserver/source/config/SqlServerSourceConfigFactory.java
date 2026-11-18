@@ -58,8 +58,17 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
 
         // set database history impl to flink database history
         props.setProperty(
-                "database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
-        props.setProperty("database.history.instance.name", UUID.randomUUID() + "_" + subtask);
+                "schema.history.internal", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
+        props.setProperty(
+                "schema.history.internal.instance.name", UUID.randomUUID() + "_" + subtask);
+
+        // SQL Server is Debezium's only multi-partition connector, and for those Metrics tags
+        // the JMX ObjectName with "task.id" as well as the topic prefix. Kafka Connect supplies
+        // that property; Flink never does, so Metrics#metricName passes null to
+        // Sanitizer.jmxSanitize and every SQL Server task dies with a NullPointerException
+        // before it reads a row. The subtask index is the natural analogue of a Connect task id
+        // and keeps the name unique within the TaskManager JVM.
+        props.setProperty("task.id", String.valueOf(subtask));
 
         // hard code server name, because we don't need to distinguish it, docs:
         // Logical name that identifies and provides a namespace for the SQL Server database
@@ -67,13 +76,21 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
         // all other connectors, since it is used as a prefix for all Kafka topic names
         // emanating from this connector. Only alphanumeric characters and underscores should be
         // used.
-        props.setProperty("database.server.name", DATABASE_SERVER_NAME);
+        // Debezium 2.0 renamed "database.server.name" to "topic.prefix".
+        props.setProperty("topic.prefix", DATABASE_SERVER_NAME);
         props.setProperty("database.hostname", checkNotNull(hostname));
         props.setProperty("database.user", checkNotNull(username));
         props.setProperty("database.password", checkNotNull(password));
         props.setProperty("database.port", String.valueOf(port));
-        props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
+        props.setProperty("schema.history.internal.skip.unparseable.ddl", String.valueOf(true));
         props.setProperty("database.dbname", checkNotNull(databaseList.get(0)));
+        // Debezium 2.0 replaced "database.dbname" with the multi-database "database.names";
+        // it is a required option and validation fails when it is empty.
+        props.setProperty("database.names", checkNotNull(databaseList.get(0)));
+        // The mssql-jdbc driver bundled with Debezium 2.x defaults "encrypt" to true, while the
+        // 9.x driver used by Debezium 1.9 defaulted it to false. Keep the historical Flink CDC
+        // behavior; users can opt into TLS with "debezium.database.encrypt".
+        props.setProperty("database.encrypt", "false");
 
         if (tableList != null) {
             props.setProperty("table.include.list", String.join(",", tableList));
