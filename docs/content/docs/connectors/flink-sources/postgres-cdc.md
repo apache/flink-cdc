@@ -393,9 +393,9 @@ The following options is available only when `scan.incremental.snapshot.enabled=
           <td>The maximum time that the connector should wait after trying to connect to the PostgreSQL database server before timing out.</td>
     </tr>
     <tr>
-          <td>connect.pool.size</td>
+          <td>connection.pool.size</td>
           <td>optional</td>
-          <td style="word-wrap: break-word;">30</td>
+          <td style="word-wrap: break-word;">20</td>
           <td>Integer</td>
           <td>The connection pool size.</td>
     </tr>

@@ -388,9 +388,9 @@ SELECT * FROM shipments;
           <td>连接器在尝试连接到 PostgreSQL 数据库服务器后超时前应等待的最长时间。</td>
     </tr>
     <tr>
-          <td>connect.pool.size</td>
+          <td>connection.pool.size</td>
           <td>optional</td>
-          <td style="word-wrap: break-word;">30</td>
+          <td style="word-wrap: break-word;">20</td>
           <td>Integer</td>
           <td>连接池大小。</td>
     </tr>
