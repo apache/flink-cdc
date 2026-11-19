@@ -362,7 +362,8 @@ public class PreTransformOperator extends AbstractStreamOperatorAdapter<Event>
 
     private Schema transformSchemaMetaData(
             Schema schema, SchemaMetadataTransform schemaMetadataTransform) {
-        Schema.Builder schemaBuilder = Schema.newBuilder().setColumns(schema.getColumns());
+        Schema.Builder schemaBuilder =
+                Schema.newBuilder().setColumns(schema.getColumns()).comment(schema.comment());
         if (!schemaMetadataTransform.getPrimaryKeys().isEmpty()) {
             schemaBuilder.primaryKey(schemaMetadataTransform.getPrimaryKeys());
         } else {

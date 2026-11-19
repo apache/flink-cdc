@@ -56,6 +56,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOpt
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST;
+import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.USE_LEGACY_JSON_FORMAT;
 
@@ -122,6 +123,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.initial(),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
@@ -129,7 +131,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -172,6 +175,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.initial(),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         "testCol",
@@ -179,7 +183,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -218,6 +223,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.initial(),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
@@ -225,7 +231,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -262,6 +269,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.latest(),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
@@ -269,7 +277,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -322,6 +331,7 @@ class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
                         true,
+                        false,
                         true,
                         jdbcProperties,
                         Duration.ofMillis(15213),
@@ -330,7 +340,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         true,
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource)
                 .isEqualTo(expectedSource)
                 .isInstanceOf(MySqlTableSource.class);
@@ -382,6 +393,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.specificOffset(offsetFile, offsetPos),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
@@ -389,7 +401,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -424,6 +437,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.initial(),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
@@ -431,7 +445,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -467,6 +482,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.earliest(),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
@@ -474,7 +490,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -511,6 +528,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.timestamp(0L),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
@@ -518,7 +536,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -553,6 +572,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.latest(),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
@@ -560,7 +580,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -600,6 +621,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.initial(),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
@@ -607,11 +629,24 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
 
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+    }
+
+    @Test
+    void testRateLimitRequiresIncrementalSnapshot() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.incremental.snapshot.enabled", "false");
+        properties.put("scan.rate-limit.records-per-second", "100");
+
+        Assertions.assertThatThrownBy(() -> createTableSource(properties))
+                .hasStackTraceContaining(
+                        "Option 'scan.rate-limit.records-per-second' requires option "
+                                + "'scan.incremental.snapshot.enabled'");
     }
 
     @Test
@@ -803,6 +838,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.initial(),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
@@ -810,8 +846,22 @@ class MySqlTableSourceFactoryTest {
                         true,
                         true,
                         true,
-                        false);
+                        false,
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+    }
+
+    @Test
+    void testReleaseSnapshotMetadataOption() {
+        // Setting the option must be accepted (it is registered in optionalOptions, so there is no
+        // "unsupported options" validation error) and must change the produced source.
+        Map<String, String> withRelease = getAllOptions();
+        withRelease.put("scan.incremental.snapshot.metadata.release.enabled", "true");
+        DynamicTableSource sourceWithRelease = createTableSource(withRelease);
+
+        Assertions.assertThat(sourceWithRelease)
+                .isInstanceOf(MySqlTableSource.class)
+                .isNotEqualTo(createTableSource(getAllOptions()));
     }
 
     private Map<String, String> getAllOptions() {

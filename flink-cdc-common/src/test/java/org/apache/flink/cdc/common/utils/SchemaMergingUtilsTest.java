@@ -21,10 +21,15 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
+import org.apache.flink.cdc.common.data.GenericArrayData;
+import org.apache.flink.cdc.common.data.GenericMapData;
+import org.apache.flink.cdc.common.data.GenericRecordData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
+import org.apache.flink.cdc.common.data.binary.BinaryArrayData;
+import org.apache.flink.cdc.common.data.binary.BinaryMapData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
@@ -823,13 +828,55 @@ class SchemaMergingUtilsTest {
                                 TIMESTAMP_TZ,
                                 zTsOf("2019", "02", "02"),
                                 STRING,
-                                binStrOf("2019-02-02T00:00:00Z")));
+                                binStrOf("2019-02-02T00:00:00Z")),
+
+                        // From ARRAY
+                        Tuple4.of(
+                                ARRAY,
+                                new GenericArrayData(
+                                        new Object[] {binStrOf("hello"), binStrOf("world")}),
+                                STRING,
+                                binStrOf("[hello, world]")),
+
+                        // From MAP
+                        Tuple4.of(
+                                MAP,
+                                new GenericMapData(Collections.singletonMap(42, binStrOf("value"))),
+                                STRING,
+                                binStrOf("{42=value}")),
+
+                        // From ROW
+                        Tuple4.of(
+                                ROW,
+                                GenericRecordData.of(42, binStrOf("Alice")),
+                                STRING,
+                                binStrOf("[42, Alice]")));
 
         conversionExpects.forEach(
                 rule ->
                         Assertions.assertThat(coerceObject("UTC", rule.f1, rule.f0, rule.f2))
                                 .as("Try coercing %s (%s) to %s type", rule.f1, rule.f0, rule.f2)
                                 .isEqualTo(rule.f3));
+    }
+
+    @Test
+    void testCoerceObjectBinaryTypes() {
+        DataType intArrayType = DataTypes.ARRAY(DataTypes.INT());
+        DataType intIntMapType = DataTypes.MAP(DataTypes.INT(), DataTypes.INT());
+
+        // BinaryArrayData to STRING
+        BinaryArrayData binaryArray = BinaryArrayData.fromPrimitiveArray(new int[] {1, 2, 3});
+        Assertions.assertThat(coerceObject("UTC", binaryArray, intArrayType, STRING))
+                .as("Try coercing BinaryArrayData to STRING")
+                .isEqualTo(binStrOf("[1, 2, 3]"));
+
+        // BinaryMapData to STRING
+        BinaryArrayData keys = BinaryArrayData.fromPrimitiveArray(new int[] {10});
+        BinaryArrayData values = BinaryArrayData.fromPrimitiveArray(new int[] {100});
+        BinaryMapData binaryMap = BinaryMapData.valueOf(keys, values);
+        Assertions.assertThat(coerceObject("UTC", binaryMap, intIntMapType, STRING))
+                .as("Try coercing BinaryMapData to STRING")
+                .isEqualTo(binStrOf("{10=100}"));
     }
 
     @Test

@@ -1,9 +1,9 @@
 ---
 title: "Table ID"
-weight: 4
-type: docs
-aliases:
-  - /core-concept/table-id/
+slug: "/docs/core-concept/table-id"
+sidebar_position: 4
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -33,8 +33,8 @@ Connectors should establish the mapping between Table Id and storage objects in 
 
 The following table lists the parts in table Id of different data systems:
 
-| data system           | parts in tableId         | String example      |
-|-----------------------|--------------------------|---------------------|
-| Oracle/PostgreSQL     | database, schema, table  | mydb.default.orders |
-| MySQL/Doris/StarRocks | database, table          | mydb.orders         |
-| Kafka                 | topic                    | orders              |
+| data system                  | parts in tableId         | String example      |
+|-------------------------------|--------------------------|---------------------|
+| Oracle/PostgreSQL/SQL Server  | database, schema, table  | mydb.dbo.orders     |
+| MySQL/Doris/StarRocks         | database, table          | mydb.orders         |
+| Kafka                         | topic                    | orders              |

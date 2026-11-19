@@ -1,9 +1,9 @@
 ---
 title: "OceanBase Tutorial"
-weight: 3
-type: docs
-aliases:
-- /connectors/flink-sources/tutorials/oceanbase-tutorial.html
+slug: "/docs/connectors/flink-sources/tutorials/oceanbase-tutorial"
+sidebar_position: 3
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -134,7 +134,7 @@ VALUES (default,"scooter","Small 2-wheel scooter"),
        (default,"hammer","14oz carpenter's hammer"),
        (default,"hammer","16oz carpenter's hammer"),
        (default,"rocks","box of assorted rocks"),
-       (default,"jacket","water resistent black wind breaker"),
+       (default,"jacket","water resistant black wind breaker"),
        (default,"spare tire","24 inch spare tire");
 
 CREATE TABLE orders (
@@ -155,8 +155,8 @@ VALUES (default, '2020-07-30 10:08:22', 'Jark', 50.50, 102, false),
 ### Download the libraries required
 
 
-- [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
-- [flink-sql-connector-oceanbase-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc)
+- [flink-sql-connector-elasticsearch7-3.1.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.1.0-1.20/flink-sql-connector-elasticsearch7-3.1.0-1.20.jar)
+- [flink-sql-connector-oceanbase-cdc-3.7.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-oceanbase-cdc/3.7.0-1.20/flink-sql-connector-oceanbase-cdc-3.7.0-1.20.jar)
 
 ### Use Flink DDL to create dynamic table in Flink SQL CLI
 
@@ -273,5 +273,3 @@ Stop the flink cluster by following command.
 ```shell
 ./bin/stop-cluster.sh
 ```
-
-{{< top >}}

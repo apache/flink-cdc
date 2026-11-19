@@ -1,9 +1,9 @@
 ---
 title: "Doris"
-weight: 5
-type: docs
-aliases:
-- /connectors/pipeline-connectors/doris
+slug: "/docs/connectors/pipeline-connectors/doris"
+sidebar_position: 5
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -116,14 +116,14 @@ pipeline:
        <td>auto-redirect</td>
        <td>optional</td>
        <td style="word-wrap: break-word;">false</td>
-       <td>String</td>
+       <td>Boolean</td>
        <td> Whether to write through FE redirection and directly connect to BE to write </td>
      </tr>
      <tr>
        <td>charset-encoding</td>
        <td>optional</td>
-       <td style="word-wrap: break-word;">false</td>
-       <td>Boolean</td>
+       <td style="word-wrap: break-word;">UTF-8</td>
+       <td>String</td>
        <td> Charset encoding for doris http client, default UTF-8 </td>
      </tr>
      <tr>
@@ -181,8 +181,49 @@ pipeline:
        <td>optional</td>
        <td style="word-wrap: break-word;">true</td>
        <td>Boolean</td>
-       <td>In the CDC scenario, when the primary key of the upstream is inconsistent with that of the downstream, the update-before data needs to be passed to the downstream as deleted data, otherwise the data cannot be deleted.\n"
-                                    + "The default is to ignore, that is, perform upsert semantics.</td>
+       <td>In the CDC scenario, when the primary key of the upstream is inconsistent with that of the downstream, the update-before data needs to be passed to the downstream as deleted data, otherwise the data cannot be deleted. The default is to ignore, that is, perform upsert semantics.</td>
+     </tr>
+     <tr>
+       <td>sink.enable-2pc</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">false</td>
+       <td>Boolean</td>
+       <td>Enable 2PC while loading</td>
+     </tr>
+     <tr>
+       <td>sink.check-interval</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">10000</td>
+       <td>Integer</td>
+       <td>Check exception with the interval (in milliseconds) while loading</td>
+     </tr>
+     <tr>
+       <td>sink.buffer-size</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">1048576(1MB)</td>
+       <td>Integer</td>
+       <td>The buffer size (in bytes) to cache data for stream load</td>
+     </tr>
+     <tr>
+       <td>sink.buffer-count</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">3</td>
+       <td>Integer</td>
+       <td>The buffer count to cache data for stream load</td>
+     </tr>
+     <tr>
+       <td>sink.label-prefix</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">(none)</td>
+       <td>String</td>
+       <td>The unique label prefix used for stream load</td>
+     </tr>
+     <tr>
+       <td>sink.use-cache</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">false</td>
+       <td>Boolean</td>
+       <td>Whether to use buffer cache for breakpoint resume</td>
      </tr>
      <tr>
        <td>sink.properties.</td>
@@ -210,8 +251,8 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Create the auto partition Properties configuration of the table.<br/>
-        Currently the partition function only supports date_trunc, and the partition column supports only DATE or DATETIME types, and the version of Doris must greater than 2.1.6. See more about <a href="https://doris.apache.org/docs/table-design/data-partitioning/auto-partitioning">Doris Auto Partitioning</a><br/>
-        These properties are supported now：<br/>
+        Currently, the partition function only supports date_trunc, the partition column only supports DATE or DATETIME types, and the Doris version must be later than 2.1.6. See more about <a href="https://doris.apache.org/docs/table-design/data-partitioning/auto-partitioning">Doris Auto Partitioning</a><br/>
+        These properties are supported now:<br/>
         <code> table.create.auto-partition.properties.include</code>A collection of tables after route to include, separated by commas, supports regular expressions;<br/>
         <code> table.create.auto-partition.properties.exclude</code>A collection of tables after route to exclude, separated by commas, supports regular expressions;<br/>
         <code> table.create.auto-partition.properties.default-partition-key</code>The default partition key;<br/>
@@ -335,5 +376,3 @@ pipeline:
     </tbody>
 </table>
 </div>
-
-{{< top >}}

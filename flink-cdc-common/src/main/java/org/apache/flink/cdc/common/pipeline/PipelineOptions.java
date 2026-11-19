@@ -136,5 +136,72 @@ public class PipelineOptions {
                     .withDescription(
                             "The timeout time for SchemaOperator to wait downstream SchemaChangeEvent applying finished, the default value is 3 minutes.");
 
+    public static final ConfigOption<HashFunctionStrategy> PIPELINE_PARTITIONING_STRATEGY =
+            ConfigOptions.key("sink.partitioning.strategy")
+                    .enumType(HashFunctionStrategy.class)
+                    .defaultValue(HashFunctionStrategy.SINK_DEFINED)
+                    .withDescription(
+                            Description.builder()
+                                    .text(
+                                            "Partitioning strategy for DataChangeEvent routing. Defaults to SINK_DEFINED. "
+                                                    + "Paimon, Fluss, and MaxCompute sinks only support SINK_DEFINED.")
+                                    .linebreak()
+                                    .add(
+                                            ListElement.list(
+                                                    text(
+                                                            "SINK_DEFINED: Use the HashFunctionProvider defined by the sink (default). This is the only supported strategy for paimon, fluss, and maxcompute sinks."),
+                                                    text(
+                                                            "PRIMARY_KEY: Hash by TableId and primary keys. Events from the same table may be distributed across multiple subtasks for load balancing. This strategy is not supported for paimon, fluss, or maxcompute sinks."),
+                                                    text(
+                                                            "TABLE_ID: Hash by TableId only. All events from the same table will land on the same subtask, ensuring per-table ordering semantics. This strategy is not supported for paimon, fluss, or maxcompute sinks.")))
+                                    .build());
+
+    public static final ConfigOption<DecimalPrecisionMode>
+            PIPELINE_TRANSFORM_DECIMAL_PRECISION_MODE =
+                    ConfigOptions.key("transform.decimal.precision.mode")
+                            .enumType(DecimalPrecisionMode.class)
+                            .defaultValue(DecimalPrecisionMode.UP_TO_19)
+                            .withDescription(
+                                    Description.builder()
+                                            .text(
+                                                    "Maximum precision mode for DECIMAL type in transform expression evaluation. ")
+                                            .linebreak()
+                                            .add(
+                                                    ListElement.list(
+                                                            text(
+                                                                    "UP_TO_19: Limits DECIMAL precision to 19 digits, matching Calcite's default type system. "
+                                                                            + "This is the default behavior for all versions."),
+                                                            text(
+                                                                    "UP_TO_38: Allows DECIMAL precision up to 38 digits, matching Flink CDC's extended type system.")))
+                                            .build());
+
+    public static final ConfigOption<Boolean> PIPELINE_TRANSFORM_ASYNC_EXECUTION_ENABLED =
+            ConfigOptions.key("transform.async-execution.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to enable ordered async execution for post-transform.");
+
+    public static final ConfigOption<Duration> PIPELINE_TRANSFORM_ASYNC_EXECUTION_TIMEOUT =
+            ConfigOptions.key("transform.async-execution.timeout")
+                    .durationType()
+                    .defaultValue(Duration.ofMinutes(5))
+                    .withDescription(
+                            "The timeout for each post-transform event in ordered async execution.");
+
+    public static final ConfigOption<Integer> PIPELINE_TRANSFORM_ASYNC_EXECUTION_CAPACITY =
+            ConfigOptions.key("transform.async-execution.capacity")
+                    .intType()
+                    .defaultValue(100)
+                    .withDescription(
+                            "The maximum number of in-flight post-transform events in ordered async execution.");
+
+    public static final ConfigOption<Integer> PIPELINE_TRANSFORM_ASYNC_EXECUTION_WORKER_THREADS =
+            ConfigOptions.key("transform.async-execution.worker-threads")
+                    .intType()
+                    .defaultValue(16)
+                    .withDescription(
+                            "The number of worker threads used by each async post-transform task.");
+
     private PipelineOptions() {}
 }

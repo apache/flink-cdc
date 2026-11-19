@@ -160,6 +160,11 @@ public class StoreSinkWriteImpl implements StoreSinkWrite {
     }
 
     @Override
+    public SinkRecord write(InternalRow internalRow, int i, int totalBuckets) throws Exception {
+        return write.writeAndReturn(internalRow, i, totalBuckets);
+    }
+
+    @Override
     public void compact(BinaryRow partition, int bucket, boolean fullCompaction) throws Exception {
         write.compact(partition, bucket, fullCompaction);
     }

@@ -28,8 +28,10 @@ import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.Preconditions;
+import org.apache.flink.cdc.common.utils.SchemaMergingUtils;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.OperatorIDGenerator;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.PaimonWriterHelper;
@@ -188,6 +190,18 @@ public class BucketAssignOperator extends AbstractStreamOperatorAdapter<Event>
                         partition = 0;
                         break;
                     }
+                case POSTPONE_MODE:
+                    {
+                        // Postpone bucket tables: the actual bucket written to Paimon is -2
+                        // (assigned by a downstream compaction job). However, using -2 as the
+                        // shuffle key here would route all postpone events to the same writer
+                        // subtask and cause severe data skew. Use currentTaskNumber so events
+                        // are evenly spread across writer subtasks; PaimonWriter will rewrite
+                        // the bucket back to POSTPONE_BUCKET (-2) when persisting records.
+                        bucket = currentTaskNumber;
+                        partition = tuple4.f3.partition(genericRow).hashCode();
+                        break;
+                    }
                 case KEY_DYNAMIC:
                 default:
                     {
@@ -236,8 +250,9 @@ public class BucketAssignOperator extends AbstractStreamOperatorAdapter<Event>
                         catalog.getTable(PaimonWriterHelper.identifierFromTableId(tableId)));
         MixedSchemaInfo mixedSchemaInfo =
                 new MixedSchemaInfo(
-                        new TableSchemaInfo(upstreamSchema, zoneId),
-                        new TableSchemaInfo(physicalSchema, zoneId));
+                        tableId,
+                        new TableSchemaInfo(upstreamSchema, zoneId, null),
+                        new TableSchemaInfo(physicalSchema, zoneId, null));
         if (!mixedSchemaInfo.isSameColumnsIgnoringCommentAndDefaultValue()) {
             LOGGER.warn(
                     "Upstream schema of {} is {}, which is different with paimon physical table schema {}. Data precision loss and truncation may occur.",
@@ -264,13 +279,15 @@ public class BucketAssignOperator extends AbstractStreamOperatorAdapter<Event>
             if (schema.isPresent()) {
                 MixedSchemaInfo mixedSchemaInfo =
                         new MixedSchemaInfo(
-                                new TableSchemaInfo(schema.get(), zoneId),
+                                tableId,
+                                new TableSchemaInfo(schema.get(), zoneId, null),
                                 new TableSchemaInfo(
                                         PaimonWriterHelper.deduceSchemaForPaimonTable(
                                                 catalog.getTable(
                                                         PaimonWriterHelper.identifierFromTableId(
                                                                 tableId))),
-                                        zoneId));
+                                        zoneId,
+                                        null));
                 if (!mixedSchemaInfo.isSameColumnsIgnoringCommentAndDefaultValue()) {
                     LOGGER.warn(
                             "Upstream schema of {} is {}, which is different with paimon physical table schema {}. Data precision loss and truncation may occur.",
@@ -354,6 +371,8 @@ public class BucketAssignOperator extends AbstractStreamOperatorAdapter<Event>
 
     /** MixedSchemaInfo is used to store the mixed schema info of upstream and paimon table. */
     private static class MixedSchemaInfo {
+        private final TableId tableId;
+
         private final TableSchemaInfo upstreamSchemaInfo;
 
         private final TableSchemaInfo paimonSchemaInfo;
@@ -361,12 +380,16 @@ public class BucketAssignOperator extends AbstractStreamOperatorAdapter<Event>
         private final boolean sameColumnsIgnoringCommentAndDefaultValue;
 
         public MixedSchemaInfo(
-                TableSchemaInfo upstreamSchemaInfo, TableSchemaInfo paimonSchemaInfo) {
+                TableId tableId,
+                TableSchemaInfo upstreamSchemaInfo,
+                TableSchemaInfo paimonSchemaInfo) {
+            this.tableId = tableId;
             this.upstreamSchemaInfo = upstreamSchemaInfo;
             this.paimonSchemaInfo = paimonSchemaInfo;
             this.sameColumnsIgnoringCommentAndDefaultValue =
                     PaimonWriterHelper.sameColumnsIgnoreCommentAndDefaultValue(
                             upstreamSchemaInfo.getSchema(), paimonSchemaInfo.getSchema());
+            validatePrimaryKeyTypes();
         }
 
         public TableSchemaInfo getUpstreamSchemaInfo() {
@@ -379,6 +402,32 @@ public class BucketAssignOperator extends AbstractStreamOperatorAdapter<Event>
 
         public boolean isSameColumnsIgnoringCommentAndDefaultValue() {
             return sameColumnsIgnoringCommentAndDefaultValue;
+        }
+
+        private void validatePrimaryKeyTypes() {
+            for (String columnName : paimonSchemaInfo.getSchema().primaryKeys()) {
+                Column upstreamPrimaryKeyColumn =
+                        upstreamSchemaInfo.getSchema().getColumn(columnName).orElse(null);
+                Column paimonPrimaryKeyColumn =
+                        paimonSchemaInfo.getSchema().getColumn(columnName).get();
+                if (upstreamPrimaryKeyColumn == null) {
+                    throw new IllegalStateException(
+                            String.format(
+                                    "The primary key column %s of %s is not found in upstream schema.",
+                                    columnName, tableId));
+                }
+                if (!SchemaMergingUtils.isDataTypeCompatible(
+                        paimonPrimaryKeyColumn.getType().nullable(),
+                        upstreamPrimaryKeyColumn.getType().nullable())) {
+                    throw new IllegalStateException(
+                            String.format(
+                                    "The primary key column %s of %s is %s, which is not compatible with upstream column type %s.",
+                                    columnName,
+                                    tableId,
+                                    paimonPrimaryKeyColumn.getType(),
+                                    upstreamPrimaryKeyColumn.getType()));
+                }
+            }
         }
     }
 }

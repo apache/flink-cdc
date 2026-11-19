@@ -19,6 +19,8 @@ package org.apache.flink.cdc.connectors.oceanbase;
 
 import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseContainer;
 
+import com.github.dockerjava.api.model.HostConfig;
+import com.github.dockerjava.api.model.Ulimit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -37,8 +39,9 @@ public class OceanBaseTestUtils {
     private static final String TEST_PASSWORD = "654321";
 
     public static OceanBaseContainer createOceanBaseContainerForJdbc() {
-        return createOceanBaseContainer(OB_4_3_3_VERSION, "mini")
-                .withStartupTimeout(Duration.ofMinutes(4));
+        return createOceanBaseContainer(OB_4_3_3_VERSION, "slim")
+                .withStartupAttempts(3)
+                .withStartupTimeout(Duration.ofMinutes(6));
     }
 
     public static OceanBaseContainer createOceanBaseContainer(String version, String mode) {
@@ -47,6 +50,19 @@ public class OceanBaseTestUtils {
                 .withTenantPassword(TEST_PASSWORD)
                 .withEnv("OB_DATAFILE_SIZE", "2G")
                 .withEnv("OB_LOG_DISK_SIZE", "4G")
+                .withCreateContainerCmdModifier(
+                        cmd -> {
+                            HostConfig hostConfig = cmd.getHostConfig();
+                            if (hostConfig == null) {
+                                hostConfig = HostConfig.newHostConfig();
+                            }
+                            cmd.withHostConfig(
+                                    hostConfig.withUlimits(
+                                            new Ulimit[] {
+                                                new Ulimit("nproc", 120000L, 120000L),
+                                                new Ulimit("nofile", 655350L, 655350L)
+                                            }));
+                        })
                 .withLogConsumer(new Slf4jLogConsumer(LOG));
     }
 }

@@ -1,9 +1,9 @@
 ---
 title: "MySQL"
-weight: 2
-type: docs
-aliases:
-- /connectors/flink-sources/mysql-cdc
+slug: "/docs/connectors/flink-sources/mysql-cdc"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -26,7 +26,7 @@ under the License.
 
 # MySQL CDC Connector
 
-The MySQL CDC connector allows for reading snapshot data and incremental data from MySQL database. This document describes how to setup the MySQL CDC connector to run SQL queries against MySQL databases.
+The MySQL CDC connector allows for reading snapshot data and incremental data from MySQL database. This document describes how to set up the MySQL CDC connector to run SQL queries against MySQL databases.
 
 
 ## Supported Databases
@@ -38,11 +38,17 @@ The MySQL CDC connector allows for reading snapshot data and incremental data fr
 Dependencies
 ------------
 
-In order to setup the MySQL CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
+To set up the MySQL CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
 ### Maven dependency
 
-{{< artifact flink-connector-mysql-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-mysql-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -103,7 +109,7 @@ Notes
 ### Set a different SERVER ID for each reader
 
 Every MySQL database client for reading binlog should have a unique id, called server id. MySQL server will use this id to maintain network connection and the binlog position. Therefore, if different jobs share a same server id, it may result to read from wrong binlog position. 
-Thus, it is recommended to set different server id for each reader via the [SQL Hints](https://ci.apache.org/projects/flink/flink-docs-release-1.11/dev/table/sql/hints.html), 
+Thus, it is recommended to set different server id for each reader via the [SQL Hints](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/dev/table/sql/queries/hints/), 
 e.g.  assuming the source parallelism is 4, then we can use `SELECT * FROM source_table /*+ OPTIONS('server-id'='5401-5404') */ ;` to assign unique server id for each of the 4 source readers. 
 
 
@@ -243,7 +249,7 @@ Connector Options
                 (1) source can be parallel during snapshot reading, 
                 (2) source can perform checkpoints in the chunk granularity during snapshot reading, 
                 (3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.
-              If you would like the source run in parallel, each parallel reader should have an unique server id, so 
+              If you would like the source to run in parallel, each parallel reader should have a unique server id, so
               the 'server-id' must be a range like '5400-6400', and the range must be larger than the parallelism.
               Please see <a href="#incremental-snapshot-reading ">Incremental Snapshot Reading</a>section for more detailed information.
           </td>
@@ -388,6 +394,13 @@ Only valid for cdc 1.x version. During a snapshot operation, the connector will 
           See more about the <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties">Debezium's MySQL Connector properties</a></td> 
     </tr>
     <tr>
+      <td>scan.incremental.snapshot.metadata.release.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to release the snapshot split metadata (assigned splits, finished offsets and table schemas) held by the source coordinator once the source has entered the binlog phase, to reduce JobManager memory on jobs with a very large number of snapshot splits. Disabled by default. Incompatible with scan.newly-added-table.enabled: enabling both fails at startup, and a job that has released the metadata cannot later enable newly-added-table scanning. Release happens only after a successful checkpoint; if checkpointing is disabled or no checkpoint completes, the metadata is retained, so this option has no effect without checkpointing. A checkpoint or savepoint taken with this option enabled cannot be used to restore the job after downgrading to Flink CDC 3.6.0 or an earlier version.</td>
+    </tr>
+    <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
@@ -466,6 +479,17 @@ Only valid for cdc 1.x version. During a snapshot operation, the connector will 
         If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in change log reading phase instead of being merged into the snapshot.<br>
         WARNING: Skipping backfill might lead to data inconsistency because some change log events happened within the snapshot phase might be replayed (only at-least-once semantic is promised).
         For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
+      </td>
+    </tr>
+    <tr>
+      <td>scan.rate-limit.records-per-second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">-1</td>
+      <td>Double</td>
+      <td>
+        The maximum number of records emitted per second, the default value: -1, means no rate limiting.(only for flink2.x)<br>
+        This option only takes effect when `scan.incremental.snapshot.enabled` is `true`. The legacy non-incremental source does not support rate limiting, and configuring this option with incremental snapshot disabled fails validation.<br>
+        WARNING: Incremental/binlog phase: Rate limiting can cause the connector to fall behind the upstream change stream, risking binlog/WAL purging before the connector catches up (data loss for MySQL, replication slot issues for PostgreSQL).
       </td>
     </tr>
     </tbody>
@@ -604,7 +628,7 @@ Incremental snapshot reading is a new mechanism to read snapshot of a table. Com
 * (2) MySQL CDC Source can perform checkpoints in the chunk granularity during snapshot reading
 * (3) MySQL CDC Source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading
 
-If you would like the source run in parallel, each parallel reader should have an unique server id, so the 'server-id' must be a range like '5400-6400', 
+If you would like the source to run in parallel, each parallel reader should have a unique server id, so the 'server-id' must be a range like '5400-6400',
 and the range must be larger than the parallelism.
 
 During the incremental snapshot reading, the MySQL CDC Source firstly splits snapshot chunks (splits) by user specified chunk key of table,
@@ -658,7 +682,7 @@ The CDC job may restart fails in this case. So the heartbeat event will help upd
 When the MySQL CDC source is started, it reads snapshot of table parallelly and then reads binlog of table with single parallelism.
 
 In snapshot phase, the snapshot is cut into multiple snapshot chunks according to chunk key of table and the size of table rows.
-Snapshot chunks is assigned to multiple snapshot readers. Each snapshot reader reads its received chunks with [chunk reading algorithm](#snapshot-chunk-reading) and send the read data to downstream.
+Snapshot chunks is assigned to multiple snapshot readers. Each snapshot reader reads its received chunks with [chunk reading algorithm](#chunk-reading-algorithm) and send the read data to downstream.
 The source manages the process status (finished or not) of chunks, thus the source of snapshot phase can support checkpoint in chunk level.
 If a failure happens, the source can be restored and continue to read chunks from last finished chunks.
 
@@ -712,7 +736,7 @@ get a final consistent output of the snapshot chunk. The **Offset Signal Algorit
  * (5) Upsert the read binlog records into the buffered chunk records, and emit all records in the buffer as final output (all as INSERT records) of the snapshot chunk
  * (6) Continue to read and emit binlog records belong to the chunk after the `HIGH` offset in *single binlog reader*.
 
-The algorithm is inspired by [DBLog Paper](https://arxiv.org/pdf/2010.12597v1.pdf), please refer it for more detail.
+The algorithm is inspired by the [DBLog paper](https://arxiv.org/pdf/2010.12597v1.pdf). Please refer to it for more details.
  
 **Note:** If the actual values for the primary key are not uniformly distributed across its range, this may lead to unbalanced tasks when incremental snapshot read.
 
@@ -829,7 +853,7 @@ The following operations show how to enable this feature to resolve above scenar
    // your business code
 ```
 
-If we would like to add new tables `[order, custom]` to an existing Flink job，just need to update the `tableList()` value of the job to include `[order, custom]` and restore the job from previous savepoint.
+If we would like to add new tables `[order, custom]` to an existing Flink job, just need to update the `tableList()` value of the job to include `[order, custom]` and restore the job from previous savepoint.
 
 _Step 1_: Stop the existing Flink job with savepoint.
 ```shell
@@ -862,7 +886,7 @@ $ ./bin/flink run \
       --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**Note:** Please refer the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) for more details.
+**Note:** Please refer to [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/cli/#command-line-interface) for more details.
 
 ### Tables Without primary keys
 
@@ -957,7 +981,7 @@ Data Type Mapping
     <thead>
       <tr>
         <th class="text-left" style="width:30%;">MySQL type<a href="https://dev.mysql.com/doc/refman/8.0/en/data-types.html"></a></th>
-        <th class="text-left" style="width:10%;">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left" style="width:10%;">Flink SQL type</th>
         <th class="text-left" style="width:60%;">NOTE</th>
       </tr>
     </thead>
@@ -1258,5 +1282,3 @@ The example for different spatial data types mapping is as follows:
     </tbody>
 </table>
 </div>
-
-{{< top >}}

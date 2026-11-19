@@ -20,6 +20,7 @@ package org.apache.flink.cdc.composer.definition;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
+import org.apache.flink.cdc.common.pipeline.ExistingTableSchemaExpansionMode;
 
 import javax.annotation.Nullable;
 
@@ -46,6 +47,7 @@ public class SinkDef {
     @Nullable private final String name;
     private final Configuration config;
     private final Set<SchemaChangeEventType> includedSchemaEvolutionTypes;
+    private final ExistingTableSchemaExpansionMode existingTableSchemaExpansionMode;
 
     public SinkDef(String type, @Nullable String name, Configuration config) {
         this.type = type;
@@ -53,6 +55,7 @@ public class SinkDef {
         this.config = config;
         this.includedSchemaEvolutionTypes =
                 Arrays.stream(SchemaChangeEventTypeFamily.ALL).collect(Collectors.toSet());
+        this.existingTableSchemaExpansionMode = ExistingTableSchemaExpansionMode.DISABLED;
     }
 
     public SinkDef(
@@ -60,10 +63,25 @@ public class SinkDef {
             @Nullable String name,
             Configuration config,
             Set<SchemaChangeEventType> includedSchemaEvolutionTypes) {
+        this(
+                type,
+                name,
+                config,
+                includedSchemaEvolutionTypes,
+                ExistingTableSchemaExpansionMode.DISABLED);
+    }
+
+    public SinkDef(
+            String type,
+            @Nullable String name,
+            Configuration config,
+            Set<SchemaChangeEventType> includedSchemaEvolutionTypes,
+            ExistingTableSchemaExpansionMode existingTableSchemaExpansionMode) {
         this.type = type;
         this.name = name;
         this.config = config;
         this.includedSchemaEvolutionTypes = includedSchemaEvolutionTypes;
+        this.existingTableSchemaExpansionMode = existingTableSchemaExpansionMode;
     }
 
     public String getType() {
@@ -82,6 +100,10 @@ public class SinkDef {
         return includedSchemaEvolutionTypes;
     }
 
+    public ExistingTableSchemaExpansionMode getExistingTableSchemaExpansionMode() {
+        return existingTableSchemaExpansionMode;
+    }
+
     @Override
     public String toString() {
         return "SinkDef{"
@@ -95,6 +117,8 @@ public class SinkDef {
                 + config
                 + ", includedSchemaEvolutionTypes="
                 + includedSchemaEvolutionTypes
+                + ", existingTableSchemaExpansionMode="
+                + existingTableSchemaExpansionMode
                 + '}';
     }
 
@@ -111,11 +135,13 @@ public class SinkDef {
                 && Objects.equals(name, sinkDef.name)
                 && Objects.equals(config, sinkDef.config)
                 && Objects.equals(
-                        includedSchemaEvolutionTypes, sinkDef.includedSchemaEvolutionTypes);
+                        includedSchemaEvolutionTypes, sinkDef.includedSchemaEvolutionTypes)
+                && existingTableSchemaExpansionMode == sinkDef.existingTableSchemaExpansionMode;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, name, config, includedSchemaEvolutionTypes);
+        return Objects.hash(
+                type, name, config, includedSchemaEvolutionTypes, existingTableSchemaExpansionMode);
     }
 }

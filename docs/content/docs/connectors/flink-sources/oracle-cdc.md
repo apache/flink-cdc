@@ -1,9 +1,9 @@
 ---
 title: "Oracle"
-weight: 3
-type: docs
-aliases:
-- /connectors/flink-sources/oracle-cdc
+slug: "/docs/connectors/flink-sources/oracle-cdc"
+sidebar_position: 3
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -26,16 +26,22 @@ under the License.
 
 # Oracle CDC Connector
 
-The Oracle CDC connector allows for reading snapshot data and incremental data from Oracle database. This document describes how to setup the Oracle CDC connector to run SQL queries against Oracle databases.
+The Oracle CDC connector allows for reading snapshot data and incremental data from Oracle database. This document describes how to set up the Oracle CDC connector to run SQL queries against Oracle databases.
 
 Dependencies
 ------------
 
-In order to setup the Oracle CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
+To set up the Oracle CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
 ### Maven dependency
 
-{{< artifact flink-connector-oracle-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-oracle-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -351,8 +357,8 @@ Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td>Optional startup mode for Oracle CDC consumer, valid enumerations are "initial"
-           , "latest-offset" , specific-offset. 
+      <td>Optional startup mode for Oracle CDC consumer, valid enumerations are "initial",
+           "latest-offset", specific-offset.
            Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
     </tr>
     <tr>
@@ -423,6 +429,13 @@ Connector Options
       </td>
     </tr>
     <tr>
+      <td>scan.incremental.snapshot.metadata.release.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to release the snapshot split metadata (assigned splits, finished offsets and table schemas) held by the source coordinator once the source has entered the stream phase, to reduce JobManager memory on jobs with a very large number of snapshot splits. Disabled by default. Incompatible with scan.newly-added-table.enabled: enabling both fails at startup, and a job that has released the metadata cannot later enable newly-added-table scanning. Release happens only after a successful checkpoint; if checkpointing is disabled or no checkpoint completes, the metadata is retained, so this option has no effect without checkpointing. A checkpoint or savepoint taken with this option enabled cannot be used to restore the job after downgrading to Flink CDC 3.6.0 or an earlier version.</td>
+    </tr>
+    <tr>
           <td>scan.incremental.snapshot.chunk.key-column</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">(none)</td>
@@ -453,6 +466,17 @@ Connector Options
         If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in change log reading phase instead of being merged into the snapshot.<br>
         WARNING: Skipping backfill might lead to data inconsistency because some change log events happened within the snapshot phase might be replayed (only at-least-once semantic is promised).
         For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
+      </td>
+    </tr>
+    <tr>
+      <td>scan.rate-limit.records-per-second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">-1</td>
+      <td>Double</td>
+      <td>
+        The maximum number of records emitted per second, the default value: -1, means no rate limiting.(only for flink2.x)<br>
+        This option only takes effect when `scan.incremental.snapshot.enabled` is `true`. The legacy non-incremental source does not support rate limiting, and configuring this option with incremental snapshot disabled fails validation.<br>
+        WARNING: Incremental/binlog phase: Rate limiting can cause the connector to fall behind the upstream change stream, risking binlog/WAL purging before the connector catches up (data loss for MySQL, replication slot issues for PostgreSQL).
       </td>
     </tr>
     </tbody>
@@ -618,7 +642,7 @@ $ ./bin/flink run \
       --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**Note:** Please refer the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) for more details.
+**Note:** Please refer to [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/cli/#command-line-interface) for more details.
 
 ### DataStream Source
 
@@ -771,7 +795,7 @@ Data Type Mapping
     <thead>
       <tr>
         <th class="text-left"><a href="https://docs.oracle.com/en/database/oracle/oracle-database/21/sqlrf/Data-Types.html">Oracle type</a></th>
-        <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">Flink SQL type</th>
       </tr>
     </thead>
     <tbody>
@@ -873,5 +897,3 @@ Data Type Mapping
     </tbody>
 </table>
 </div>
-
-{{< top >}}

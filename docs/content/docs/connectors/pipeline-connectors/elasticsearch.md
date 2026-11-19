@@ -1,9 +1,9 @@
 ---
 title: "Elasticsearch"
-weight: 7
-type: docs
-aliases:
-- /connectors/pipeline-connectors/elasticsearch
+slug: "/docs/connectors/pipeline-connectors/elasticsearch"
+sidebar_position: 7
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -160,7 +160,7 @@ Pipeline Connector Options
     <tr>
       <td>record.size.max.bytes</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">10485760</td>
+      <td style="word-wrap: break-word;">5242880</td>
       <td>Long</td>
       <td>The maximum size of a single record in bytes.</td>
     </tr>
@@ -185,7 +185,7 @@ Pipeline Connector Options
 Usage Notes
 --------
 
-* The written index of Elasticsearch will be `namespace.schemaName.tableName` string of TableId，this can be changed using route function of pipeline.
+* The written index of Elasticsearch will be `namespace.schemaName.tableName` string of TableId, this can be changed using route function of pipeline.
 
 * No support for automatic Elasticsearch index creation.
 
@@ -285,5 +285,3 @@ Elasticsearch stores document in a JSON string. So the data type mapping is betw
     </tbody>
 </table>
 </div>
-
-{{< top >}}

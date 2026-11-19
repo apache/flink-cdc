@@ -65,7 +65,7 @@ public class Db2TestBase {
                             new ImageFromDockerfile("custom/db2-cdc:1.4")
                                     .withDockerfile(getFilePath("db2_server/Dockerfile"))
                                     .get())
-                    .asCompatibleSubstituteFor("ibmcom/db2");
+                    .asCompatibleSubstituteFor("icr.io/db2_community/db2");
     private static boolean db2AsnAgentRunning = false;
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 

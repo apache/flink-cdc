@@ -177,6 +177,273 @@ public class TableIdRouterTest extends SchemaTestBase {
                 .collect(Collectors.toList());
     }
 
+    // ---- Case-insensitive route tests based on real-world production rules ----
+
+    private static List<String> routeWith(TableIdRouter router, String tableId) {
+        return router.route(TableId.parse(tableId)).stream()
+                .map(TableId::toString)
+                .collect(Collectors.toList());
+    }
+
+    @Test
+    void testCamelCaseDatabaseNameMatchesLowerCase() {
+        TableIdRouter router =
+                new TableIdRouter(
+                        List.of(
+                                new RouteRule(
+                                        "shortPlay.hi_label_language_new",
+                                        "ods.hi_label_language_new")));
+        Stream.of(
+                        "shortplay.hi_label_language_new",
+                        "shortPlay.hi_label_language_new",
+                        "SHORTPLAY.HI_LABEL_LANGUAGE_NEW")
+                .forEach(
+                        tableId ->
+                                assertThat(routeWith(router, tableId))
+                                        .containsExactly("ods.hi_label_language_new"));
+    }
+
+    @Test
+    void testMixedCaseDatabaseNamesInSameJob() {
+        TableIdRouter router =
+                new TableIdRouter(
+                        List.of(
+                                new RouteRule(
+                                        "shortPlay.hi_short_play_config",
+                                        "ods.hi_short_play_config"),
+                                new RouteRule(
+                                        "shortplay.hi_task_center_config",
+                                        "ods.ods_mysql2sr_shortplay_hi_task_center_config_rt"),
+                                new RouteRule(
+                                        "shortplay.hi_daily_report_country_income",
+                                        "ods.ods_mysql_shortplay_hi_daily_report_country_income_i_rt")));
+
+        assertThat(
+                        Stream.of(
+                                "shortplay.hi_short_play_config",
+                                "shortPlay.hi_task_center_config",
+                                "otherdb.some_table"))
+                .map(id -> routeWith(router, id).toString())
+                .containsExactly(
+                        "[ods.hi_short_play_config]",
+                        "[ods.ods_mysql2sr_shortplay_hi_task_center_config_rt]",
+                        "[otherdb.some_table]");
+    }
+
+    @Test
+    void testUpperCaseSourceTableMatchesLowerCase() {
+        TableIdRouter router =
+                new TableIdRouter(
+                        List.of(
+                                new RouteRule(
+                                        "devops_ci_process.T_PIPELINE_BUILD_HISTORY",
+                                        "ods_mbu_pdw_devops_ci_process.t_pipeline_build_history"),
+                                new RouteRule(
+                                        "devops_ci_process.T_PIPELINE_INFO",
+                                        "ods_mbu_pdw_devops_ci_process.t_pipeline_info")));
+
+        assertThat(
+                        Stream.of(
+                                "devops_ci_process.t_pipeline_build_history",
+                                "devops_ci_process.T_PIPELINE_BUILD_HISTORY",
+                                "devops_ci_process.t_pipeline_info"))
+                .map(id -> routeWith(router, id).toString())
+                .containsExactly(
+                        "[ods_mbu_pdw_devops_ci_process.t_pipeline_build_history]",
+                        "[ods_mbu_pdw_devops_ci_process.t_pipeline_build_history]",
+                        "[ods_mbu_pdw_devops_ci_process.t_pipeline_info]");
+    }
+
+    @Test
+    void testAllUpperCaseTableNamesInWmsRules() {
+        TableIdRouter router =
+                new TableIdRouter(
+                        List.of(
+                                new RouteRule("wms.GSP_DRUG_ISH_REC", "gsp_wms.GSP_DRUG_ISH_REC"),
+                                new RouteRule("wms.GSP_OSH_REC", "gsp_wms.GSP_OSH_REC"),
+                                new RouteRule(
+                                        "wms.wms_goods_attribute", "gsp_wms.wms_goods_attribute")));
+
+        assertThat(
+                        Stream.of(
+                                "wms.gsp_drug_ish_rec",
+                                "WMS.GSP_DRUG_ISH_REC",
+                                "wms.WMS_GOODS_ATTRIBUTE"))
+                .map(id -> routeWith(router, id).toString())
+                .containsExactly(
+                        "[gsp_wms.GSP_DRUG_ISH_REC]",
+                        "[gsp_wms.GSP_DRUG_ISH_REC]",
+                        "[gsp_wms.wms_goods_attribute]");
+    }
+
+    @Test
+    void testCamelCaseTableNames() {
+        TableIdRouter router =
+                new TableIdRouter(
+                        List.of(
+                                new RouteRule(
+                                        "hotelbooking.SupplierBookingHotelConfirmCodeUpdateRecord",
+                                        "didadata.booking.supplier_booking_hotel_confirm_code_update_record"),
+                                new RouteRule(
+                                        "hotelbooking.ChannelBookingRateAdjust",
+                                        "didadata.booking.channel_booking_reate_adjust")));
+
+        Stream.of(
+                        "hotelbooking.supplierbookinghotelconfirmcodeupdaterecord",
+                        "hotelbooking.SupplierBookingHotelConfirmCodeUpdateRecord")
+                .forEach(
+                        tableId ->
+                                assertThat(routeWith(router, tableId))
+                                        .containsExactly(
+                                                "didadata.booking.supplier_booking_hotel_confirm_code_update_record"));
+    }
+
+    @Test
+    void testCommaSeparatedTablesWithRepSymAndCaseInsensitive() {
+        TableIdRouter router =
+                new TableIdRouter(
+                        List.of(
+                                new RouteRule(
+                                        "PaymentDB.tblRefundRecord,PaymentDB.tblSignRecord,PaymentDB.tblDeductRecord",
+                                        "ods.ods_paymentdb_<>_rt",
+                                        "<>")));
+
+        assertThat(
+                        Stream.of(
+                                "paymentdb.tblRefundRecord",
+                                "PaymentDB.tblSignRecord",
+                                "paymentdb.tbldeductrecord",
+                                "PaymentDB.tblOther"))
+                .map(id -> routeWith(router, id).toString())
+                .containsExactly(
+                        "[ods.ods_paymentdb_tblRefundRecord_rt]",
+                        "[ods.ods_paymentdb_tblSignRecord_rt]",
+                        "[ods.ods_paymentdb_tbldeductrecord_rt]",
+                        "[PaymentDB.tblOther]");
+    }
+
+    @Test
+    void testWildcardRouteWithCaseMismatch() {
+        TableIdRouter router =
+                new TableIdRouter(
+                        List.of(
+                                new RouteRule(
+                                        "shortPlay.hi_watch_history\\.*", "ods.hi_watch_history")));
+
+        Stream.of(
+                        "shortplay.hi_watch_history_01",
+                        "SHORTPLAY.HI_WATCH_HISTORY_99",
+                        "shortPlay.hi_watch_history")
+                .forEach(
+                        tableId ->
+                                assertThat(routeWith(router, tableId))
+                                        .containsExactly("ods.hi_watch_history"));
+    }
+
+    @Test
+    void testMergingShardedTablesWithCaseMismatch() {
+        TableIdRouter router =
+                new TableIdRouter(
+                        List.of(
+                                new RouteRule(
+                                        "shortPlay.hi_bonus_record_v2_t0", "ods.hi_bonus_record"),
+                                new RouteRule(
+                                        "shortPlay.hi_bonus_record_v2_t1", "ods.hi_bonus_record")));
+
+        Stream.of("shortplay.hi_bonus_record_v2_t0", "SHORTPLAY.HI_BONUS_RECORD_V2_T1")
+                .forEach(
+                        tableId ->
+                                assertThat(routeWith(router, tableId))
+                                        .containsExactly("ods.hi_bonus_record"));
+    }
+
+    @Test
+    void testRouteWithoutBackReferenceWithMultiDigitSuffix() {
+        // Regression test: when the source-table regex matches multi-digit suffixes (e.g. 10-16)
+        // but the sink-table does NOT contain a `$1` back-reference, every matched source table
+        // should still be routed to the exact sink-table declared in the routing rule. Previously
+        // TableIdRouter.resolveReplacement used Matcher.find(), which only matched a prefix of
+        // the source table ID, leaving the unmatched tail characters to be appended to the
+        // sink-table after replaceAll. As a result, table `db_6.table_13` was wrongly routed to
+        // `new_db_6.table_merged3` (and similarly `db_6.table_14` to `new_db_6.table_merged4`).
+        List<String> sourceTables =
+                List.of(
+                        "db_6.table_1",
+                        "db_6.table_2",
+                        "db_6.table_9",
+                        "db_6.table_10",
+                        "db_6.table_11",
+                        "db_6.table_13",
+                        "db_6.table_14",
+                        "db_6.table_15",
+                        "db_6.table_16");
+        assertThat(
+                        testStdRegExpRoute(
+                                "db_6.table_([1-9]|1[0-6])", "new_db_6.table_merged", sourceTables))
+                .containsExactly(
+                        "[new_db_6.table_merged]",
+                        "[new_db_6.table_merged]",
+                        "[new_db_6.table_merged]",
+                        "[new_db_6.table_merged]",
+                        "[new_db_6.table_merged]",
+                        "[new_db_6.table_merged]",
+                        "[new_db_6.table_merged]",
+                        "[new_db_6.table_merged]",
+                        "[new_db_6.table_merged]");
+    }
+
+    @Test
+    void testRouteWithBackReferenceAndMultiDigitCapture() {
+        // Companion test for the same fix: when the sink-table uses a `$1` back-reference, the
+        // captured group must be the FULL multi-digit value (e.g. `13`), not just a single digit.
+        // Previously the alternation order in `([1-9]|1[0-6])` together with find() caused
+        // `[1-9]` to win against `1[0-6]` for input `13`, capturing only `1` and producing a
+        // sink-table name `..._1` followed by leftover `3`.
+        List<String> sourceTables =
+                List.of("db_6.table_1", "db_6.table_10", "db_6.table_13", "db_6.table_16");
+        assertThat(
+                        testStdRegExpRoute(
+                                "db_6.table_([1-9]|1[0-6])", "new_db_6.table_$1", sourceTables))
+                .containsExactly(
+                        "[new_db_6.table_1]",
+                        "[new_db_6.table_10]",
+                        "[new_db_6.table_13]",
+                        "[new_db_6.table_16]");
+    }
+
+    @Test
+    void testRouteWithBackReferenceSuffixAndMultiDigitCapture() {
+        // Genuine multi-character capture-group regression test: the sink-table template
+        // `new_db_6.table_$1_suffix` puts a literal `_suffix` AFTER the `$1` back-reference. With
+        // the pre-fix `Matcher.find()` + `Matcher.replaceAll()` implementation, the regex
+        // `new_db_6\.table_([1-9]|1[0-6])` matched the prefix `new_db_6.table_1` of the source
+        // table id `new_db_6.table_13`, leaving the unmatched tail `3` to be appended to the
+        // sink-table, producing the wrong sink-table id `new_db_6.table_1_suffix3` (note the `3`
+        // at the very end, after `_suffix`). The corrected implementation uses `matches()` and
+        // therefore consumes the entire source table id, yielding the expected
+        // `new_db_6.table_13_suffix`.
+        List<String> sourceTables =
+                List.of(
+                        "new_db_6.table_1",
+                        "new_db_6.table_2",
+                        "new_db_6.table_9",
+                        "new_db_6.table_10",
+                        "new_db_6.table_13",
+                        "new_db_6.table_16");
+        assertThat(
+                        testStdRegExpRoute(
+                                "new_db_6.table_([1-9]|1[0-6])",
+                                "new_db_6.table_$1_suffix",
+                                sourceTables))
+                .containsExactly(
+                        "[new_db_6.table_1_suffix]",
+                        "[new_db_6.table_2_suffix]",
+                        "[new_db_6.table_9_suffix]",
+                        "[new_db_6.table_10_suffix]",
+                        "[new_db_6.table_13_suffix]",
+                        "[new_db_6.table_16_suffix]");
+    }
+
     @Test
     void testRegExpComplexRouting() {
         // Capture the entire database.

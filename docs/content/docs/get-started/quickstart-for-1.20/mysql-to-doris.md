@@ -1,7 +1,9 @@
 ---
 title: "MySQL to Doris"
-weight: 1
-type: docs
+slug: "/docs/get-started/quickstart-for-1.20/mysql-to-doris"
+sidebar_position: 1
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -30,14 +32,14 @@ All exercises in this tutorial are performed in the Flink CDC CLI, and the entir
 without a single line of Java/Scala code or IDE installation.
 
 ## Preparation
-Prepare a Linux or MacOS computer with Docker installed.
+Prepare a Linux or macOS computer with Docker installed.
 
 ### Prepare Flink Standalone cluster
-1. Download [Flink 1.20.3](https://archive.apache.org/dist/flink/flink-1.20.3/flink-1.20.3-bin-scala_2.12.tgz) ，unzip and get flink-1.20.3 directory.
-   Use the following command to navigate to the Flink directory and set FLINK_HOME to the directory where flink-1.20.3 is located.
+1. Download [Flink 1.20.5](https://archive.apache.org/dist/flink/flink-1.20.5/flink-1.20.5-bin-scala_2.12.tgz), unzip and get flink-1.20.5 directory.
+   Use the following command to navigate to the Flink directory and set FLINK_HOME to the directory where flink-1.20.5 is located.
 
    ```shell
-   cd flink-1.20.3
+   cd flink-1.20.5
    ```
 
 2. Enable checkpointing by appending the following parameters to the conf/config.yaml configuration file to perform a checkpoint every 3 seconds.
@@ -56,7 +58,7 @@ Prepare a Linux or MacOS computer with Docker installed.
 
 If successfully started, you can access the Flink Web UI at [http://localhost:8081/](http://localhost:8081/), as shown below.
 
-{{< img src="/fig/mysql-doris-tutorial/flink-ui.png" alt="Flink UI" >}}
+<img src="@@BASE_URL@@fig/mysql-doris-tutorial/flink-ui.png" alt="Flink UI" class="doc-image">
 
 Executing `start-cluster.sh` multiple times can start multiple `TaskManager`s.
 
@@ -69,7 +71,7 @@ Since `Doris` requires memory mapping support for operation, execute the followi
    ```shell
    sysctl -w vm.max_map_count=2000000
    ```
-Due to the different ways of implementing containers internally on MacOS, it may not be possible to directly modify the value of max_map_count on the host during deployment. You need to create the following containers first:
+Due to the different ways of implementing containers internally on macOS, it may not be possible to directly modify the value of max_map_count on the host during deployment. You need to create the following containers first:
 
    ```shell
    docker run -it --privileged --pid=host --name=change_count debian nsenter -t 1 -m -u -n -i sh
@@ -167,11 +169,11 @@ This command automatically starts all the containers defined in the Docker Compo
 
 #### Create database in Doris
 `Doris` connector currently does not support automatic database creation and needs to first create a database corresponding to the write table.
-1. Enter Doris Web UI。  
+1. Enter Doris Web UI.\
    [http://localhost:8030/](http://localhost:8030/)  
    The default username is `root`, and the default password is empty.
 
-   {{< img src="/fig/mysql-doris-tutorial/doris-ui.png" alt="Doris UI" >}}
+   <img src="@@BASE_URL@@fig/mysql-doris-tutorial/doris-ui.png" alt="Doris UI" class="doc-image">
 
 2. Create `app_db` database through Web UI.
 
@@ -179,12 +181,12 @@ This command automatically starts all the containers defined in the Docker Compo
    create database app_db;
     ```
 
-   {{< img src="/fig/mysql-doris-tutorial/doris-create-table.png" alt="Doris create table" >}}
+   <img src="@@BASE_URL@@fig/mysql-doris-tutorial/doris-create-table.png" alt="Doris create table" class="doc-image">
 
 ## Submit job with Flink CDC CLI
-1. Download the binary compressed packages listed below and extract them to the directory `flink cdc-{{< param Version >}}'`：    
-   [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
-   flink-cdc-{{< param Version >}} directory will contain four directory: `bin`, `lib`, `log`, and `conf`.
+1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-@@VERSION@@`:\
+   [flink-cdc-@@VERSION@@-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-@@VERSION@@/flink-cdc-@@VERSION@@-bin.tar.gz)
+   flink-cdc-@@VERSION@@ directory will contain four directory: `bin`, `lib`, `log`, and `conf`.
 
 2. Download the connector package listed below and move it to the `lib` directory  
    **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
@@ -196,7 +198,7 @@ This command automatically starts all the containers defined in the Docker Compo
     - [MySQL Connector Java](https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)
 
 3. Write task configuration yaml file 
-  Here is an example file for synchronizing the entire database `mysql-to-doris.yaml`：
+  Here is an example file for synchronizing the entire database `mysql-to-doris.yaml`:
 
    ```yaml
    ################################################################################
@@ -230,11 +232,11 @@ Notice that:
 `tables: app_db.\.*` in source synchronize all tables in `app_db` through Regular Matching.   
 `table.create.properties.replication_num` in sink is because there is only one Doris BE node in the Docker image.
 
-4. Finally, submit job to Flink Standalone cluster using Cli.
+4. Finally, submit job to Flink Standalone cluster using CLI.
    ```shell
    bash bin/flink-cdc.sh mysql-to-doris.yaml
    ```
-After successful submission, the return information is as follows：
+After successful submission, the return information is as follows:
    ```shell
    Pipeline has been submitted to cluster.
    Job ID: ae30f4580f1918bebf16752d4963dc54
@@ -242,11 +244,11 @@ After successful submission, the return information is as follows：
    ```
  We can find a job  named `Sync MySQL Database to Doris` is running through Flink Web UI.   
 
-{{< img src="/fig/mysql-doris-tutorial/mysql-to-doris.png" alt="MySQL-to-Doris" >}}
+<img src="@@BASE_URL@@fig/mysql-doris-tutorial/mysql-to-doris.png" alt="MySQL-to-Doris" class="doc-image">
 
 We can find that tables are created and inserted through Doris Web UI.   
 
-{{< img src="/fig/mysql-doris-tutorial/doris-display-data.png" alt="Doris display data" >}}
+<img src="@@BASE_URL@@fig/mysql-doris-tutorial/doris-display-data.png" alt="Doris display data" class="doc-image">
 
 ### Synchronize Schema and Data changes
 Enter MySQL container
@@ -255,7 +257,7 @@ Enter MySQL container
  docker-compose exec mysql mysql -uroot -p123456
  ```
 
-Then, modify schema and record in MySQL, and the tables of Doris will change the same in real time：
+Then, modify schema and record in MySQL, and the tables of Doris will change the same in real time:
 1. insert one record in `orders` from MySQL:   
 
    ```sql
@@ -279,9 +281,9 @@ Then, modify schema and record in MySQL, and the tables of Doris will change the
    DELETE FROM app_db.orders WHERE id=2;
    ```
 
-Refresh the Doris Web UI every time you execute a step, and you can see that the `orders` table displayed in Doris will be updated in real-time, like the following：
+Refresh the Doris Web UI every time you execute a step, and you can see that the `orders` table displayed in Doris will be updated in real-time, like the following:
 
-{{< img src="/fig/mysql-doris-tutorial/doris-display-result.png" alt="Doris display result" >}}
+<img src="@@BASE_URL@@fig/mysql-doris-tutorial/doris-display-result.png" alt="Doris display result" class="doc-image">
 
 Similarly, by modifying the 'shipments' and' products' tables, you can also see the results of synchronized changes in real-time in Doris.
 
@@ -326,7 +328,7 @@ Here is an example file for using `route` feature:
    ```
 
 Using the upper `route` configuration, we can synchronize the table schema and data of `app_db.orders` to `ods_db.ods_orders`, thus achieving the function of database migration.   
-Specifically, `source-table` support regular expression matching with multiple tables to synchronize sharding databases and tables. like the following：
+Specifically, `source-table` support regular expression matching with multiple tables to synchronize sharding databases and tables. like the following:
 
    ```yaml
    route:
@@ -343,10 +345,8 @@ After finishing the tutorial, run the following command to stop all containers i
    ```shell
    docker-compose down
    ```
-Run the following command to stop the Flink cluster in the directory of Flink `flink-1.20.3`:
+Run the following command to stop the Flink cluster in the directory of Flink `flink-1.20.5`:
 
    ```shell
    ./bin/stop-cluster.sh
    ```
-
-{{< top >}}

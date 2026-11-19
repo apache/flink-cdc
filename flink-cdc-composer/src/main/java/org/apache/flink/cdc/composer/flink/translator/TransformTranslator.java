@@ -18,21 +18,38 @@
 package org.apache.flink.cdc.composer.flink.translator;
 
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.factories.FactoryHelper;
+import org.apache.flink.cdc.common.model.AiModelClient;
+import org.apache.flink.cdc.common.model.AiModelClientFactory;
+import org.apache.flink.cdc.common.model.ModelContext;
+import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.cdc.composer.definition.UdfDef;
+import org.apache.flink.cdc.composer.flink.FlinkEnvironmentUtils;
+import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperatorBuilder;
 import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
 import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperatorBuilder;
+import org.apache.flink.cdc.runtime.operators.transform.async.AsyncPostTransformFunction;
+import org.apache.flink.cdc.runtime.operators.transform.async.AsyncPostTransformFunctionBuilder;
+import org.apache.flink.cdc.runtime.operators.transform.async.AsyncPostTransformOperatorFactory;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
+import java.time.Duration;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
+import static org.apache.flink.cdc.common.utils.Preconditions.checkArgument;
 
 /**
  * Translator used to build {@link PreTransformOperator} and {@link PostTransformOperator} for event
@@ -85,7 +102,10 @@ public class TransformTranslator {
                                 .map(this::udfDefToUDFTuple)
                                 .collect(Collectors.toList()))
                 .addUdfFunctions(
-                        models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()));
+                        models.stream()
+                                .filter(ModelDef::isLegacy)
+                                .map(this::modelToUDFTuple)
+                                .collect(Collectors.toList()));
 
         return preTransformFunctionBuilder.build();
     }
@@ -94,10 +114,12 @@ public class TransformTranslator {
             DataStream<Event> input,
             List<TransformDef> transforms,
             String timezone,
+            DecimalPrecisionMode decimalPrecisionMode,
             List<UdfDef> udfFunctions,
             List<ModelDef> models,
             SupportedMetadataColumn[] supportedMetadataColumns,
-            OperatorUidGenerator operatorUidGenerator) {
+            OperatorUidGenerator operatorUidGenerator,
+            StreamExecutionEnvironment env) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -117,12 +139,82 @@ public class TransformTranslator {
                     supportedMetadataColumns);
         }
         postTransformFunctionBuilder.addTimezone(timezone);
+        postTransformFunctionBuilder.addDecimalPrecisionMode(decimalPrecisionMode);
         postTransformFunctionBuilder.addUdfFunctions(
                 udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
         postTransformFunctionBuilder.addUdfFunctions(
-                models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()));
+                models.stream()
+                        .filter(ModelDef::isLegacy)
+                        .map(this::modelToUDFTuple)
+                        .collect(Collectors.toList()));
+        Map<String, AiModelClient> modelClients = loadModelClients(models, env);
+        postTransformFunctionBuilder.addModelClients(modelClients);
         return input.transform(
                         "Transform:Data", new EventTypeInfo(), postTransformFunctionBuilder.build())
+                .uid(operatorUidGenerator.generateUid("post-transform"));
+    }
+
+    public DataStream<Event> translateAsyncPostTransform(
+            DataStream<Event> input,
+            List<TransformDef> transforms,
+            String timezone,
+            DecimalPrecisionMode decimalPrecisionMode,
+            List<UdfDef> udfFunctions,
+            List<ModelDef> models,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            OperatorUidGenerator operatorUidGenerator,
+            Duration asyncTransformTimeout,
+            int asyncTransformCapacity,
+            int asyncTransformWorkerThreads,
+            StreamExecutionEnvironment env) {
+        if (transforms.isEmpty()) {
+            return input;
+        }
+        checkArgument(
+                asyncTransformTimeout.toMillis() > 0,
+                "Async transform timeout must be greater than 0.");
+        checkArgument(
+                asyncTransformCapacity > 0, "Async transform capacity must be greater than 0.");
+        checkArgument(
+                asyncTransformWorkerThreads > 0,
+                "Async transform worker threads must be greater than 0.");
+
+        AsyncPostTransformFunctionBuilder asyncPostTransformFunctionBuilder =
+                AsyncPostTransformFunction.newBuilder();
+        for (TransformDef transform : transforms) {
+            asyncPostTransformFunctionBuilder.addTransform(
+                    transform.getSourceTable(),
+                    transform.getProjection(),
+                    transform.getFilter(),
+                    transform.getPrimaryKeys(),
+                    transform.getPartitionKeys(),
+                    transform.getTableOptions(),
+                    transform.getTableOptionsDelimiter(),
+                    transform.getPostTransformConverter(),
+                    supportedMetadataColumns);
+        }
+        asyncPostTransformFunctionBuilder.addTimezone(timezone);
+        asyncPostTransformFunctionBuilder.addDecimalPrecisionMode(decimalPrecisionMode);
+        asyncPostTransformFunctionBuilder.addUdfFunctions(
+                udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
+        asyncPostTransformFunctionBuilder.addUdfFunctions(
+                models.stream()
+                        .filter(ModelDef::isLegacy)
+                        .map(this::modelToUDFTuple)
+                        .collect(Collectors.toList()));
+        Map<String, AiModelClient> modelClients = loadModelClients(models, env);
+        asyncPostTransformFunctionBuilder.addModelClients(modelClients);
+        asyncPostTransformFunctionBuilder.addAsyncWorkerThreads(asyncTransformWorkerThreads);
+
+        long timeoutMillis = asyncTransformTimeout.toMillis();
+        return input.transform(
+                        "Transform:Data",
+                        new EventTypeInfo(),
+                        new AsyncPostTransformOperatorFactory(
+                                asyncPostTransformFunctionBuilder.build(),
+                                timeoutMillis,
+                                asyncTransformCapacity))
+                .name("Transform:Data")
                 .uid(operatorUidGenerator.generateUid("post-transform"));
     }
 
@@ -133,7 +225,61 @@ public class TransformTranslator {
                 model.getParameters());
     }
 
+    private Map<String, AiModelClient> loadModelClients(
+            List<ModelDef> models, StreamExecutionEnvironment env) {
+        List<ModelDef> clientModels =
+                models.stream().filter(model -> !model.isLegacy()).collect(Collectors.toList());
+        if (clientModels.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        Map<String, AiModelClient> clients = new LinkedHashMap<>();
+        for (ModelDef model : clientModels) {
+            AiModelClientFactory factory =
+                    FactoryDiscoveryUtils.getFactoryByIdentifier(
+                            model.getType(), AiModelClientFactory.class);
+            FactoryDiscoveryUtils.getJarPathByIdentifier(factory)
+                    .ifPresent(jar -> FlinkEnvironmentUtils.addJar(env, jar));
+            FactoryHelper.createFactoryHelper(
+                            factory,
+                            new FactoryHelper.DefaultContext(
+                                    Configuration.fromMap(model.getOptions()),
+                                    new Configuration(),
+                                    classLoader))
+                    .validate();
+            ModelContext context = new DefaultModelContext(model, classLoader);
+            clients.put(model.getName(), factory.createClient(context));
+        }
+        return clients;
+    }
+
     private Tuple3<String, String, Map<String, String>> udfDefToUDFTuple(UdfDef udf) {
         return Tuple3.of(udf.getName(), udf.getClasspath(), udf.getOptions());
+    }
+
+    private static final class DefaultModelContext implements ModelContext {
+        private final ModelDef modelDef;
+        private final ClassLoader classLoader;
+
+        private DefaultModelContext(ModelDef modelDef, ClassLoader classLoader) {
+            this.modelDef = modelDef;
+            this.classLoader = classLoader;
+        }
+
+        @Override
+        public String getModelName() {
+            return modelDef.getName();
+        }
+
+        @Override
+        public Map<String, String> getOptions() {
+            return modelDef.getOptions();
+        }
+
+        @Override
+        public ClassLoader getClassLoader() {
+            return classLoader;
+        }
     }
 }

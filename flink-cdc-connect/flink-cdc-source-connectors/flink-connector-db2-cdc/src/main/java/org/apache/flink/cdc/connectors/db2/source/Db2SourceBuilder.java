@@ -241,6 +241,21 @@ public class Db2SourceBuilder<T> {
         return this;
     }
 
+    public Db2SourceBuilder<T> scanRateLimitRecordsPerSecond(double scanRateLimitRecordsPerSecond) {
+        this.configFactory.scanRateLimitRecordsPerSecond(scanRateLimitRecordsPerSecond);
+        return this;
+    }
+
+    /**
+     * Whether to release the finished snapshot split metadata from the coordinator after entering
+     * the stream phase, to reduce JobManager memory pressure (FLINK-40697).
+     */
+    public Db2SourceBuilder<T> releaseSnapshotMetadataEnabled(
+            boolean releaseSnapshotMetadataEnabled) {
+        this.configFactory.releaseSnapshotMetadataEnabled(releaseSnapshotMetadataEnabled);
+        return this;
+    }
+
     /**
      * Build the {@link Db2IncrementalSource}.
      *

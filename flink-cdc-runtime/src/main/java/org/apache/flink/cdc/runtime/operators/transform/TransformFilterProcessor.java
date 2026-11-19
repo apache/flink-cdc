@@ -19,6 +19,8 @@ package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.converter.JavaClassConverter;
+import org.apache.flink.cdc.common.model.AiModelClient;
+import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
@@ -28,6 +30,7 @@ import org.codehaus.janino.ExpressionEvaluator;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -45,8 +48,10 @@ public class TransformFilterProcessor {
     private final PostTransformChangeInfo tableInfo;
     private final TransformFilter transformFilter;
     private final String timezone;
+    private final DecimalPrecisionMode decimalPrecisionMode;
     private final List<Object> udfFunctionInstances;
     private final Map<String, SupportedMetadataColumn> supportedMetadataColumns;
+    private final Map<String, AiModelClient> modelClients;
 
     private final TransformExpressionKey transformExpressionKey;
     private final ExpressionEvaluator expressionEvaluator;
@@ -56,15 +61,19 @@ public class TransformFilterProcessor {
             PostTransformChangeInfo tableInfo,
             TransformFilter transformFilter,
             String timezone,
+            DecimalPrecisionMode decimalPrecisionMode,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             List<Object> udfFunctionInstances,
-            Map<String, SupportedMetadataColumn> supportedMetadataColumns) {
+            Map<String, SupportedMetadataColumn> supportedMetadataColumns,
+            Map<String, AiModelClient> modelClients) {
         this.isNoOp = isNoOp;
         this.tableInfo = tableInfo;
         this.transformFilter = transformFilter;
         this.timezone = timezone;
+        this.decimalPrecisionMode = decimalPrecisionMode;
         this.udfFunctionInstances = udfFunctionInstances;
         this.supportedMetadataColumns = supportedMetadataColumns;
+        this.modelClients = modelClients == null ? Collections.emptyMap() : modelClients;
 
         if (isNoOp) {
             this.transformExpressionKey = null;
@@ -83,17 +92,20 @@ public class TransformFilterProcessor {
         }
     }
 
-    public static TransformFilterProcessor ofNoOp() {
-        return new TransformFilterProcessor(true, null, null, null, null, null, null);
+    public static TransformFilterProcessor ofNoOp(DecimalPrecisionMode decimalPrecisionMode) {
+        return new TransformFilterProcessor(
+                true, null, null, null, decimalPrecisionMode, null, null, null, null);
     }
 
     public static TransformFilterProcessor of(
             PostTransformChangeInfo tableInfo,
             TransformFilter transformFilter,
             String timezone,
+            DecimalPrecisionMode decimalPrecisionMode,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             List<Object> udfFunctionInstances,
-            SupportedMetadataColumn[] supportedMetadataColumns) {
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            Map<String, AiModelClient> modelClients) {
         Map<String, SupportedMetadataColumn> supportedMetadataColumnsMap = new HashMap<>();
         for (SupportedMetadataColumn supportedMetadataColumn : supportedMetadataColumns) {
             supportedMetadataColumnsMap.put(
@@ -104,9 +116,11 @@ public class TransformFilterProcessor {
                 tableInfo,
                 transformFilter,
                 timezone,
+                decimalPrecisionMode,
                 udfDescriptors,
                 udfFunctionInstances,
-                supportedMetadataColumnsMap);
+                supportedMetadataColumnsMap,
+                modelClients);
     }
 
     public boolean test(Object[] preRow, Object[] postRow, TransformContext context) {
@@ -115,7 +129,8 @@ public class TransformFilterProcessor {
         }
 
         try {
-            return (Boolean) expressionEvaluator.evaluate(generateParams(preRow, postRow, context));
+            return Boolean.TRUE.equals(
+                    expressionEvaluator.evaluate(generateParams(preRow, postRow, context)));
         } catch (InvocationTargetException e) {
             throw new RuntimeException(
                     String.format(
@@ -208,6 +223,9 @@ public class TransformFilterProcessor {
 
         // 3 - Add UDF function instances
         params.addAll(udfFunctionInstances);
+
+        // 4 - Add AI model clients
+        params.add(modelClients);
         return params.toArray();
     }
 
@@ -228,7 +246,8 @@ public class TransformFilterProcessor {
                         columns,
                         udfDescriptors,
                         supportedMetadataColumns,
-                        transformFilter.getColumnNameMap());
+                        transformFilter.getColumnNameMap(),
+                        decimalPrecisionMode);
 
         return TransformExpressionKey.of(
                 transformFilter.getExpression(),

@@ -22,15 +22,21 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.source.ReaderOutput;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
+import org.apache.flink.cdc.connectors.base.source.meta.events.StreamSplitUpdateRequestEvent;
+import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitState;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
+import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplitState;
 import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
 import org.apache.flink.cdc.connectors.postgres.source.MockPostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresSourceBuilder;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
+import org.apache.flink.cdc.connectors.postgres.source.events.OffsetCommitEvent;
+import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffset;
 import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
 import org.apache.flink.cdc.connectors.postgres.testutils.RecordsFormatter;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
@@ -43,6 +49,7 @@ import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Collector;
 
+import io.debezium.connector.postgresql.connection.Lsn;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -53,14 +60,19 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
+import static io.debezium.connector.postgresql.connection.ReplicationConnection.Builder.DEFAULT_PUBLICATION_NAME;
 import static org.apache.flink.core.io.InputStatus.END_OF_INPUT;
 import static org.apache.flink.core.io.InputStatus.MORE_AVAILABLE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -69,6 +81,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class PostgresSourceReaderTest extends PostgresTestBase {
     private static final String DB_NAME_PREFIX = "postgres";
     private static final String SCHEMA_NAME = "customer";
+    private static final DataType CUSTOMER_TYPE =
+            DataTypes.ROW(
+                    DataTypes.FIELD("Id", DataTypes.BIGINT()),
+                    DataTypes.FIELD("Name", DataTypes.STRING()),
+                    DataTypes.FIELD("address", DataTypes.STRING()),
+                    DataTypes.FIELD("phone_number", DataTypes.STRING()));
     private String slotName;
     private final UniqueDatabase customDatabase =
             new UniqueDatabase(
@@ -81,6 +99,7 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
     @BeforeEach
     public void before() throws SQLException {
         customDatabase.createAndInitialize();
+        customDatabase.createPublication(DEFAULT_PUBLICATION_NAME);
 
         this.slotName = getSlotName();
     }
@@ -88,6 +107,75 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
     @AfterEach
     public void after() throws Exception {
         customDatabase.removeSlot(slotName);
+    }
+
+    @Test
+    public void testReceiveLogicalMessagesWithPrefix() throws Exception {
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("Id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("Name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+
+        // Discover table schemas and create a stream split
+        PostgresSourceConfigFactory configFactory = createConfigFactory();
+        configFactory.includeLogicalMessages(Collections.singletonList("test_prefix"));
+        PostgresSourceConfig sourceConfig = configFactory.create(0);
+        try (PostgresDialect dialect = new PostgresDialect(sourceConfig);
+                PostgresSourceReader reader =
+                        createStreamReaderWithLogicalMessage(
+                                Collections.singletonList("test_prefix"))) {
+            reader.start();
+            Map<TableId, TableChanges.TableChange> tableSchemas =
+                    dialect.discoverDataCollectionSchemas(sourceConfig);
+
+            PostgresOffsetFactory offsetFactory = new PostgresOffsetFactory();
+            StreamSplit streamSplit =
+                    new StreamSplit(
+                            StreamSplit.STREAM_SPLIT_ID,
+                            offsetFactory.createInitialOffset(),
+                            offsetFactory.createNoStoppingOffset(),
+                            Collections.emptyList(),
+                            tableSchemas,
+                            0);
+            reader.addSplits(Collections.singletonList(streamSplit));
+
+            // Wait for the reader to start consuming
+            Thread.sleep(1000L);
+
+            try (Connection conn =
+                            getJdbcConnection(
+                                    POSTGRES_CONTAINER, customDatabase.getDatabaseName());
+                    Statement stmt = conn.createStatement()) {
+                // Emit logical message -> insert data -> emit another logical message
+                stmt.execute("SELECT pg_logical_emit_message(false, 'test_prefix', 'message1')");
+                stmt.execute(
+                        "INSERT INTO customer.\"Customers\" VALUES (3001, 'between_msg', 'Beijing', '111')");
+                stmt.execute("SELECT pg_logical_emit_message(false, 'other_prefix', 'message2')");
+                stmt.execute(
+                        "INSERT INTO customer.\"Customers\" VALUES (3002, 'after_other', 'Shanghai', '222')");
+                stmt.execute("SELECT pg_logical_emit_message(false, 'test_prefix', 'message3')");
+            }
+
+            // Wait for the logical message events to be processed
+            Thread.sleep(2000L);
+
+            // Poll records so the emitter processes all events
+            List<String> results = consumeStreamRecords(reader, dataType, 4);
+            // Verify ordering and filtering:
+            // - message1 (test_prefix) is captured
+            // - insert between_msg is captured
+            // - message2 (other_prefix) is filtered out
+            // - insert after_other is captured
+            // - message3 (test_prefix) is captured
+            assertThat(results)
+                    .containsExactly(
+                            "M[test_prefix, message1]",
+                            "+I[3001, between_msg, Beijing, 111]",
+                            "+I[3002, after_other, Shanghai, 222]",
+                            "M[test_prefix, message3]");
+        }
     }
 
     @Test
@@ -118,6 +206,324 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
         assertThat(completedCheckpointIds).isEmpty();
         reader.notifyCheckpointComplete(104L);
         assertThat(completedCheckpointIds).containsExactly(101L);
+    }
+
+    /**
+     * A snapshot-only stream split that reached its ending offset must release the replication slot
+     * even though its starting offset is behind that ending offset.
+     *
+     * <p>That combination is the normal case rather than an edge case: {@code
+     * HybridSplitAssigner#createStreamSplit} seeds the two offsets with the lowest and highest high
+     * watermark of the finished snapshot splits, so they differ as soon as there is more than one
+     * split or any concurrent write, and only emitted data-change or heartbeat records move the
+     * starting offset afterwards.
+     */
+    @Test
+    void testSnapshotOnlyRemovesSlotWhenStartingOffsetIsBehindEndingOffset() throws Exception {
+        final PostgresSourceReader reader = createSnapshotOnlyReader();
+        createSlot();
+        assertThat(customDatabase.checkSlot(slotName)).isEqualTo(slotName);
+
+        reader.onSplitFinished(finishedStreamSplit());
+
+        // checkSlot returns a human-readable "does not exist" sentence that itself embeds the slot
+        // name, so compare for equality rather than containment.
+        assertThat(customDatabase.checkSlot(slotName)).isNotEqualTo(slotName);
+    }
+
+    /**
+     * A suspended stream split is the other reason {@code onSplitFinished} fires — the enumerator
+     * paused streaming so newly added tables can be snapshotted, and the split will resume. The
+     * slot has to survive that, otherwise resuming loses its position.
+     */
+    @Test
+    void testSnapshotOnlyKeepsSlotWhenStreamSplitIsMerelySuspended() throws Exception {
+        final PostgresSourceReader reader = createSnapshotOnlyReader();
+        createSlot();
+        // StreamSplitUpdateRequestEvent is what the enumerator sends to pause streaming; note the
+        // reader context flag is the authority here, not StreamSplit#isSuspended.
+        reader.handleSourceEvents(new StreamSplitUpdateRequestEvent());
+
+        reader.onSplitFinished(finishedStreamSplit());
+
+        assertThat(customDatabase.checkSlot(slotName)).isEqualTo(slotName);
+    }
+
+    private Map<String, SourceSplitState> finishedStreamSplit() {
+        // Deliberately startingOffset < endingOffset: that is what the assigner produces for a
+        // multi-split snapshot, and what the previous guard treated as "not finished".
+        final Offset startingOffset = lsnOffset(1000L);
+        final Offset endingOffset = lsnOffset(2000L);
+        final StreamSplit split =
+                new StreamSplit(
+                        StreamSplit.STREAM_SPLIT_ID,
+                        startingOffset,
+                        endingOffset,
+                        new ArrayList<>(),
+                        new HashMap<>(),
+                        0,
+                        false,
+                        true);
+        final Map<String, SourceSplitState> finished = new HashMap<>();
+        finished.put(split.splitId(), new StreamSplitState(split));
+        return finished;
+    }
+
+    private static Offset lsnOffset(long lsn) {
+        final Map<String, String> offset = new HashMap<>();
+        offset.put("lsn", Long.toString(lsn));
+        return PostgresOffset.of(offset);
+    }
+
+    private void createSlot() throws Exception {
+        try (Connection connection =
+                        getJdbcConnection(POSTGRES_CONTAINER, customDatabase.getDatabaseName());
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    String.format(
+                            "SELECT pg_create_logical_replication_slot('%s', 'pgoutput')",
+                            slotName));
+        }
+    }
+
+    private PostgresSourceReader createSnapshotOnlyReader() throws Exception {
+        final PostgresOffsetFactory offsetFactory = new PostgresOffsetFactory();
+        final PostgresSourceConfigFactory configFactory = createConfigFactory();
+        configFactory.startupOptions(StartupOptions.snapshot());
+        PostgresDialect dialect = new PostgresDialect(configFactory.create(0));
+        final PostgresSourceBuilder.PostgresIncrementalSource<?> source =
+                new PostgresSourceBuilder.PostgresIncrementalSource<>(
+                        configFactory, new ForwardDeserializeSchema(), offsetFactory, dialect);
+        return source.createReader(new TestingReaderContext());
+    }
+
+    /**
+     * Checkpoints taken before the stream split is assigned (e.g. during the snapshot phase) have
+     * no stream offset. With a commit delay, such a checkpoint is still committed after the stream
+     * phase has started. The committed LSN must not go beyond the offset of the latest completed
+     * checkpoint, otherwise the changes in between are lost when restoring from it.
+     */
+    @Test
+    void testLsnCommitDoesNotPassLatestCompletedCheckpoint() throws Exception {
+        PostgresSourceConfig sourceConfig = createConfigFactory().create(0);
+        try (PostgresDialect dialect = new PostgresDialect(sourceConfig);
+                PostgresSourceReader reader = createStreamReader(3)) {
+            Lsn checkpointLsn =
+                    streamOffsetLsn(completeCheckpointsAcrossStreamStart(reader, dialect));
+
+            // checkpoint 4 is committed by now, wait until the slot reaches it
+            Lsn confirmedFlushLsn =
+                    waitForConfirmedFlushLsn(lsn -> lsn.compareTo(checkpointLsn) >= 0, 15_000L);
+            assertThat(confirmedFlushLsn)
+                    .as(
+                            "confirmed_flush_lsn %s must not pass the offset %s of the latest"
+                                    + " completed checkpoint",
+                            confirmedFlushLsn, checkpointLsn)
+                    .isLessThanOrEqualTo(checkpointLsn);
+        }
+    }
+
+    /** Same as above, but restores from the latest completed checkpoint and checks the data. */
+    @Test
+    void testNoDataLossWhenRestoringAfterLsnCommit() throws Exception {
+        PostgresSourceConfig sourceConfig = createConfigFactory().create(0);
+        List<SourceSplitBase> checkpointState;
+        try (PostgresDialect dialect = new PostgresDialect(sourceConfig);
+                PostgresSourceReader reader = createStreamReader(3)) {
+            checkpointState = completeCheckpointsAcrossStreamStart(reader, dialect);
+            // wait until the slot receives what was committed
+            Lsn checkpointLsn = streamOffsetLsn(checkpointState);
+            waitForConfirmedFlushLsn(lsn -> lsn.compareTo(checkpointLsn) >= 0, 15_000L);
+        }
+
+        // restore from checkpoint 4, the latest completed one
+        try (PostgresSourceReader reader = createStreamReader(3)) {
+            reader.start();
+            reader.addSplits(checkpointState);
+            waitForSlotActive(30_000L);
+            insertCustomer(3003);
+
+            assertThat(pollStreamRecords(reader, CUSTOMER_TYPE, 2, 30_000L))
+                    .contains(customerRecord(3003))
+                    .contains(customerRecord(3002));
+        }
+    }
+
+    /**
+     * With scan.newly-added-table.enabled, the enumerator turns offset commit off while newly added
+     * tables are snapshotted, and the reader drops the stream offsets of the checkpoints taken
+     * meanwhile. Once offset commit is turned on again, those checkpoints are still committed
+     * because of the commit delay. The committed LSN must not go beyond the offset of the latest
+     * completed checkpoint.
+     */
+    @Test
+    void testLsnCommitDoesNotPassLatestCompletedCheckpointAfterNewlyAddedTables() throws Exception {
+        PostgresSourceConfig sourceConfig = createConfigFactory().create(0);
+        try (PostgresDialect dialect = new PostgresDialect(sourceConfig);
+                PostgresSourceReader reader = createStreamReader(3, true)) {
+            reader.start();
+            reader.handleSourceEvents(new OffsetCommitEvent(true));
+            reader.addSplits(Collections.singletonList(createStreamSplit(dialect)));
+            waitForSlotActive(30_000L);
+
+            insertCustomer(3001);
+            assertThat(pollStreamRecords(reader, CUSTOMER_TYPE, 1, 5_000L))
+                    .containsExactly(customerRecord(3001));
+            long checkpointId = 1L;
+            for (; checkpointId <= 3L; checkpointId++) {
+                reader.snapshotState(checkpointId);
+                reader.notifyCheckpointComplete(checkpointId);
+            }
+
+            // newly added tables are being snapshotted
+            reader.handleSourceEvents(new OffsetCommitEvent(false));
+            for (; checkpointId <= 6L; checkpointId++) {
+                reader.snapshotState(checkpointId);
+                reader.notifyCheckpointComplete(checkpointId);
+            }
+
+            // the snapshot of newly added tables has finished
+            reader.handleSourceEvents(new OffsetCommitEvent(true));
+            Lsn checkpointLsn = streamOffsetLsn(reader.snapshotState(checkpointId));
+
+            // a change after the latest checkpoint, which must be replayed when restoring from it
+            insertCustomer(3002);
+            pollStreamRecords(reader, CUSTOMER_TYPE, 1, 5_000L);
+            reader.notifyCheckpointComplete(checkpointId);
+
+            // the slot may already be at the offset of checkpoint 1, which equals that of
+            // checkpoint
+            // 7, so watch it for a while in case it passes the offset
+            Lsn confirmedFlushLsn =
+                    waitForConfirmedFlushLsn(lsn -> lsn.compareTo(checkpointLsn) > 0, 15_000L);
+            assertThat(confirmedFlushLsn)
+                    .as(
+                            "confirmed_flush_lsn %s must not pass the offset %s of the latest"
+                                    + " completed checkpoint",
+                            confirmedFlushLsn, checkpointLsn)
+                    .isLessThanOrEqualTo(checkpointLsn);
+        }
+    }
+
+    /**
+     * Takes checkpoints 1 to 3 before the stream split is assigned, then checkpoint 4 in the stream
+     * phase after change 3001, then reads change 3002, and completes checkpoints 1 to 7. Returns
+     * the state of checkpoint 4.
+     */
+    private List<SourceSplitBase> completeCheckpointsAcrossStreamStart(
+            PostgresSourceReader reader, PostgresDialect dialect) throws Exception {
+        reader.start();
+
+        // checkpoints taken before the stream split is assigned
+        reader.snapshotState(1L);
+        reader.snapshotState(2L);
+        reader.snapshotState(3L);
+
+        reader.addSplits(Collections.singletonList(createStreamSplit(dialect)));
+        waitForSlotActive(30_000L);
+
+        insertCustomer(3001);
+        assertThat(pollStreamRecords(reader, CUSTOMER_TYPE, 1, 5_000L))
+                .containsExactly(customerRecord(3001));
+        List<SourceSplitBase> checkpointState = reader.snapshotState(4L);
+
+        // a change after checkpoint 4, which must be replayed when restoring from it. Keep
+        // polling so that the stream reader reads it and moves its offset context forward.
+        insertCustomer(3002);
+        pollStreamRecords(reader, CUSTOMER_TYPE, 1, 5_000L);
+
+        for (long checkpointId = 1L; checkpointId <= 7L; checkpointId++) {
+            if (checkpointId > 4L) {
+                reader.snapshotState(checkpointId);
+            }
+            reader.notifyCheckpointComplete(checkpointId);
+        }
+        return checkpointState;
+    }
+
+    private StreamSplit createStreamSplit(PostgresDialect dialect) {
+        PostgresOffsetFactory offsetFactory = new PostgresOffsetFactory();
+        return new StreamSplit(
+                StreamSplit.STREAM_SPLIT_ID,
+                offsetFactory.createInitialOffset(),
+                offsetFactory.createNoStoppingOffset(),
+                Collections.emptyList(),
+                dialect.discoverDataCollectionSchemas(createConfigFactory().create(0)),
+                0);
+    }
+
+    private static String customerRecord(int id) {
+        return String.format("+I[%d, user, Beijing, 123]", id);
+    }
+
+    private void insertCustomer(int id) throws SQLException {
+        try (Connection conn =
+                        getJdbcConnection(POSTGRES_CONTAINER, customDatabase.getDatabaseName());
+                Statement stmt = conn.createStatement()) {
+            stmt.execute(
+                    String.format(
+                            "INSERT INTO customer.\"Customers\" VALUES (%d, 'user', 'Beijing', '123')",
+                            id));
+        }
+    }
+
+    private static Lsn streamOffsetLsn(List<SourceSplitBase> splits) {
+        return splits.stream()
+                .filter(SourceSplitBase::isStreamSplit)
+                .map(split -> ((PostgresOffset) split.asStreamSplit().getStartingOffset()).getLsn())
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No stream split in state"));
+    }
+
+    /**
+     * Returns the first confirmed_flush_lsn that matches the condition, or the last one seen when
+     * the timeout elapses.
+     */
+    private Lsn waitForConfirmedFlushLsn(Predicate<Lsn> condition, long timeoutMillis)
+            throws Exception {
+        long deadline = System.currentTimeMillis() + timeoutMillis;
+        Lsn lsn = null;
+        try (Connection conn =
+                        getJdbcConnection(POSTGRES_CONTAINER, customDatabase.getDatabaseName());
+                PreparedStatement stmt =
+                        conn.prepareStatement(
+                                "SELECT confirmed_flush_lsn FROM pg_replication_slots"
+                                        + " WHERE slot_name = ?")) {
+            stmt.setString(1, slotName);
+            while (System.currentTimeMillis() < deadline) {
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next() && rs.getString(1) != null) {
+                        lsn = Lsn.valueOf(rs.getString(1));
+                        if (condition.test(lsn)) {
+                            return lsn;
+                        }
+                    }
+                }
+                Thread.sleep(200L);
+            }
+        }
+        return lsn;
+    }
+
+    /** Waits until the stream reader is connected to the replication slot. */
+    private void waitForSlotActive(long timeoutMillis) throws Exception {
+        long deadline = System.currentTimeMillis() + timeoutMillis;
+        try (Connection conn =
+                        getJdbcConnection(POSTGRES_CONTAINER, customDatabase.getDatabaseName());
+                PreparedStatement stmt =
+                        conn.prepareStatement(
+                                "SELECT active FROM pg_replication_slots WHERE slot_name = ?")) {
+            stmt.setString(1, slotName);
+            while (System.currentTimeMillis() < deadline) {
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next() && rs.getBoolean(1)) {
+                        return;
+                    }
+                }
+                Thread.sleep(200L);
+            }
+        }
+        throw new IllegalStateException("Replication slot " + slotName + " is not active");
     }
 
     @ParameterizedTest
@@ -242,30 +648,34 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
                     "INSERT INTO customer.\"Customers\" VALUES (3002, 'after_ddl', 'Shanghai', '222', 'after@test.com')");
         }
 
-        // Wait for the schema change event to be processed
-        Thread.sleep(1000L);
-
-        // Poll records so the emitter processes all events
+        // Poll until the reader captures both stream records in order.
         final SimpleReaderOutput output = new SimpleReaderOutput();
-        for (int i = 0; i < 10; i++) {
-            reader.pollNext(output);
-        }
-
-        // Verify the emitted records contain data before and after DDL in correct order
-        List<SourceRecord> results = output.getResults();
         int beforeDdlPos = -1;
         int afterDdlPos = -1;
-        for (int i = 0; i < results.size(); i++) {
-            SourceRecord record = results.get(i);
-            if (record.value() != null) {
-                String value = record.value().toString();
-                if (value.contains("before_ddl")) {
-                    beforeDdlPos = i;
-                } else if (value.contains("after_ddl")) {
-                    afterDdlPos = i;
+        long recordDeadline = System.currentTimeMillis() + 10_000L;
+        while (System.currentTimeMillis() < recordDeadline) {
+            reader.pollNext(output);
+
+            List<SourceRecord> results = output.getResults();
+            beforeDdlPos = -1;
+            afterDdlPos = -1;
+            for (int i = 0; i < results.size(); i++) {
+                SourceRecord record = results.get(i);
+                if (record.value() != null) {
+                    String value = record.value().toString();
+                    if (value.contains("before_ddl")) {
+                        beforeDdlPos = i;
+                    } else if (value.contains("after_ddl")) {
+                        afterDdlPos = i;
+                    }
                 }
             }
+            if (beforeDdlPos >= 0 && afterDdlPos >= 0 && beforeDdlPos < afterDdlPos) {
+                break;
+            }
+            Thread.sleep(100L);
         }
+
         assertThat(beforeDdlPos)
                 .as("Should capture the INSERT before DDL")
                 .isGreaterThanOrEqualTo(0);
@@ -274,22 +684,31 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
                 .as("INSERT before DDL should appear before INSERT after DDL")
                 .isLessThan(afterDdlPos);
 
-        // Verify that snapshotState returns splits with updated table schema
-        List<SourceSplitBase> splits = reader.snapshotState(1L);
-        assertThat(splits).isNotEmpty();
-
+        // Verify that snapshotState returns splits with updated table schema.
+        List<SourceSplitBase> splits = Collections.emptyList();
         boolean foundUpdatedSchema = false;
-        for (SourceSplitBase split : splits) {
-            if (split.isStreamSplit()) {
-                Map<TableId, TableChanges.TableChange> schemas =
-                        split.asStreamSplit().getTableSchemas();
-                if (schemas.containsKey(tableId)
-                        && schemas.get(tableId).getTable().columnWithName("email") != null) {
-                    foundUpdatedSchema = true;
-                    break;
+        long schemaDeadline = System.currentTimeMillis() + 10_000L;
+        while (System.currentTimeMillis() < schemaDeadline) {
+            splits = reader.snapshotState(1L);
+            foundUpdatedSchema = false;
+            for (SourceSplitBase split : splits) {
+                if (split.isStreamSplit()) {
+                    Map<TableId, TableChanges.TableChange> schemas =
+                            split.asStreamSplit().getTableSchemas();
+                    if (schemas.containsKey(tableId)
+                            && schemas.get(tableId).getTable().columnWithName("email") != null) {
+                        foundUpdatedSchema = true;
+                        break;
+                    }
                 }
             }
+            if (foundUpdatedSchema) {
+                break;
+            }
+            Thread.sleep(100L);
         }
+
+        assertThat(splits).isNotEmpty();
         assertThat(foundUpdatedSchema)
                 .as("The snapshotState should contain the updated table schema with 'email' column")
                 .isTrue();
@@ -302,6 +721,36 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
         final SimpleReaderOutput output = new SimpleReaderOutput();
         InputStatus status = MORE_AVAILABLE;
         while (END_OF_INPUT != status) {
+            status = sourceReader.pollNext(output);
+        }
+        final RecordsFormatter formatter = new RecordsFormatter(recordType);
+        return formatter.format(output.getResults());
+    }
+
+    /** Polls until at least {@code expectedCount} records are read or the timeout elapses. */
+    private List<String> pollStreamRecords(
+            PostgresSourceReader sourceReader,
+            DataType recordType,
+            int expectedCount,
+            long timeoutMillis)
+            throws Exception {
+        final SimpleReaderOutput output = new SimpleReaderOutput();
+        long deadline = System.currentTimeMillis() + timeoutMillis;
+        while (output.getResults().size() < expectedCount
+                && System.currentTimeMillis() < deadline) {
+            if (sourceReader.pollNext(output) != MORE_AVAILABLE) {
+                Thread.sleep(100L);
+            }
+        }
+        return new RecordsFormatter(recordType).format(output.getResults());
+    }
+
+    private List<String> consumeStreamRecords(
+            PostgresSourceReader sourceReader, DataType recordType, int size) throws Exception {
+        // Poll all the n records of the single split.
+        final SimpleReaderOutput output = new SimpleReaderOutput();
+        InputStatus status = MORE_AVAILABLE;
+        while (MORE_AVAILABLE == status || output.getResults().size() < size) {
             status = sourceReader.pollNext(output);
         }
         final RecordsFormatter formatter = new RecordsFormatter(recordType);
@@ -327,10 +776,36 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
     }
 
     private PostgresSourceReader createStreamReader() throws Exception {
+        return createStreamReader(1);
+    }
+
+    private PostgresSourceReader createStreamReader(final int lsnCommitCheckpointsDelay)
+            throws Exception {
+        return createStreamReader(lsnCommitCheckpointsDelay, false);
+    }
+
+    private PostgresSourceReader createStreamReader(
+            final int lsnCommitCheckpointsDelay, boolean scanNewlyAddedTableEnabled)
+            throws Exception {
+        final PostgresOffsetFactory offsetFactory = new PostgresOffsetFactory();
+        final PostgresSourceConfigFactory configFactory = createConfigFactory();
+        configFactory.startupOptions(StartupOptions.latest());
+        configFactory.setLsnCommitCheckpointsDelay(lsnCommitCheckpointsDelay);
+        configFactory.scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled);
+        PostgresDialect dialect = new PostgresDialect(configFactory.create(0));
+        final PostgresSourceBuilder.PostgresIncrementalSource<?> source =
+                new PostgresSourceBuilder.PostgresIncrementalSource<>(
+                        configFactory, new ForwardDeserializeSchema(), offsetFactory, dialect);
+        return source.createReader(new TestingReaderContext());
+    }
+
+    private PostgresSourceReader createStreamReaderWithLogicalMessage(List<String> prefixes)
+            throws Exception {
         final PostgresOffsetFactory offsetFactory = new PostgresOffsetFactory();
         final PostgresSourceConfigFactory configFactory = createConfigFactory();
         configFactory.startupOptions(StartupOptions.latest());
         configFactory.setLsnCommitCheckpointsDelay(1);
+        configFactory.includeLogicalMessages(prefixes);
         PostgresDialect dialect = new PostgresDialect(configFactory.create(0));
         final PostgresSourceBuilder.PostgresIncrementalSource<?> source =
                 new PostgresSourceBuilder.PostgresIncrementalSource<>(
@@ -346,6 +821,7 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
         configFactory.tableList(SCHEMA_NAME + ".Customers");
         configFactory.username(customDatabase.getUsername());
         configFactory.password(customDatabase.getPassword());
+        configFactory.slotName(slotName);
         configFactory.decodingPluginName("pgoutput");
         return configFactory;
     }

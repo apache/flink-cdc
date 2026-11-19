@@ -60,6 +60,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -74,6 +75,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static io.debezium.connector.postgresql.connection.ReplicationConnection.Builder.DEFAULT_PUBLICATION_NAME;
 import static java.lang.String.format;
 import static org.apache.flink.cdc.connectors.postgres.testutils.PostgresTestUtils.hasNextData;
 import static org.apache.flink.cdc.connectors.postgres.testutils.PostgresTestUtils.triggerFailover;
@@ -185,6 +187,24 @@ class PostgresSourceITCase extends PostgresTestBase {
                 scanStartupMode);
     }
 
+    @Test
+    void testFilteredPublication() throws Exception {
+        Map<String, String> options = new HashMap<>();
+        options.put("debezium.publication.autocreate.mode", "filtered");
+        options.put("scan.incremental.snapshot.chunk.size", "10");
+        testPostgresParallelSource(
+                1,
+                DEFAULT_SCAN_STARTUP_MODE,
+                PostgresTestUtils.FailoverType.NONE,
+                PostgresTestUtils.FailoverPhase.NEVER,
+                new String[] {"Customers", "customers_1", "customers_2"},
+                1,
+                0,
+                options,
+                this::checkPublicationForBackfillPhase,
+                false);
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"initial", "latest-offset"})
     void testReadMultipleTableWithMultipleParallelism(String scanStartupMode) throws Exception {
@@ -235,6 +255,61 @@ class PostgresSourceITCase extends PostgresTestBase {
                 PostgresTestUtils.FailoverPhase.STREAM,
                 new String[] {"Customers", "customers_1"},
                 scanStartupMode);
+    }
+
+    @Test
+    void testCoordinatorReleasesSnapshotMetadataInGroupFetchPath() throws Exception {
+        // A small chunk size yields many snapshot splits and a small meta-group size forces the
+        // reader to fetch metadata over several groups, which is the path where the coordinator
+        // holds (and, with the option on, releases) the bulk snapshot-split metadata. No failover:
+        // this asserts the release does not drop any snapshot or stream data.
+        testPostgresParallelSource(
+                DEFAULT_PARALLELISM,
+                DEFAULT_SCAN_STARTUP_MODE,
+                PostgresTestUtils.FailoverType.NONE,
+                PostgresTestUtils.FailoverPhase.NEVER,
+                new String[] {"Customers", "customers_1"},
+                1,
+                0,
+                releaseEnabledGroupFetchOptions());
+    }
+
+    @Test
+    void testCoordinatorReleaseSurvivesStreamPhaseFailover() throws Exception {
+        // JobManager (coordinator) failover in the stream phase after the release: the light,
+        // released state must restore correctly and lose no data.
+        testPostgresParallelSource(
+                DEFAULT_PARALLELISM,
+                DEFAULT_SCAN_STARTUP_MODE,
+                PostgresTestUtils.FailoverType.JM,
+                PostgresTestUtils.FailoverPhase.STREAM,
+                new String[] {"Customers", "customers_1"},
+                1,
+                0,
+                releaseEnabledGroupFetchOptions());
+    }
+
+    @Test
+    void testCoordinatorReleaseSurvivesStreamPhaseReaderFailover() throws Exception {
+        // TaskManager (reader) failover in the stream phase with the release enabled: the
+        // generation guard must reject any stale assembled report and no data is lost.
+        testPostgresParallelSource(
+                DEFAULT_PARALLELISM,
+                DEFAULT_SCAN_STARTUP_MODE,
+                PostgresTestUtils.FailoverType.TM,
+                PostgresTestUtils.FailoverPhase.STREAM,
+                new String[] {"Customers", "customers_1"},
+                1,
+                0,
+                releaseEnabledGroupFetchOptions());
+    }
+
+    private static Map<String, String> releaseEnabledGroupFetchOptions() {
+        Map<String, String> options = new HashMap<>();
+        options.put("scan.incremental.snapshot.chunk.size", "2");
+        options.put("chunk-meta.group.size", "2");
+        options.put("scan.incremental.snapshot.metadata.release.enabled", "true");
+        return options;
     }
 
     @ParameterizedTest
@@ -379,6 +454,52 @@ class PostgresSourceITCase extends PostgresTestBase {
                         "+I[1019, user_20, Shanghai, 123567891234]",
                         "+I[2000, user_21, Shanghai, 123567891234]");
         assertEqualsInAnyOrder(expectedRecords, records);
+    }
+
+    @Test
+    void testSnapshotOnlyModeReleasesReplicationSlot() throws Exception {
+        ResolvedSchema customersSchema =
+                new ResolvedSchema(
+                        Arrays.asList(
+                                physical("Id", BIGINT().notNull()),
+                                physical("Name", STRING()),
+                                physical("address", STRING()),
+                                physical("phone_number", STRING())),
+                        new ArrayList<>(),
+                        UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
+        TestTable table = new TestTable(customersSchema);
+        PostgresSourceBuilder.PostgresIncrementalSource<RowData> source =
+                PostgresSourceBuilder.PostgresIncrementalSource.<RowData>builder()
+                        .hostname(customDatabase.getHost())
+                        .port(customDatabase.getDatabasePort())
+                        .username(customDatabase.getUsername())
+                        .password(customDatabase.getPassword())
+                        .database(customDatabase.getDatabaseName())
+                        .decodingPluginName("pgoutput")
+                        .slotName(slotName)
+                        .tableList(new TestTableId("customer", "Customers").toString())
+                        .startupOptions(StartupOptions.snapshot())
+                        // Multiple splits have different high watermarks. No captured DML or
+                        // heartbeat advances the stream split's starting offset to its end.
+                        .splitSize(2)
+                        .heartbeatInterval(Duration.ZERO)
+                        .deserializer(table.getDeserializer())
+                        .build();
+
+        try (StreamExecutionEnvironment env =
+                StreamExecutionEnvironment.getExecutionEnvironment()) {
+            env.enableCheckpointing(1000);
+            env.setParallelism(1);
+            try (CloseableIterator<RowData> iterator =
+                    env.fromSource(source, WatermarkStrategy.noWatermarks(), "Snapshot Only Source")
+                            .executeAndCollect()) {
+                // Request more than the 21 rows to wait for the bounded source to finish.
+                assertThat(fetchRowData(iterator, 22, table::stringify)).hasSize(21);
+            }
+            try (PostgresConnection connection = getConnection()) {
+                assertThat(getSlotCount(connection)).isZero();
+            }
+        }
     }
 
     @Test
@@ -850,6 +971,31 @@ class PostgresSourceITCase extends PostgresTestBase {
             Map<String, String> otherOptions,
             StreamDataChecker streamDataChecker)
             throws Exception {
+        testPostgresParallelSource(
+                parallelism,
+                scanStartupMode,
+                failoverType,
+                failoverPhase,
+                captureCustomerTables,
+                restartAttempts,
+                delayBetweenAttempts,
+                otherOptions,
+                streamDataChecker,
+                true);
+    }
+
+    private void testPostgresParallelSource(
+            int parallelism,
+            String scanStartupMode,
+            PostgresTestUtils.FailoverType failoverType,
+            PostgresTestUtils.FailoverPhase failoverPhase,
+            String[] captureCustomerTables,
+            int restartAttempts,
+            long delayBetweenAttempts,
+            Map<String, String> otherOptions,
+            StreamDataChecker streamDataChecker,
+            boolean checkSnapshot)
+            throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
@@ -862,7 +1008,7 @@ class PostgresSourceITCase extends PostgresTestBase {
         TableResult tableResult = tEnv.executeSql("select * from customers");
 
         // first step: check the snapshot data
-        if (DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
+        if (checkSnapshot && DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
             checkSnapshotData(tableResult, failoverType, failoverPhase, captureCustomerTables);
         }
 
@@ -899,7 +1045,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                         + " 'schema-name' = '%s',"
                         + " 'table-name' = '%s',"
                         + " 'scan.startup.mode' = '%s',"
-                        + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                        + " 'scan.incremental.snapshot.chunk.size' = '%s',"
                         + " 'decoding.plugin.name' = 'pgoutput', "
                         + " 'slot.name' = '%s',"
                         + " 'scan.lsn-commit.checkpoints-num-delay' = '1'"
@@ -914,17 +1060,17 @@ class PostgresSourceITCase extends PostgresTestBase {
                 SCHEMA_NAME,
                 getTableNameRegex(captureCustomerTables),
                 scanStartupMode,
+                otherOptions.getOrDefault("scan.incremental.snapshot.chunk.size", "100"),
                 slotName,
-                otherOptions.isEmpty()
-                        ? ""
-                        : ","
-                                + otherOptions.entrySet().stream()
-                                        .map(
-                                                e ->
-                                                        String.format(
-                                                                "'%s'='%s'",
-                                                                e.getKey(), e.getValue()))
-                                        .collect(Collectors.joining(",")));
+                otherOptions.entrySet().stream()
+                        .filter(
+                                e ->
+                                        !e.getKey().equals("connector")
+                                                && !e.getKey()
+                                                        .equals(
+                                                                "scan.incremental.snapshot.chunk.size"))
+                        .map(e -> String.format(",'%s'='%s'", e.getKey(), e.getValue()))
+                        .collect(Collectors.joining()));
     }
 
     private void checkSnapshotData(
@@ -979,6 +1125,48 @@ class PostgresSourceITCase extends PostgresTestBase {
 
         assertEqualsInAnyOrder(
                 expectedSnapshotData, fetchRows(iterator, expectedSnapshotData.size()));
+    }
+
+    private void checkPublicationForBackfillPhase(
+            TableResult tableResult,
+            PostgresTestUtils.FailoverType failoverType,
+            PostgresTestUtils.FailoverPhase failoverPhase,
+            String[] captureCustomerTables)
+            throws Exception {
+        List<String> expectedTables =
+                Arrays.stream(captureCustomerTables)
+                        .map(table -> SCHEMA_NAME + "." + table)
+                        .collect(Collectors.toList());
+        // Backfill creates its slot after initializing the shared publication.
+        String query =
+                format(
+                        "SELECT schemaname, tablename FROM pg_publication_tables "
+                                + "WHERE pubname = '%s' AND EXISTS ("
+                                + "SELECT 1 FROM pg_replication_slots "
+                                + "WHERE slot_name = '%s_0' AND database = current_database())",
+                        DEFAULT_PUBLICATION_NAME, slotName);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        try (PostgresConnection connection = getConnection()) {
+            while (System.nanoTime() < deadline) {
+                List<String> publishedTables = new ArrayList<>();
+                connection.query(
+                        query,
+                        rs -> {
+                            while (rs.next()) {
+                                publishedTables.add(rs.getString(1) + "." + rs.getString(2));
+                            }
+                        });
+                connection.commit();
+                if (!publishedTables.isEmpty()) {
+                    assertThat(publishedTables)
+                            .as("Publication must retain all captured tables during backfill")
+                            .containsExactlyInAnyOrderElementsOf(expectedTables);
+                    return;
+                }
+                Thread.sleep(10L);
+            }
+        }
+        throw new AssertionError("No backfill publication observed within 30 seconds");
     }
 
     private void checkStreamData(
@@ -1351,6 +1539,23 @@ class PostgresSourceITCase extends PostgresTestBase {
         // NOTE: it requires ANALYZE or VACUUM to be run first in PostgreSQL.
         final String query = String.format("SELECT COUNT(1) FROM %s", tableId.toString());
 
+        return jdbc.queryAndMap(
+                query,
+                rs -> {
+                    if (!rs.next()) {
+                        throw new SQLException(
+                                String.format(
+                                        "No result returned after running query [%s]", query));
+                    }
+                    return rs.getLong(1);
+                });
+    }
+
+    private long getSlotCount(JdbcConnection jdbc) throws SQLException {
+        final String query =
+                String.format(
+                        "SELECT count(*) FROM pg_replication_slots WHERE slot_name = '%s'",
+                        slotName);
         return jdbc.queryAndMap(
                 query,
                 rs -> {

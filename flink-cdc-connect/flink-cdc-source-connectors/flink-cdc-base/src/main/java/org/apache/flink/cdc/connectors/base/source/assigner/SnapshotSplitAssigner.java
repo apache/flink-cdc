@@ -29,6 +29,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SchemalessSnapshot
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceEnumeratorMetrics;
+import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReader;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
@@ -72,7 +73,21 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
 
     private final List<TableId> alreadyProcessedTables;
     private final List<SchemalessSnapshotSplit> remainingSplits;
-    private final Map<String, SchemalessSnapshotSplit> assignedSplits;
+
+    /**
+     * The splits that have been assigned to a reader. Once a split is finished, it remains in this
+     * map. An entry added to {@link #splitFinishedOffsets} indicates that the split has been
+     * finished. If reading the split fails, it is removed from this map.
+     *
+     * <p>{@link IncrementalSourceReader} relies on the order of elements within the map:
+     *
+     * <ol>
+     *   <li>It must correspond to the order of assignment of the splits to readers.
+     *   <li>The order must be retained across job restarts.
+     * </ol>
+     */
+    private final LinkedHashMap<String, SchemalessSnapshotSplit> assignedSplits;
+
     private final Map<TableId, TableChanges.TableChange> tableSchemas;
     private final Map<String, Offset> splitFinishedOffsets;
 
@@ -93,6 +108,9 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
     private SourceEnumeratorMetrics enumeratorMetrics;
     private final Map<String, Long> splitFinishedCheckpointIds;
     private static final long UNDEFINED_CHECKPOINT_ID = -1;
+
+    /** Whether the bulk snapshot split metadata has been released (FLINK-40697). */
+    private boolean snapshotMetaReleased = false;
 
     private final Object lock = new Object();
     private ExecutorService splittingExecutorService;
@@ -145,6 +163,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                 offsetFactory,
                 new ConcurrentHashMap<>(),
                 checkpoint.getChunkSplitterState());
+        this.snapshotMetaReleased = checkpoint.isSnapshotMetaReleased();
     }
 
     private SnapshotSplitAssigner(
@@ -167,17 +186,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
         this.currentParallelism = currentParallelism;
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = remainingSplits;
-        // When job restore from savepoint, sort the existing tables and newly added tables
-        // to let enumerator only send newly added tables' StreamSplitMetaEvent
-        this.assignedSplits =
-                assignedSplits.entrySet().stream()
-                        .sorted(Map.Entry.comparingByKey())
-                        .collect(
-                                Collectors.toMap(
-                                        Map.Entry::getKey,
-                                        Map.Entry::getValue,
-                                        (o, o2) -> o,
-                                        LinkedHashMap::new));
+        this.assignedSplits = new LinkedHashMap<>(assignedSplits);
         this.tableSchemas = tableSchemas;
         this.splitFinishedOffsets = splitFinishedOffsets;
         this.assignerStatus = assignerStatus;
@@ -295,7 +304,10 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
         }
     }
 
-    /** This should be invoked after this class's open method. */
+    /**
+     * This must be invoked before this class's {@link #open()} method, because {@code open()}
+     * starts an asynchronous splitting thread that concurrently mutates {@code remainingSplits}.
+     */
     public void initEnumeratorMetrics(SourceEnumeratorMetrics enumeratorMetrics) {
         this.enumeratorMetrics = enumeratorMetrics;
 
@@ -527,7 +539,8 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                         isTableIdCaseSensitive,
                         true,
                         splitFinishedCheckpointIds,
-                        chunkSplitter.snapshotState(checkpointId));
+                        chunkSplitter.snapshotState(checkpointId),
+                        snapshotMetaReleased);
         // we need a complete checkpoint before mark this assigner to be finished, to wait for all
         // records of snapshot splits are completely processed
         if (checkpointIdToFinish == null
@@ -571,6 +584,32 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                     checkpointId,
                     splitFinishedCheckpointIds.size());
         }
+    }
+
+    /**
+     * Releases the bulk snapshot-split metadata once the reader has assembled it and a checkpoint
+     * has covered that assignment. Clears the metadata maps but keeps {@code
+     * alreadyProcessedTables}, the assigner status and the chunk-splitter state so a restore does
+     * not re-discover tables or rebuild the stream split. Generalizes the MySQL mechanism
+     * (FLINK-39775).
+     */
+    @Override
+    public void releaseSnapshotMetadata() {
+        if (snapshotMetaReleased) {
+            return;
+        }
+        assignedSplits.clear();
+        splitFinishedOffsets.clear();
+        splitFinishedCheckpointIds.clear();
+        tableSchemas.clear();
+        snapshotMetaReleased = true;
+        LOG.info(
+                "Released snapshot split metadata from the coordinator; the assigner state is now light.");
+    }
+
+    @Override
+    public boolean isSnapshotMetaReleased() {
+        return snapshotMetaReleased;
     }
 
     @Override

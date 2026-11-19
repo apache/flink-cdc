@@ -117,7 +117,10 @@ class OracleTableSourceFactoryTest {
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         JdbcSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
-                                .defaultValue());
+                                .defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
+                                .defaultValue(),
+                        JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -156,7 +159,10 @@ class OracleTableSourceFactoryTest {
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
-                                .defaultValue());
+                                .defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
+                                .defaultValue(),
+                        JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -200,7 +206,10 @@ class OracleTableSourceFactoryTest {
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         true,
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
-                                .defaultValue());
+                                .defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
+                                .defaultValue(),
+                        JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -272,7 +281,10 @@ class OracleTableSourceFactoryTest {
                         true,
                         true,
                         true,
-                        true);
+                        true,
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
+                                .defaultValue(),
+                        JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -312,7 +324,10 @@ class OracleTableSourceFactoryTest {
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
-                                .defaultValue());
+                                .defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
+                                .defaultValue(),
+                        JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -352,7 +367,10 @@ class OracleTableSourceFactoryTest {
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
-                                .defaultValue());
+                                .defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
+                                .defaultValue(),
+                        JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -396,12 +414,27 @@ class OracleTableSourceFactoryTest {
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
-                                .defaultValue());
+                                .defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
+                                .defaultValue(),
+                        JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "table_name", "schema_name");
 
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+    }
+
+    @Test
+    void testRateLimitRequiresIncrementalSnapshot() {
+        Map<String, String> properties = getAllRequiredOptionsWithHost();
+        properties.put("scan.incremental.snapshot.enabled", "false");
+        properties.put("scan.rate-limit.records-per-second", "100");
+
+        Assertions.assertThatThrownBy(() -> createTableSource(properties))
+                .hasStackTraceContaining(
+                        "Option 'scan.rate-limit.records-per-second' requires option "
+                                + "'scan.incremental.snapshot.enabled'");
     }
 
     @Test

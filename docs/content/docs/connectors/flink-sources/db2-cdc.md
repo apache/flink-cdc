@@ -1,9 +1,9 @@
 ---
 title: "Db2"
-weight: 7
-type: docs
-aliases:
-- /connectors/flink-sources/db2-cdc
+slug: "/docs/connectors/flink-sources/db2-cdc"
+sidebar_position: 7
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -27,7 +27,7 @@ under the License.
 # Db2 CDC Connector
 
 The Db2 CDC connector allows for reading snapshot data and incremental data from Db2 database. This document 
-describes how to setup the db2 CDC connector to run SQL queries against Db2 databases.
+describes how to set up the db2 CDC connector to run SQL queries against Db2 databases.
 
 
 ## Supported Databases
@@ -44,7 +44,13 @@ using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR
 
 ### Maven dependency
 
-{{< artifact flink-connector-db2-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-db2-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -264,6 +270,13 @@ Db2 server.
           so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
       </td>
     </tr>
+    <tr>
+      <td>scan.incremental.snapshot.metadata.release.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to release the snapshot split metadata (assigned splits, finished offsets and table schemas) held by the source coordinator once the source has entered the stream phase, to reduce JobManager memory on jobs with a very large number of snapshot splits. Disabled by default. Release happens only after a successful checkpoint; if checkpointing is disabled or no checkpoint completes, the metadata is retained, so this option has no effect without checkpointing. A checkpoint or savepoint taken with this option enabled cannot be used to restore the job after downgrading to Flink CDC 3.6.0 or an earlier version.</td>
+    </tr>
      <tr>
       <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
       <td>optional</td>
@@ -272,6 +285,17 @@ Db2 server.
       <td>
         Whether to assign the unbounded chunks first during snapshot reading phase.<br>
         This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.<br> 
+      </td>
+    </tr>
+    <tr>
+      <td>scan.rate-limit.records-per-second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">-1</td>
+      <td>Double</td>
+      <td>
+        The maximum number of records emitted per second, the default value: -1, means no rate limiting.(only for flink2.x)<br>
+        This option only takes effect when `scan.incremental.snapshot.enabled` is `true`. The legacy non-incremental source does not support rate limiting, and configuring this option with incremental snapshot disabled fails validation.<br>
+        WARNING: Incremental/binlog phase: Rate limiting can cause the connector to fall behind the upstream change stream, risking binlog/WAL purging before the connector catches up (data loss for MySQL, replication slot issues for PostgreSQL).
       </td>
     </tr>
     </tbody>
@@ -469,7 +493,7 @@ Data Type Mapping
     <thead>
       <tr>
         <th class="text-left" style="width:30%;"><a href="https://www.ibm.com/docs/en/db2/11.5?topic=elements-data-types">Db2 type</a></th>
-        <th class="text-left" style="width:10%;">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left" style="width:10%;">Flink SQL type</th>
         <th class="text-left" style="width:60%;">NOTE</th>
       </tr>
     </thead>
@@ -582,5 +606,3 @@ Data Type Mapping
     </tbody>
 </table>
 </div>
-
-{{< top >}}

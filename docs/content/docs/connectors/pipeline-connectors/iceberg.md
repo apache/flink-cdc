@@ -1,9 +1,9 @@
 ---
 title: "Iceberg"
-weight: 9
-type: docs
-aliases:
-- /connectors/pipeline-connectors/iceberg
+slug: "/docs/connectors/pipeline-connectors/iceberg"
+sidebar_position: 9
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -232,14 +232,14 @@ Pipeline Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Pass Iceberg catalog options to the pipeline，See <a href="https://iceberg.apache.org/docs/nightly/flink-configuration/#catalog-configuration">Iceberg catalog options</a>. </td>
+      <td>Pass Iceberg catalog options to the pipeline. See <a href="https://iceberg.apache.org/docs/nightly/flink-configuration/#catalog-configuration">Iceberg catalog options</a>. </td>
     </tr>
     <tr>
       <td>table.properties.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Pass Iceberg table options to the pipeline，See <a href="https://iceberg.apache.org/docs/nightly/configuration/#write-properties">Iceberg table options</a>. </td>
+      <td>Pass Iceberg table options to the pipeline. See <a href="https://iceberg.apache.org/docs/nightly/configuration/#write-properties">Iceberg table options</a>. </td>
     </tr>
     <tr>
       <td>hadoop.conf.*</td>
@@ -339,5 +339,3 @@ Data Type Mapping
     </tbody>
 </table>
 </div>
-
-{{< top >}}

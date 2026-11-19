@@ -257,6 +257,77 @@ class MySqlFullTypesITCase extends MySqlSourceTestBase {
         testMysqlPrecisionTypes(fullTypesMySql8Database);
     }
 
+    @Test
+    void testMysql57ZerofillTypes() throws Throwable {
+        testZerofillTypes(fullTypesMySql57Database);
+    }
+
+    @Test
+    void testMysql8ZerofillTypes() throws Throwable {
+        testZerofillTypes(fullTypesMySql8Database);
+    }
+
+    private void testZerofillTypes(UniqueDatabase database) throws Exception {
+        database.createAndInitialize();
+        Boolean useLegacyJsonFormat = true;
+        CloseableIterator<Event> iterator =
+                env.fromSource(
+                                getFlinkSourceProvider(
+                                                new String[] {"zerofill_types"},
+                                                database,
+                                                useLegacyJsonFormat)
+                                        .getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                "Event-Source")
+                        .executeAndCollect();
+
+        // skip CreateTableEvent
+        List<Event> snapshotResults =
+                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+        RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
+
+        RowType recordType =
+                RowType.of(
+                        DataTypes.DECIMAL(20, 0).notNull(),
+                        // SHOW CREATE TABLE may add UNSIGNED for ZEROFILL types, so use the mapped
+                        // types
+                        DataTypes.SMALLINT(), // tiny_z_c -> SMALLINT
+                        DataTypes.INT(), // small_z_c -> INT
+                        DataTypes.INT(), // medium_z_c -> INT
+                        DataTypes.BIGINT(), // int_z_c -> BIGINT
+                        DataTypes.BIGINT(), // integer_z_c -> BIGINT
+                        DataTypes.DECIMAL(20, 0), // big_z_c -> DECIMAL(20,0)
+                        DataTypes.DOUBLE(), // real_z_c
+                        DataTypes.FLOAT(), // float_z_c
+                        DataTypes.DOUBLE(), // double_z_c
+                        DataTypes.DOUBLE(), // double_precision_z_c
+                        DataTypes.DECIMAL(8, 3), // numeric_z_c
+                        DataTypes.DECIMAL(8, 3), // fixed_z_c
+                        DataTypes.DECIMAL(8, 3) // decimal_z_c
+                        );
+
+        Object[] expectedSnapshot =
+                new Object[] {
+                    DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
+                    (short) 1,
+                    2,
+                    3,
+                    4L,
+                    5L,
+                    DecimalData.fromBigDecimal(new BigDecimal("6"), 20, 0),
+                    7.5d,
+                    8.5f,
+                    9.5d,
+                    10.5d,
+                    DecimalData.fromBigDecimal(new BigDecimal("11.5"), 8, 3),
+                    DecimalData.fromBigDecimal(new BigDecimal("12.5"), 8, 3),
+                    DecimalData.fromBigDecimal(new BigDecimal("13.5"), 8, 3)
+                };
+
+        Assertions.assertThat(RecordDataTestUtils.recordFields(snapshotRecord, recordType))
+                .isEqualTo(expectedSnapshot);
+    }
+
     void testMysqlPrecisionTypes(UniqueDatabase database) throws Throwable {
         RowType recordType =
                 RowType.of(

@@ -29,7 +29,7 @@ permissions:
 jobs:
   label-when-approved:
     name: "Label when approved"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       isApprovedByCommiters: ${{ steps.label-when-approved-by-commiters.outputs.isApproved }}
       isApprovedByAnyone: ${{ steps.label-when-approved-by-anyone.outputs.isApproved }}

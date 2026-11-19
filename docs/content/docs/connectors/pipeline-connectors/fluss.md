@@ -1,9 +1,9 @@
 ---
 title: "Fluss"
-weight: 4
-type: docs
-aliases:
-- /connectors/pipeline-connectors/fluss
+slug: "/docs/connectors/pipeline-connectors/fluss"
+sidebar_position: 4
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -26,12 +26,33 @@ under the License.
 
 # Fluss Pipeline Connector
 
-The Fluss Pipeline connector can be used as the *Data Sink* of the pipeline, and write data to [Fluss](https://fluss.apache.org). This document describes how to set up the Fluss Pipeline connector.
+The Fluss Pipeline connector can be used as a *Data Source* or *Data Sink* of the pipeline. It
+reads from or writes data to [Fluss](https://fluss.apache.org). This document describes how to set
+up both roles.
 
 ## What can the connector do?
 * Create table automatically if not exist
 * Data synchronization
 * Schema change synchronization (lenient mode)
+* Dynamic source table subscriptions
+
+## Fluss Source
+
+The following is the minimal configuration for reading dynamically discovered Fluss tables:
+
+```yaml
+source:
+  type: fluss
+  bootstrap.servers: localhost:9123
+  table.discoverer.type: fluss-default
+  table.discoverer.pattern: 'inventory\..*'
+  scan.discovery.interval: 10 s
+  scan.startup.mode: earliest
+```
+
+`table.discoverer.type` selects the source table discoverer. `fluss-default` matches fully
+qualified table names with `table.discoverer.pattern`; configure another discoverer's required
+`table.discoverer.*` options when selecting it instead.
 
 How to create Pipeline
 ----------------
@@ -101,6 +122,13 @@ Pipeline Connector Options
       <td>The bootstrap servers for the Fluss sink connection. </td>
     </tr>
     <tr>
+      <td>sink.partitioning.strategy</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">DEFAULT</td>
+      <td>String</td>
+      <td>The partitioning strategy for DataChangeEvent routing. Available values are <code>DEFAULT</code> and <code>FORWARD</code>. <code>DEFAULT</code> hashes primary key tables by primary keys and randomly distributes log table events across downstream subtasks for balanced load. <code>FORWARD</code> routes data events to downstream subtasks with the same indices as upstream and is intended for Fluss-to-Fluss data synchronization. The upstream data distribution must match the Fluss table bucket distribution; otherwise, data correctness issues may occur.</td>
+    </tr>
+    <tr>
       <td>bucket.key</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
@@ -122,22 +150,110 @@ Pipeline Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Pass options of Fluss table to pipeline，See <a href="https://fluss.apache.org/docs/engine-flink/options/#storage-options">Fluss table options</a>. </td>
+      <td>Pass options of Fluss table to pipeline. See <a href="https://fluss.apache.org/docs/engine-flink/options/#storage-options">Fluss table options</a>. </td>
+    </tr>
+    <tr>
+      <td>properties.&lt;data-lake-format&gt;.*</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Pass data lake table properties to Fluss when creating tables. Supported prefixes follow the Fluss client's data lake formats, currently <code>properties.paimon.*</code>, <code>properties.iceberg.*</code>, <code>properties.hudi.*</code>, and <code>properties.lance.*</code>. Only the outer <code>properties.</code> prefix is removed. Individual options are not validated by Flink CDC.</td>
     </tr>
     <tr>
       <td>properties.client.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Pass options of Fluss client to pipeline，See <a href="https://fluss.apache.org/docs/engine-flink/options/#write-options">Fluss client options</a>. </td>
+      <td>Pass options of Fluss client to pipeline. See <a href="https://fluss.apache.org/docs/engine-flink/options/#write-options">Fluss client options</a>. </td>
+    </tr>
+    <tr>
+      <td>scan.rate-limit.records-per-second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">-1</td>
+      <td>Double</td>
+      <td>
+        The maximum number of records emitted per second, the default value: -1, means no rate limiting.(only for flink2.x)<br>
+        WARNING: In the log reading phase, rate limiting can make the source fall behind the table's log retention (table.log.ttl), so records may expire before they are consumed, which can lead to data loss.
+      </td>
     </tr>
     </tbody>
 </table>    
 </div>
 
+### Table options in transform rules
+
+Use `table-options` in a transform rule to configure Fluss table properties for the matched table.
+Use Fluss property names such as `table.replication.factor`, without the `properties.` prefix used
+in the sink configuration. These options override matching `sink.properties.table.*` options;
+other sink table properties still apply.
+
+```yaml
+transform:
+  - source-table: inventory.products
+    projection: "*"
+    table-options: table.replication.factor=2,table.log.ttl=7d
+
+sink:
+  type: fluss
+  bootstrap.servers: localhost:9123
+  properties.table.replication.factor: 3
+```
+
+In this example, the Fluss table created for `inventory.products` has a replication factor of 2
+and a log retention time of 7 days. Other tables use a replication factor of 3.
+These options apply when creating tables and do not update the properties of existing tables.
+Continue to configure bucket keys and bucket counts with the sink options `bucket.key` and `bucket.num`.
+
 ## Usage Notes
 
 * Support Fluss primary key table and log table.
+
+### Data lake table properties
+
+To create Fluss tables with lakehouse storage enabled, configure the Fluss sink as follows:
+
+```yaml
+sink:
+  type: fluss
+  bootstrap.servers: localhost:9123
+  properties.table.datalake.enabled: 'true'
+  properties.table.datalake.freshness: 30s
+  properties.paimon.file.format: orc
+  properties.paimon.deletion-vectors.enabled: 'true'
+```
+
+The connector removes only `properties.`, so `properties.paimon.file.format` becomes
+`paimon.file.format` in the Fluss table properties. For Iceberg, use `properties.iceberg.*`,
+for example `properties.iceberg.write.format.default: parquet`.
+The lake format and tiering service must be configured in Fluss; see the
+[Fluss lakehouse documentation](https://fluss.apache.org/docs/streaming-lakehouse/datalake-formats/paimon/).
+
+These properties apply to all tables created by this sink. They do not alter properties of
+existing tables. Flink CDC accepts arbitrary option names and values under supported data lake
+prefixes and delegates their interpretation and validation to Fluss and the lake integration;
+an unrecognized option may be ignored if the downstream implementation does not reject it.
+Unsupported prefixes, such as `properties.icerberg.*`, are still rejected by Flink CDC.
+
+### Dynamic source subscriptions
+
+When Fluss is used as a source with a table discoverer, each successful discovery result is the
+authoritative complete subscription set. Set a positive `scan.discovery.interval` to enable
+periodic updates. An empty result unsubscribes every discovered table; a discovery failure does not
+change the current subscription and fails the job.
+
+Unsubscribing a table only stops and cleans up its source-side readers. It does not delete the Fluss
+table or change sink behavior. A restored reader waits for a fresh subscription snapshot before it
+opens restored splits, so a table that remains unsubscribed cannot emit from restored splits after recovery.
+If a table is subscribed again, it is treated as a new table and uses the configured
+`scan.startup.mode`.
+
+Removal is coordinated with checkpoint state: a failure restores source splits and pending removal
+tombstones from the latest completed checkpoint; subscription is refreshed by discovery. A removal
+and re-addition that both occur between the same two completed checkpoints may be rolled back as
+though the removal had not occurred. Restoring a checkpoint from before a removal tombstone while
+the table is currently re-subscribed does not promise a fresh table lifecycle. For primary key
+tables, snapshot leases are not released early during removal;
+their existing expiry and close handling remain in effect.
 
 * For creating table automatically
   * There is no partition key
@@ -152,7 +268,7 @@ Pipeline Connector Options
 
   To enable schema change synchronization, configure the pipeline with `schema.change.behavior: lenient`. If you want to ignore all schema changes, use `schema.change.behavior: IGNORE`.
 
-* For data synchronization, the pipeline connector uses [Fluss Java Client](https://fluss.apache.org/docs/apis/java-client/)
+* For data synchronization, the pipeline connector uses [Fluss Java Client](https://fluss.apache.org/docs/apis/java/)
   to write data to Fluss.
 
 Data Type Mapping
@@ -265,5 +381,3 @@ Data Type Mapping
     </tbody>
 </table>
 </div>
-
-{{< top >}}

@@ -1,9 +1,9 @@
 ---
 title: "Vitess"
-weight: 10
-type: docs
-aliases:
-- /connectors/flink-sources/vitess-cdc
+slug: "/docs/connectors/flink-sources/vitess-cdc"
+sidebar_position: 10
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -26,17 +26,23 @@ under the License.
 
 # Vitess CDC Connector
 
-The Vitess CDC connector allows for reading of incremental data from Vitess cluster. The connector does not support snapshot feature at the moment. This document describes how to setup the Vitess CDC connector to run SQL queries against Vitess databases.
+The Vitess CDC connector allows for reading of incremental data from Vitess cluster. The connector does not support snapshot feature at the moment. This document describes how to set up the Vitess CDC connector to run SQL queries against Vitess databases.
 [Vitess debezium documentation](https://debezium.io/documentation/reference/connectors/vitess.html)
 
 Dependencies
 ------------
 
-In order to setup the Vitess CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
+To set up the Vitess CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
 ### Maven dependency
 
-{{< artifact flink-connector-vitess-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-vitess-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -262,7 +268,7 @@ Data Type Mapping
     <thead>
       <tr>
         <th class="text-left">MySQL type<a href="https://dev.mysql.com/doc/refman/8.0/en/data-types.html"></a></th>
-        <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">Flink SQL type</th>
       </tr>
     </thead>
     <tbody>
@@ -329,5 +335,3 @@ Data Type Mapping
     </tbody>
 </table>
 </div>
-
-{{< top >}}

@@ -82,6 +82,27 @@ rsync -a \
   . flink-cdc-${RELEASE_VERSION}
 
 tar $TAR_OPTIONS -czf ${RELEASE_DIR}/flink-cdc-${RELEASE_VERSION}-src.tgz flink-cdc-${RELEASE_VERSION}
+
+# Verify that the bundled documentation assets and their licenses are in the archive.
+tar -tzf "${RELEASE_DIR}/flink-cdc-${RELEASE_VERSION}-src.tgz" > "${RELEASE_DIR}/source-archive-contents"
+for bundled_file in \
+    LICENSE \
+    NOTICE \
+    docs/static/js/anchor.min.js \
+    docs/static/font-awesome/css/font-awesome.css \
+    docs/static/font-awesome/fonts/FontAwesome.otf \
+    docs/assets/github.css \
+    licenses/LICENSE.anchorjs \
+    licenses/LICENSE.font-awesome \
+    licenses/LICENSE.chroma; do
+    if ! grep -Fxq "flink-cdc-${RELEASE_VERSION}/${bundled_file}" \
+        "${RELEASE_DIR}/source-archive-contents"; then
+        echo "Source archive is missing ${bundled_file}"
+        exit 1
+    fi
+done
+rm "${RELEASE_DIR}/source-archive-contents"
+
 gpg --armor --detach-sig ${RELEASE_DIR}/flink-cdc-${RELEASE_VERSION}-src.tgz
 cd ${RELEASE_DIR}
 ${SHASUM} flink-cdc-${RELEASE_VERSION}-src.tgz > flink-cdc-${RELEASE_VERSION}-src.tgz.sha512

@@ -1,9 +1,9 @@
 ---
 title: "Oracle"
-weight: 2
-type: docs
-aliases:
-- /connectors/pipeline-connectors/oracle
+slug: "/docs/connectors/pipeline-connectors/oracle"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -27,7 +27,7 @@ under the License.
 # Oracle Connector
 
 Oracle connector allows reading snapshot data and incremental data from Oracle database and provides end-to-end full-database data synchronization capabilities.
-This document describes how to setup the Oracle connector.
+This document describes how to set up the Oracle connector.
 
 
 ## Example
@@ -135,7 +135,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td>Optional startup mode for Oracle CDC consumer, valid enumerations are "initial" ,"latest-offset" and "snapshot".</td>
+      <td>Optional startup mode for Oracle CDC consumer, valid enumerations are "initial", "latest-offset" and "snapshot".</td>
     </tr>
     <tr>
       <td>debezium.*</td>
@@ -169,7 +169,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td> The url for oracle jdbc ,the url will be used preferentially,if no url is configured, then use "jdbc:oracle:thin:@localhost:1521:orcl"，but oracle 19c url is "jdbc:oracle:thin:@//localhost:1521/pdb1",so the url property is option to adapt to different versions of Oracle.</td>
+      <td> The url for Oracle JDBC, the url will be used preferentially, if no url is configured, then use "jdbc:oracle:thin:@localhost:1521:orcl", but oracle 19c url is "jdbc:oracle:thin:@//localhost:1521/pdb1", so the url property is option to adapt to different versions of Oracle.</td>
     </tr>
     <tr>
       <td>database</td>
@@ -274,6 +274,16 @@ The max retry times that the connector should retry to build oracle database ser
       <td>Boolean</td>
       <td>
       Whether to skip backfill in snapshot reading phase. If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in incremental reading phase instead of being merged into the snapshot.WARNING: Skipping backfill might lead to data inconsistency because some incremental events happened within the snapshot phase might be replayed (only at-least-once semantic is promised). For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed binlog events should be handled specially.
+      </td>
+    </tr>
+    <tr>
+      <td>scan.rate-limit.records-per-second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">-1</td>
+      <td>Double</td>
+      <td>
+        The maximum number of records emitted per second, the default value: -1, means no rate limiting.(only for flink2.x)<br>
+        WARNING: Incremental/binlog phase: Rate limiting can cause the connector to fall behind the upstream change stream, risking binlog/WAL purging before the connector catches up (data loss for MySQL, replication slot issues for PostgreSQL).
       </td>
     </tr>
     </tbody>
@@ -434,4 +444,3 @@ source:
     </tbody>
 </table>
 </div>
-{{< top >}}

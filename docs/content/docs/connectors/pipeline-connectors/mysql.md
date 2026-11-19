@@ -1,9 +1,9 @@
 ---
 title: "MySQL"
-weight: 2
-type: docs
-aliases:
-- /connectors/pipeline-connectors/mysql
+slug: "/docs/connectors/pipeline-connectors/mysql"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -27,7 +27,7 @@ under the License.
 # MySQL Connector
 
 MySQL connector allows reading snapshot data and incremental data from MySQL database and provides end-to-end full-database data synchronization capabilities.
-This document describes how to setup the MySQL connector.
+This document describes how to set up the MySQL connector.
 
 ## Dependencies
 
@@ -290,6 +290,13 @@ pipeline:
       <td>Whether to enable scan the newly added tables feature or not, by default is false. This option is only useful when we start the job from a savepoint/checkpoint.</td>
     </tr>
     <tr>
+      <td>scan.incremental.snapshot.metadata.release.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to release the snapshot split metadata held by the source coordinator after entering the binlog phase to reduce JobManager memory. Incompatible with scan.newly-added-table.enabled (enabling both fails at startup); disabled by default. Release happens only after a successful checkpoint; if checkpointing is disabled or no checkpoint completes, the metadata is retained, so this option has no effect without checkpointing. A checkpoint or savepoint taken with this option enabled cannot be used to restore the job after downgrading to Flink CDC 3.6.0 or an earlier version.</td>
+    </tr>
+    <tr>
       <td>scan.binlog.newly-added-table.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
@@ -369,6 +376,16 @@ pipeline:
       <td>String</td>
       <td>
         List of readable metadata from SourceRecord to be passed to downstream and could be used in transform module, split by `,`. Available readable metadata are: op_ts.
+      </td>
+    </tr>
+    <tr>
+      <td>scan.rate-limit.records-per-second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">-1</td>
+      <td>Double</td>
+      <td>
+        The maximum number of records emitted per second, the default value: -1, means no rate limiting.(only for flink2.x)<br>
+        WARNING: Incremental/binlog phase: Rate limiting can cause the connector to fall behind the upstream change stream, risking binlog/WAL purging before the connector catches up (data loss for MySQL, replication slot issues for PostgreSQL).
       </td>
     </tr>
     </tbody>
@@ -736,5 +753,3 @@ The example for different spatial data types mapping is as follows:
     </tbody>
 </table>
 </div>
-
-{{< top >}}

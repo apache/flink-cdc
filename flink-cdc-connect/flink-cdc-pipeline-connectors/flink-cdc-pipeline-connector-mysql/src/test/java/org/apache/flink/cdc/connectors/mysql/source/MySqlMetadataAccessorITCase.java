@@ -374,7 +374,9 @@ class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
         database.createAndInitialize();
 
         String[] tables =
-                new String[] {"common_types", "time_types", "precision_types", "json_types"};
+                new String[] {
+                    "common_types", "time_types", "precision_types", "json_types", "zerofill_types"
+                };
         MySqlMetadataAccessor metadataAccessor = getMetadataAccessor(tables, database, true);
 
         assertThatThrownBy(metadataAccessor::listNamespaces)
