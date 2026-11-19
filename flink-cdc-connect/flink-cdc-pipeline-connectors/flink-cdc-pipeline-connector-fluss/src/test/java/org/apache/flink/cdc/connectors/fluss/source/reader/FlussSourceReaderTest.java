@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.metrics.WrapperFlussMetricRegistry;
 import org.apache.flink.cdc.connectors.fluss.source.deserializer.FlussRecordDeserializer;
 import org.apache.flink.cdc.connectors.fluss.source.event.FinishedKvSnapshotConsumeEvent;
+import org.apache.flink.cdc.connectors.fluss.source.event.ReaderSplitReportEvent;
 import org.apache.flink.cdc.connectors.fluss.source.event.TableRemovalAckEvent;
 import org.apache.flink.cdc.connectors.fluss.source.event.TableSubscriptionEvent;
 import org.apache.flink.cdc.connectors.fluss.source.metrics.FlussSourceReaderMetrics;
@@ -61,6 +62,68 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for subscription-aware split handling in {@link FlussSourceReader}. */
 class FlussSourceReaderTest {
+
+    @Test
+    void testReportsRestoredSplitsAtStartBeforeSubscription() throws Exception {
+        TestingReaderContext context = new TestingReaderContext();
+        TrackingFetcherManager fetcher =
+                new TrackingFetcherManager(new FutureCompletingBlockingQueue<>());
+        try (FlussSourceReader<Event> reader =
+                new FlussSourceReader<>(
+                        context,
+                        new WrapperFlussMetricRegistry(
+                                context.metricGroup(), Collections.emptySet()),
+                        new FlussRecordEmitter<>(new FlussRecordDeserializer()),
+                        fetcher,
+                        null)) {
+            FlussLogSplit split = testSplit();
+            reader.addSplits(Collections.singletonList(split));
+            reader.start();
+            assertThat(fetcher.addedSplits).isEmpty();
+            assertThat(context.getSentEvents())
+                    .singleElement()
+                    .isInstanceOfSatisfying(
+                            ReaderSplitReportEvent.class,
+                            report -> {
+                                assertThat(report.getBuckets())
+                                        .containsExactly(split.getTableBucket());
+                            });
+
+            context.clearSentEvents();
+            reader.handleSourceEvents(
+                    new TableSubscriptionEvent(
+                            Collections.singleton(split.getTablePath()),
+                            Collections.emptyMap(),
+                            Collections.emptySet(),
+                            Collections.singleton(split.getPhysicalTablePath())));
+            assertThat(fetcher.addedSplits).containsExactly(split);
+            assertThat(context.getSentEvents()).isEmpty();
+        }
+    }
+
+    @Test
+    void testEmptyReaderReportsAtStart() throws Exception {
+        TestingReaderContext context = new TestingReaderContext();
+        try (FlussSourceReader<Event> reader = newReader(context)) {
+            reader.start();
+            assertThat(context.getSentEvents()).hasSize(1);
+            TableSubscriptionEvent subscription =
+                    new TableSubscriptionEvent(
+                            Collections.emptySet(),
+                            Collections.emptyMap(),
+                            Collections.emptySet(),
+                            Collections.emptySet());
+            reader.handleSourceEvents(subscription);
+            reader.handleSourceEvents(subscription);
+            assertThat(context.getSentEvents())
+                    .singleElement()
+                    .isInstanceOfSatisfying(
+                            ReaderSplitReportEvent.class,
+                            report -> {
+                                assertThat(report.getBuckets()).isEmpty();
+                            });
+        }
+    }
 
     @Test
     void testStagesSplitUntilFirstSubscriptionSnapshotAndIncludesItInCheckpoint() throws Exception {

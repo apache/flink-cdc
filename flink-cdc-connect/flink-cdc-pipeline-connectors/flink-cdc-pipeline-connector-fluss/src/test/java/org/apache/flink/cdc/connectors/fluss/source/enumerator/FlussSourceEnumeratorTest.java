@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.source.discover.TableDiscoverer;
 import org.apache.flink.cdc.connectors.fluss.source.discover.FlussDefaultDiscoverer;
 import org.apache.flink.cdc.connectors.fluss.source.discover.FlussSubscriberTableDiscoverer;
 import org.apache.flink.cdc.connectors.fluss.source.event.FinishedKvSnapshotConsumeEvent;
+import org.apache.flink.cdc.connectors.fluss.source.event.ReaderSplitReportEvent;
 import org.apache.flink.cdc.connectors.fluss.source.event.TableRemovalAckEvent;
 import org.apache.flink.cdc.connectors.fluss.source.event.TableSubscriptionEvent;
 import org.apache.flink.cdc.connectors.fluss.source.reader.LeaseContext;
@@ -38,13 +39,16 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.ConnectionFactory;
+import org.apache.fluss.client.admin.Admin;
 import org.apache.fluss.client.initializer.OffsetsInitializer;
 import org.apache.fluss.client.table.Table;
 import org.apache.fluss.client.table.scanner.batch.BatchScanUtils;
 import org.apache.fluss.client.table.scanner.batch.BatchScanner;
 import org.apache.fluss.config.ConfigOptions;
+import org.apache.fluss.metadata.PartitionInfo;
 import org.apache.fluss.metadata.PartitionSpec;
 import org.apache.fluss.metadata.PhysicalTablePath;
+import org.apache.fluss.metadata.TableBucket;
 import org.apache.fluss.metadata.TableChange;
 import org.apache.fluss.metadata.TableDescriptor;
 import org.apache.fluss.metadata.TablePath;
@@ -56,10 +60,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -282,11 +288,13 @@ class FlussSourceEnumeratorTest {
                         .contains(tablePath);
                 enumerator.snapshotState(1L);
                 enumerator.addReader(0);
+                enumerator.handleSourceEvent(0, new ReaderSplitReportEvent(Collections.emptySet()));
                 assertThat(latestSubscriptionEvent(context, 0).getFencedTablePaths())
                         .contains(tablePath);
                 enumerator.snapshotState(2L);
                 enumerator.notifyCheckpointComplete(2L);
                 enumerator.addReader(0);
+                enumerator.handleSourceEvent(0, new ReaderSplitReportEvent(Collections.emptySet()));
                 assertThat(latestSubscriptionEvent(context, 0).getFencedTablePaths())
                         .doesNotContain(tablePath);
 
@@ -315,12 +323,14 @@ class FlussSourceEnumeratorTest {
 
                 enumerator.notifyCheckpointComplete(3L);
                 enumerator.addReader(0);
+                enumerator.handleSourceEvent(0, new ReaderSplitReportEvent(Collections.emptySet()));
                 assertThat(latestSubscriptionEvent(context, 0).getFencedTablePaths())
                         .contains(tablePath);
 
                 enumerator.snapshotState(4L);
                 enumerator.notifyCheckpointComplete(4L);
                 enumerator.addReader(0);
+                enumerator.handleSourceEvent(0, new ReaderSplitReportEvent(Collections.emptySet()));
                 assertThat(latestSubscriptionEvent(context, 0).getFencedTablePaths())
                         .doesNotContain(tablePath);
             } finally {
@@ -376,24 +386,16 @@ class FlussSourceEnumeratorTest {
                                 .flatMap(List::stream)
                                 .collect(Collectors.toList());
                 assertThat(freshSplits).hasSize(2);
+                Map<TableBucket, Integer> owners = assignedOwners(context);
                 FlussLogSplit freshB0 =
                         freshSplits.stream()
-                                .filter(
-                                        split ->
-                                                FlussSourceEnumerator.getSplitOwner(
-                                                                split.getTableBucket(), NUM_READERS)
-                                                        == 0)
+                                .filter(split -> owners.get(split.getTableBucket()) == 0)
                                 .map(FlussSplitBase::asLogSplit)
                                 .findFirst()
                                 .orElseThrow(AssertionError::new);
                 assertThat(
                                 freshSplits.stream()
-                                        .filter(
-                                                split ->
-                                                        FlussSourceEnumerator.getSplitOwner(
-                                                                        split.getTableBucket(),
-                                                                        NUM_READERS)
-                                                                == 1))
+                                        .filter(split -> owners.get(split.getTableBucket()) == 1))
                         .singleElement();
 
                 FlussLogSplit staleB0 =
@@ -451,11 +453,16 @@ class FlussSourceEnumeratorTest {
                             fqnRegex(DATABASE_NAME, tableName));
             try {
                 enumerator.start();
-                runDiscoveryCycle(context);
+                registerAllReaders(context, enumerator);
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                context.unregisterReader(0);
+                context.runNextOneTimeCallable();
                 FlussSourceEnumStateSerializer serializer = new FlussSourceEnumStateSerializer();
                 assertThat(enumerator.snapshotState(0L).getRemainingSplits()).isNotEmpty();
                 byte[] pendingCheckpoint = serializer.serialize(enumerator.snapshotState(0L));
-                registerAllReaders(context, enumerator);
+                context.registerReader(new ReaderInfo(0, "restarted_0"));
+                enumerator.addReader(0);
+                enumerator.handleSourceEvent(0, new ReaderSplitReportEvent(Collections.emptySet()));
 
                 TablePath tablePath = TablePath.of(DATABASE_NAME, tableName);
                 PhysicalTablePath droppedPartition = PhysicalTablePath.of(tablePath, "20260904");
@@ -522,15 +529,19 @@ class FlussSourceEnumeratorTest {
                                                         .Configuration()));
                         try {
                             restored.start();
+                            registerAllReaders(restoredContext, restored);
                             if (checkpoint.getRemainingSplits().isEmpty()) {
-                                registerAllReaders(restoredContext, restored);
                                 runDiscoveryCycle(restoredContext);
                             } else {
+                                restoredContext.unregisterReader(0);
                                 runDiscoveryCycle(restoredContext);
                                 assertThat(restored.snapshotState(1L).getRemainingSplits())
                                         .extracting(FlussSplitBase::getPhysicalTablePath)
                                         .containsOnly(retainedPartition);
-                                registerAllReaders(restoredContext, restored);
+                                restoredContext.registerReader(new ReaderInfo(0, "restarted_0"));
+                                restored.addReader(0);
+                                restored.handleSourceEvent(
+                                        0, new ReaderSplitReportEvent(Collections.emptySet()));
                             }
                             assertThat(restored.snapshotState(1L).getAssignedPhysicalTablePaths())
                                     .containsExactly(retainedPartition);
@@ -766,7 +777,7 @@ class FlussSourceEnumeratorTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
-    void testRestorePendingPartitionRemovalRegeneratesRequestId(boolean registerBeforeDiscovery)
+    void testRestorePendingPartitionRemovalRegeneratesRequestId(boolean readerRestarts)
             throws Throwable {
         String tableName = "partition_ack_restore";
         createPartitionedPkTable(tableName, 1);
@@ -833,13 +844,17 @@ class FlussSourceEnumeratorTest {
                                     new org.apache.flink.configuration.Configuration()));
             try {
                 enumerator.start();
-                if (registerBeforeDiscovery) {
-                    registerAllReaders(context, enumerator);
-                    assertThat(context.getSentSourceEvent()).isEmpty();
-                    runDiscoveryCycle(context);
-                } else {
-                    runDiscoveryCycle(context);
-                    registerAllReaders(context, enumerator);
+                registerAllReaders(context, enumerator);
+                assertThat(context.getSentSourceEvent()).isEmpty();
+                if (readerRestarts) {
+                    context.unregisterReader(0);
+                }
+                runDiscoveryCycle(context);
+                if (readerRestarts) {
+                    context.registerReader(new ReaderInfo(0, "restarted_0"));
+                    enumerator.addReader(0);
+                    enumerator.handleSourceEvent(
+                            0, new ReaderSplitReportEvent(Collections.emptySet()));
                 }
 
                 long requestId =
@@ -884,7 +899,10 @@ class FlussSourceEnumeratorTest {
                             fqnRegex(DATABASE_NAME, tableName));
             try {
                 enumerator.start();
-                runDiscoveryCycle(context);
+                registerAllReaders(context, enumerator);
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                context.unregisterReader(0);
+                context.runNextOneTimeCallable();
                 assertThat(enumerator.snapshotState(0L).getRemainingSplits()).hasSize(2);
                 connection
                         .getAdmin()
@@ -900,7 +918,9 @@ class FlussSourceEnumeratorTest {
                                 split ->
                                         assertThat(split.getPhysicalTablePath())
                                                 .isEqualTo(livePath));
-                registerAllReaders(context, enumerator);
+                context.registerReader(new ReaderInfo(0, "restarted_0"));
+                enumerator.addReader(0);
+                enumerator.handleSourceEvent(0, new ReaderSplitReportEvent(Collections.emptySet()));
                 assertThat(enumerator.snapshotState(2L).getAssignedPhysicalTablePaths())
                         .containsExactly(livePath);
                 for (int readerId = 0; readerId < NUM_READERS; readerId++) {
@@ -1179,12 +1199,13 @@ class FlussSourceEnumeratorTest {
     }
 
     /**
-     * Tests that when no readers are registered yet, a completed table-bucket initialization lands
-     * in the pending assignment map instead of being lost or re-queued, and that once readers
-     * register, all pending splits are assigned exactly once.
+     * Tests that initialization completing during a reader restart stays pending until the reader
+     * reports its restored splits, without losing or re-queuing splits.
      */
-    @Test
-    void testPendingAssignmentSurvivesDiscoveryUntilReadersRegister() throws Throwable {
+    @ParameterizedTest
+    @CsvSource({"true", "false"})
+    void testPendingAssignmentSurvivesDiscoveryWhileReaderRestarts(boolean failsDuringDiscovery)
+            throws Throwable {
         String tableName = "pending_no_reader";
         createPkTable(tableName, 3);
 
@@ -1196,18 +1217,31 @@ class FlussSourceEnumeratorTest {
             FlussSourceEnumerator enumerator = newEnumerator(context, discoverer, pattern);
             try {
                 enumerator.start();
-
-                // No readers registered yet: initialization completes into the pending
-                // assignment map instead of being assigned.
-                runDiscoveryCycle(context);
+                registerAllReaders(context, enumerator);
+                if (failsDuringDiscovery) {
+                    context.unregisterReader(0);
+                }
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                if (!failsDuringDiscovery) {
+                    context.unregisterReader(0);
+                    context.runNextOneTimeCallable();
+                }
                 assertThat(context.getSplitsAssignmentSequence()).isEmpty();
+                assertThat(enumerator.snapshotState(1L).getRemainingSplits())
+                        .hasSize(failsDuringDiscovery ? 0 : 3);
 
                 // A subsequent discovery round must not re-discover or re-queue the same
                 // table-buckets while they are only pending (not yet assigned).
                 context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
                 assertThat(context.getOneTimeCallables()).isEmpty();
 
-                registerAllReaders(context, enumerator);
+                context.registerReader(new ReaderInfo(0, "restarted_0"));
+                enumerator.addReader(0);
+                assertThat(context.getSplitsAssignmentSequence()).isEmpty();
+                enumerator.handleSourceEvent(0, new ReaderSplitReportEvent(Collections.emptySet()));
+                while (!context.getOneTimeCallables().isEmpty()) {
+                    context.runNextOneTimeCallable();
+                }
 
                 assertThat(assignedBucketIds(context, tableName))
                         .containsExactlyInAnyOrder(0, 1, 2);
@@ -1246,9 +1280,12 @@ class FlussSourceEnumeratorTest {
                                 fqnRegex(DATABASE_NAME, tableName));
                 try {
                     enumerator.start();
+                    registerAllReaders(context, enumerator);
+                    context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                    context.unregisterReader(0);
+                    context.runNextOneTimeCallable();
+                    assertThat(enumerator.snapshotState(1L).getRemainingSplits()).hasSize(4);
                     if (discoveryBeforeDefaultChange) {
-                        runDiscoveryCycle(context);
-                        assertThat(enumerator.snapshotState(1L).getRemainingSplits()).hasSize(4);
                         connection
                                 .getAdmin()
                                 .alterTable(
@@ -1270,7 +1307,10 @@ class FlussSourceEnumeratorTest {
 
                     runDiscoveryCycle(context);
                     assertThat(context.getSplitsAssignmentSequence()).isEmpty();
-                    registerAllReaders(context, enumerator);
+                    context.registerReader(new ReaderInfo(0, "restarted_0"));
+                    enumerator.addReader(0);
+                    enumerator.handleSourceEvent(
+                            0, new ReaderSplitReportEvent(Collections.emptySet()));
 
                     assertThat(assignedBucketIds(context, tableName))
                             .containsExactlyInAnyOrder(0, 1, 2, 3);
@@ -1282,6 +1322,342 @@ class FlussSourceEnumeratorTest {
                     context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
                     assertThat(context.getOneTimeCallables()).isEmpty();
                     assertThat(context.getSplitsAssignmentSequence()).hasSize(assignmentCount);
+                } finally {
+                    enumerator.close();
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"0", "10000"})
+    void testDiscoveryWaitsForAllReaderReports(long discoveryInterval) throws Throwable {
+        String tableName = "wait_for_split_reports";
+        createPkTable(tableName, 2);
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator =
+                    newEnumerator(
+                            context,
+                            new FlussDefaultDiscoverer(),
+                            fqnRegex(DATABASE_NAME, tableName),
+                            OffsetsInitializer.earliest(),
+                            discoveryInterval);
+            try {
+                enumerator.start();
+                for (int reader = 0; reader < NUM_READERS; reader++) {
+                    context.registerReader(new ReaderInfo(reader, "loc_" + reader));
+                    enumerator.addReader(reader);
+                }
+                assertThat(context.getPeriodicCallables()).isEmpty();
+                assertThat(context.getOneTimeCallables()).isEmpty();
+
+                enumerator.handleSourceEvent(0, new ReaderSplitReportEvent(Collections.emptySet()));
+                assertThat(context.getPeriodicCallables()).isEmpty();
+                assertThat(context.getOneTimeCallables()).isEmpty();
+                enumerator.handleSourceEvent(1, new ReaderSplitReportEvent(Collections.emptySet()));
+                enumerator.handleSourceEvent(1, new ReaderSplitReportEvent(Collections.emptySet()));
+
+                if (discoveryInterval > 0) {
+                    assertThat(context.getPeriodicCallables()).hasSize(1);
+                    runDiscoveryCycle(context);
+                } else {
+                    assertThat(context.getOneTimeCallables()).hasSize(1);
+                    while (!context.getOneTimeCallables().isEmpty()) {
+                        context.runNextOneTimeCallable();
+                    }
+                }
+                assertThat(context.getSplitsAssignmentSequence()).hasSize(1);
+                assertThat(assignedBucketIds(context, tableName)).containsExactlyInAnyOrder(0, 1);
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false, false", "false, true", "true, false", "true, true"})
+    void testRoundRobinCursorAdvancesFromSelectedOwner(
+            boolean separateDiscoveries, boolean oldOnStartReader) throws Throwable {
+        String tableName = "round_robin_partitions";
+        createPartitionedPkTable(tableName, 1);
+        TablePath tablePath = TablePath.of(DATABASE_NAME, tableName);
+        org.apache.fluss.config.Configuration config = FLUSS_CLUSTER_EXTENSION.getClientConfig();
+        try (Connection connection = ConnectionFactory.createConnection(config);
+                MockSplitEnumeratorContext<FlussSplitBase> context =
+                        new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            Admin admin = connection.getAdmin();
+            createPartition(admin, tablePath, "old");
+            long tableId = admin.getTableInfo(tablePath).get().getTableId();
+            TableBucket oldBucket =
+                    new TableBucket(
+                            tableId,
+                            admin.listPartitionInfos(tablePath).get().get(0).getPartitionId(),
+                            0);
+            int startReader = FlussSourceEnumerator.getSplitOwner(oldBucket, NUM_READERS);
+            int oldOwner = oldOnStartReader ? startReader : 1 - startReader;
+            FlussSourceEnumerator enumerator =
+                    new FlussSourceEnumerator(
+                            context,
+                            new FlussDefaultDiscoverer(),
+                            config,
+                            buildSourceConfig(config, fqnRegex(DATABASE_NAME, "round_robin_.*")),
+                            OffsetsInitializer.earliest(),
+                            DISCOVERY_INTERVAL_MS,
+                            new HashSet<>(
+                                    Collections.singleton(PhysicalTablePath.of(tablePath, "old"))),
+                            Collections.emptyList(),
+                            LeaseContext.fromConf(
+                                    new org.apache.flink.configuration.Configuration()),
+                            true);
+            try {
+                enumerator.start();
+                for (int reader = 0; reader < NUM_READERS; reader++) {
+                    context.registerReader(new ReaderInfo(reader, "loc_" + reader));
+                    enumerator.addReader(reader);
+                    reportOwnedBuckets(
+                            enumerator, reader, Collections.singletonMap(oldBucket, oldOwner));
+                }
+                runDiscoveryCycle(context);
+                assertThat(assignedOwners(context)).isEmpty();
+
+                createPartition(admin, tablePath, "new_1");
+                if (separateDiscoveries) {
+                    runDiscoveryCycle(context);
+                    assertThat(assignedOwners(context).values()).containsExactly(1 - oldOwner);
+                    createPkTable("round_robin_other");
+                    runDiscoveryCycle(context);
+                    assertThat(assignedOwners(context)).hasSize(2);
+                    assignedOwners(context)
+                            .forEach(
+                                    (bucket, owner) -> {
+                                        if (bucket.getTableId() != tableId) {
+                                            assertThat(owner)
+                                                    .isEqualTo(
+                                                            FlussSourceEnumerator.getSplitOwner(
+                                                                    bucket, NUM_READERS));
+                                        }
+                                    });
+                }
+                createPartition(admin, tablePath, "new_2");
+                runDiscoveryCycle(context);
+                assertThat(
+                                assignedOwners(context).entrySet().stream()
+                                        .filter(entry -> entry.getKey().getTableId() == tableId)
+                                        .map(Map.Entry::getValue))
+                        .containsExactlyInAnyOrder(0, 1);
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"2", "4", "5"})
+    void testSpreadsNewPartitionAcrossReadersDespiteSkewedTableCounts(int numBuckets)
+            throws Throwable {
+        int parallelism = 4;
+        String tableName = "partition_first_assignment";
+        createPartitionedPkTable(tableName, numBuckets);
+        TablePath tablePath = TablePath.of(DATABASE_NAME, tableName);
+        org.apache.fluss.config.Configuration config = FLUSS_CLUSTER_EXTENSION.getClientConfig();
+        try (Connection connection = ConnectionFactory.createConnection(config);
+                MockSplitEnumeratorContext<FlussSplitBase> context =
+                        new MockSplitEnumeratorContext<>(parallelism)) {
+            Admin admin = connection.getAdmin();
+            for (int partition = 0; partition < 28; partition++) {
+                createPartition(admin, tablePath, "old_" + partition);
+            }
+            long tableId = admin.getTableInfo(tablePath).get().getTableId();
+            int[] remaining = {
+                7 * numBuckets + 2, 7 * numBuckets + 2, 7 * numBuckets - 2, 7 * numBuckets - 2
+            };
+            Set<PhysicalTablePath> assignedPaths = new HashSet<>();
+            Map<TableBucket, Integer> restoredOwners = new HashMap<>();
+            int owner = 0;
+            for (PartitionInfo partition : admin.listPartitionInfos(tablePath).get()) {
+                assignedPaths.add(PhysicalTablePath.of(tablePath, partition.getPartitionName()));
+                for (int bucket = 0; bucket < numBuckets; bucket++) {
+                    while (remaining[owner] == 0) {
+                        owner++;
+                    }
+                    restoredOwners.put(
+                            new TableBucket(tableId, partition.getPartitionId(), bucket), owner);
+                    remaining[owner]--;
+                }
+            }
+            FlussSourceEnumerator enumerator =
+                    new FlussSourceEnumerator(
+                            context,
+                            new FlussDefaultDiscoverer(),
+                            config,
+                            buildSourceConfig(config, fqnRegex(DATABASE_NAME, tableName)),
+                            OffsetsInitializer.earliest(),
+                            DISCOVERY_INTERVAL_MS,
+                            assignedPaths,
+                            Collections.emptyList(),
+                            LeaseContext.fromConf(
+                                    new org.apache.flink.configuration.Configuration()),
+                            true);
+            try {
+                enumerator.start();
+                for (int reader = 0; reader < parallelism; reader++) {
+                    context.registerReader(new ReaderInfo(reader, "restored_" + reader));
+                    enumerator.addReader(reader);
+                    reportOwnedBuckets(enumerator, reader, restoredOwners);
+                }
+                runDiscoveryCycle(context);
+                assertThat(assignedOwners(context)).isEmpty();
+
+                for (int partition = 0; partition < 2; partition++) {
+                    Set<TableBucket> previouslyAssigned = assignedOwners(context).keySet();
+                    createPartition(admin, tablePath, "new_" + partition);
+                    runDiscoveryCycle(context);
+                    Map<TableBucket, Integer> owners = assignedOwners(context);
+                    owners.keySet().removeAll(previouslyAssigned);
+                    assertBalancedOwners(owners, parallelism, numBuckets);
+                    assertThat(new HashSet<>(owners.values()))
+                            .hasSize(Math.min(numBuckets, parallelism));
+                    assertThat(
+                                    owners.entrySet().stream()
+                                            .filter(entry -> entry.getKey().getBucket() == 0)
+                                            .map(Map.Entry::getValue))
+                            .singleElement()
+                            .isIn(2, 3);
+                }
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"1, 4", "2, 4", "3, 3"})
+    void testBalancesNewPartitionsUsingRestoredReaderReports(
+            int numBuckets, int restoredParallelism) throws Throwable {
+        String tableName = "reported_partition_assignment";
+        String otherTable = "other_partition_ids";
+        createPartitionedPkTable(tableName, numBuckets);
+        createPartitionedPkTable(otherTable, 1);
+        TablePath tablePath = TablePath.of(DATABASE_NAME, tableName);
+        String pattern = fqnRegex(DATABASE_NAME, tableName);
+        Map<TableBucket, Integer> restoredOwners = new HashMap<>();
+        FlussSourceEnumState state;
+        try (Connection connection =
+                ConnectionFactory.createConnection(FLUSS_CLUSTER_EXTENSION.getClientConfig())) {
+            Admin admin = connection.getAdmin();
+            for (int partition = 0; partition < 4; partition++) {
+                createPartition(admin, tablePath, "p" + partition);
+                for (int other = 0; other < 3; other++) {
+                    createPartition(
+                            admin,
+                            TablePath.of(DATABASE_NAME, otherTable),
+                            "p" + partition + "_" + other);
+                }
+            }
+            try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                    new MockSplitEnumeratorContext<>(4)) {
+                FlussSourceEnumerator enumerator =
+                        newEnumerator(context, new FlussDefaultDiscoverer(), pattern);
+                try {
+                    enumerator.start();
+                    registerAllReaders(context, enumerator);
+                    runDiscoveryCycle(context);
+                    assertBalancedOwners(assignedOwners(context), 4, 4 * numBuckets);
+                    for (SplitsAssignment<FlussSplitBase> assignment :
+                            context.getSplitsAssignmentSequence()) {
+                        for (Map.Entry<Integer, List<FlussSplitBase>> entry :
+                                assignment.assignment().entrySet()) {
+                            for (FlussSplitBase split : entry.getValue()) {
+                                if (!"p0".equals(split.getPhysicalTablePath().getPartitionName())) {
+                                    int reader =
+                                            restoredParallelism == 4
+                                                    ? (entry.getKey() + 1) % 4
+                                                    : restoredOwners.size() % restoredParallelism;
+                                    restoredOwners.put(split.getTableBucket(), reader);
+                                }
+                            }
+                        }
+                    }
+                    admin.dropPartition(
+                                    tablePath,
+                                    new PartitionSpec(Collections.singletonMap("ds", "p0")),
+                                    false)
+                            .get();
+                    runDiscoveryCycle(context);
+                    state = enumerator.snapshotState(1L);
+                } finally {
+                    enumerator.close();
+                }
+            }
+            createPartition(admin, tablePath, "p4");
+            try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                    new MockSplitEnumeratorContext<>(restoredParallelism)) {
+                org.apache.fluss.config.Configuration config =
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig();
+                FlussSourceEnumerator enumerator =
+                        new FlussSourceEnumerator(
+                                context,
+                                new FlussDefaultDiscoverer(),
+                                config,
+                                buildSourceConfig(config, pattern),
+                                OffsetsInitializer.earliest(),
+                                DISCOVERY_INTERVAL_MS,
+                                state,
+                                LeaseContext.fromConf(
+                                        new org.apache.flink.configuration.Configuration()));
+                try {
+                    enumerator.start();
+                    for (int reader = 0; reader < restoredParallelism; reader++) {
+                        context.registerReader(new ReaderInfo(reader, "restored_" + reader));
+                        enumerator.addReader(reader);
+                    }
+                    assertThat(context.getPeriodicCallables()).isEmpty();
+                    for (int reader = 0; reader < restoredParallelism; reader++) {
+                        assertThat(context.getSplitsAssignmentSequence()).isEmpty();
+                        reportOwnedBuckets(enumerator, reader, restoredOwners);
+                    }
+                    runDiscoveryCycle(context);
+                    Map<TableBucket, Integer> owners = new HashMap<>(restoredOwners);
+                    owners.putAll(assignedOwners(context));
+                    assertBalancedOwners(owners, restoredParallelism, 4 * numBuckets);
+                    assertThat(assignedOwners(context)).hasSize(numBuckets);
+
+                    Map.Entry<Integer, List<FlussSplitBase>> freshAssignment =
+                            context.getSplitsAssignmentSequence()
+                                    .get(0)
+                                    .assignment()
+                                    .entrySet()
+                                    .iterator()
+                                    .next();
+                    int failedReader = freshAssignment.getKey();
+                    List<FlussSplitBase> returned = freshAssignment.getValue();
+                    int assignmentsBeforeRestart = context.getSplitsAssignmentSequence().size();
+                    context.unregisterReader(failedReader);
+                    enumerator.addSplitsBack(returned, failedReader);
+                    context.registerReader(new ReaderInfo(failedReader, "restarted"));
+                    enumerator.addReader(failedReader);
+                    assertThat(context.getSplitsAssignmentSequence())
+                            .hasSize(assignmentsBeforeRestart);
+                    reportOwnedBuckets(enumerator, failedReader, restoredOwners);
+                    assertThat(context.getSplitsAssignmentSequence())
+                            .hasSize(assignmentsBeforeRestart + 1);
+                    assertThat(
+                                    context.getSplitsAssignmentSequence()
+                                            .get(assignmentsBeforeRestart)
+                                            .assignment())
+                            .containsOnlyKeys(failedReader);
+                    assertThat(
+                                    context.getSplitsAssignmentSequence()
+                                            .get(assignmentsBeforeRestart)
+                                            .assignment()
+                                            .get(failedReader))
+                            .containsExactlyInAnyOrderElementsOf(returned);
+
+                    createPartition(admin, tablePath, "p5");
+                    runDiscoveryCycle(context);
+                    owners.putAll(assignedOwners(context));
+                    assertBalancedOwners(owners, restoredParallelism, 5 * numBuckets);
                 } finally {
                     enumerator.close();
                 }
@@ -1545,6 +1921,119 @@ class FlussSourceEnumeratorTest {
     //  Enumerator checkpoint restore tests
     // =====================================================================
 
+    @ParameterizedTest
+    @CsvSource({"false", "true"})
+    void testRestoredPendingSplitsWaitForReportsAndDiscovery(boolean readerRestarts)
+            throws Throwable {
+        String tableName = "restore_pending_owner";
+        createPartitionedPkTable(tableName, 1);
+        TablePath tablePath = TablePath.of(DATABASE_NAME, tableName);
+        org.apache.fluss.config.Configuration config = FLUSS_CLUSTER_EXTENSION.getClientConfig();
+        try (Connection connection = ConnectionFactory.createConnection(config);
+                MockSplitEnumeratorContext<FlussSplitBase> context =
+                        new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            Admin admin = connection.getAdmin();
+            for (String partition : Arrays.asList("reported", "returned", "pending")) {
+                createPartition(admin, tablePath, partition);
+            }
+            long tableId = admin.getTableInfo(tablePath).get().getTableId();
+            Map<String, Long> partitionIds =
+                    admin.listPartitionInfos(tablePath).get().stream()
+                            .collect(
+                                    Collectors.toMap(
+                                            PartitionInfo::getPartitionName,
+                                            PartitionInfo::getPartitionId));
+            FlussLogSplit pendingSplit =
+                    new FlussLogSplit(
+                            PhysicalTablePath.of(tablePath, "pending"),
+                            new TableBucket(tableId, partitionIds.get("pending"), 0),
+                            123L);
+            FlussLogSplit returnedSplit =
+                    new FlussLogSplit(
+                            PhysicalTablePath.of(tablePath, "returned"),
+                            new TableBucket(tableId, partitionIds.get("returned"), 0),
+                            456L);
+            FlussLogSplit deletedPartitionSplit =
+                    new FlussLogSplit(
+                            PhysicalTablePath.of(tablePath, "deleted"),
+                            new TableBucket(tableId, Long.MAX_VALUE - 10, 0),
+                            789L);
+            int originalOwner =
+                    FlussSourceEnumerator.getSplitOwner(pendingSplit.getTableBucket(), NUM_READERS);
+            int expectedOwner = (originalOwner + 1) % NUM_READERS;
+            Map<TableBucket, Integer> reportedOwners = new HashMap<>();
+            reportedOwners.put(
+                    new TableBucket(tableId, partitionIds.get("reported"), 0), originalOwner);
+            // The first discovery must remove stale reports before choosing an owner.
+            for (int partition = 0; partition < 3; partition++) {
+                reportedOwners.put(
+                        new TableBucket(tableId, Long.MAX_VALUE - partition, 0), expectedOwner);
+            }
+            FlussSourceEnumState state =
+                    new FlussSourceEnumState(
+                            new HashSet<>(
+                                    Arrays.asList(
+                                            PhysicalTablePath.of(tablePath, "reported"),
+                                            returnedSplit.getPhysicalTablePath())),
+                            Arrays.asList(pendingSplit, deletedPartitionSplit),
+                            "restored-pending-lease");
+            FlussSourceEnumerator enumerator =
+                    new FlussSourceEnumerator(
+                            context,
+                            new FlussDefaultDiscoverer(),
+                            config,
+                            buildSourceConfig(config, fqnRegex(DATABASE_NAME, tableName)),
+                            OffsetsInitializer.earliest(),
+                            DISCOVERY_INTERVAL_MS,
+                            state,
+                            LeaseContext.fromConf(
+                                    new org.apache.flink.configuration.Configuration()));
+            try {
+                enumerator.start();
+                assertThat(enumerator.snapshotState(1L).getRemainingSplits())
+                        .containsExactlyInAnyOrder(pendingSplit, deletedPartitionSplit);
+                enumerator.addSplitsBack(Collections.singletonList(returnedSplit), originalOwner);
+                for (int reader = 0; reader < NUM_READERS; reader++) {
+                    assertThat(context.getPeriodicCallables()).isEmpty();
+                    context.registerReader(new ReaderInfo(reader, "restored_" + reader));
+                    enumerator.addReader(reader);
+                    reportOwnedBuckets(enumerator, reader, reportedOwners);
+                }
+                assertThat(context.getSplitsAssignmentSequence()).isEmpty();
+                assertThat(enumerator.snapshotState(2L).getRemainingSplits())
+                        .containsExactlyInAnyOrder(
+                                pendingSplit, deletedPartitionSplit, returnedSplit);
+                if (readerRestarts) {
+                    context.unregisterReader(originalOwner);
+                }
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                if (readerRestarts) {
+                    assertThat(context.getSplitsAssignmentSequence()).isEmpty();
+                    assertThat(enumerator.snapshotState(3L).getRemainingSplits())
+                            .containsExactlyInAnyOrder(pendingSplit, returnedSplit);
+                    context.registerReader(new ReaderInfo(originalOwner, "restarted"));
+                    enumerator.addReader(originalOwner);
+                    reportOwnedBuckets(enumerator, originalOwner, reportedOwners);
+                }
+                assertThat(context.getOneTimeCallables()).isEmpty();
+                assertThat(assignedOwners(context))
+                        .hasSize(2)
+                        .containsEntry(pendingSplit.getTableBucket(), expectedOwner)
+                        .containsEntry(returnedSplit.getTableBucket(), originalOwner);
+                assertThat(context.getSplitsAssignmentSequence()).hasSize(1);
+                Map<Integer, List<FlussSplitBase>> assignment =
+                        context.getSplitsAssignmentSequence().get(0).assignment();
+                assertThat(assignment.get(expectedOwner)).containsExactly(pendingSplit);
+                assertThat(assignment.get(originalOwner)).containsExactly(returnedSplit);
+                assertThat(enumerator.snapshotState(4L).getRemainingSplits()).isEmpty();
+                runDiscoveryCycle(context);
+                assertThat(context.getSplitsAssignmentSequence()).hasSize(1);
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
     @Test
     void testRestorePendingLatestSplitPreservesStartingOffsetAfterRescale() throws Throwable {
         String tableName = "restore_pending_latest";
@@ -1576,8 +2065,10 @@ class FlussSourceEnumeratorTest {
                             DISCOVERY_INTERVAL_MS);
             try {
                 enumerator.start();
-
-                runDiscoveryCycle(context);
+                registerAllReaders(context, enumerator);
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                context.unregisterReader(0);
+                context.runNextOneTimeCallable();
                 checkpoint = enumerator.snapshotState(1L);
 
                 assertThat(checkpoint.getAssignedPhysicalTablePaths()).isEmpty();
@@ -1596,12 +2087,7 @@ class FlussSourceEnumeratorTest {
                         String.format("INSERT INTO %s VALUES (2, 'after-checkpoint')", tableName))
                 .await();
 
-        int originalOwner =
-                FlussSourceEnumerator.getSplitOwner(
-                        checkpointedSplit.getTableBucket(), NUM_READERS);
-        int restoredParallelism =
-                findParallelismWithDifferentOwner(
-                        checkpointedSplit.getTableBucket(), NUM_READERS, originalOwner);
+        int restoredParallelism = NUM_READERS + 1;
         int restoredOwner =
                 FlussSourceEnumerator.getSplitOwner(
                         checkpointedSplit.getTableBucket(), restoredParallelism);
@@ -1623,20 +2109,8 @@ class FlussSourceEnumeratorTest {
                                     new org.apache.flink.configuration.Configuration()));
             try {
                 restoredEnumerator.start();
-
-                // Discovery may run before the restored split's owner reader registers.
+                registerAllReaders(restoredContext, restoredEnumerator);
                 runDiscoveryCycle(restoredContext);
-
-                restoredContext.registerReader(
-                        new ReaderInfo(originalOwner, "loc_" + originalOwner));
-                restoredEnumerator.addReader(originalOwner);
-                assertThat(restoredContext.getSplitsAssignmentSequence()).isEmpty();
-
-                restoredContext.registerReader(
-                        new ReaderInfo(restoredOwner, "loc_" + restoredOwner));
-                restoredEnumerator.addReader(restoredOwner);
-
-                assertThat(restoredOwner).isNotEqualTo(originalOwner);
                 assertThat(restoredContext.getSplitsAssignmentSequence()).hasSize(1);
                 SplitsAssignment<FlussSplitBase> assignment =
                         restoredContext.getSplitsAssignmentSequence().get(0);
@@ -1674,7 +2148,10 @@ class FlussSourceEnumeratorTest {
                             DISCOVERY_INTERVAL_MS);
             try {
                 enumerator.start();
-                runDiscoveryCycle(context);
+                registerAllReaders(context, enumerator);
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                context.unregisterReader(0);
+                context.runNextOneTimeCallable();
 
                 checkpoint = enumerator.snapshotState(1L);
                 assertThat(checkpoint.getRemainingSplits()).hasSize(1);
@@ -1717,13 +2194,11 @@ class FlussSourceEnumeratorTest {
                                     new org.apache.flink.configuration.Configuration()));
             try {
                 restoredEnumerator.start();
-                runDiscoveryCycle(restoredContext);
-
                 int owner =
                         FlussSourceEnumerator.getSplitOwner(
                                 checkpointedSplit.getTableBucket(), NUM_READERS);
-                restoredContext.registerReader(new ReaderInfo(owner, "loc_" + owner));
-                restoredEnumerator.addReader(owner);
+                registerAllReaders(restoredContext, restoredEnumerator);
+                runDiscoveryCycle(restoredContext);
 
                 assertThat(restoredContext.getSplitsAssignmentSequence()).hasSize(1);
                 FlussHybridSnapshotLogSplit restoredSplit =
@@ -1963,6 +2438,7 @@ class FlussSourceEnumeratorTest {
                         .containsExactly(tablePath);
 
                 enumerator.addReader(0);
+                enumerator.handleSourceEvent(0, new ReaderSplitReportEvent(Collections.emptySet()));
                 long restartedRequestId =
                         latestSubscriptionEvent(context, 0)
                                 .getPendingRemovalRequests()
@@ -2044,6 +2520,7 @@ class FlussSourceEnumeratorTest {
 
                 context.registerReader(new ReaderInfo(0, "restarted_0"));
                 enumerator.addReader(0);
+                enumerator.handleSourceEvent(0, new ReaderSplitReportEvent(Collections.emptySet()));
                 long restartedRequestId =
                         latestSubscriptionEvent(context, 0)
                                 .getPendingRemovalRequests()
@@ -2277,8 +2754,8 @@ class FlussSourceEnumeratorTest {
                             restoredState);
             try {
                 enumerator.start();
-                runDiscoveryCycle(context);
                 registerAllReaders(context, enumerator);
+                runDiscoveryCycle(context);
 
                 long restoredRequestId =
                         latestSubscriptionEvent(context, 0)
@@ -2342,12 +2819,16 @@ class FlussSourceEnumeratorTest {
                 enumerator.start();
                 context.registerReader(new ReaderInfo(0, "loc_0"));
                 enumerator.addReader(0);
+                enumerator.handleSourceEvent(0, new ReaderSplitReportEvent(Collections.emptySet()));
                 context.unregisterReader(0);
                 context.registerReader(new ReaderInfo(0, "loc_0_restarted"));
                 enumerator.addReader(0);
+                enumerator.handleSourceEvent(0, new ReaderSplitReportEvent(Collections.emptySet()));
 
                 assertThat(context.getSentSourceEvent()).doesNotContainKey(0);
-
+                context.registerReader(new ReaderInfo(1, "loc_1"));
+                enumerator.addReader(1);
+                enumerator.handleSourceEvent(1, new ReaderSplitReportEvent(Collections.emptySet()));
                 context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
 
                 assertThat(latestSubscriptionEvent(context, 0).getPendingRemovalRequests())
@@ -2462,6 +2943,53 @@ class FlussSourceEnumeratorTest {
     //  Helpers
     // =====================================================================
 
+    private static void createPartition(Admin admin, TablePath tablePath, String partition)
+            throws Exception {
+        admin.createPartition(
+                        tablePath,
+                        new PartitionSpec(Collections.singletonMap("ds", partition)),
+                        false)
+                .get();
+    }
+
+    private static Map<TableBucket, Integer> assignedOwners(
+            MockSplitEnumeratorContext<FlussSplitBase> context) {
+        Map<TableBucket, Integer> owners = new HashMap<>();
+        context.getSplitsAssignmentSequence()
+                .forEach(
+                        assignment ->
+                                assignment
+                                        .assignment()
+                                        .forEach(
+                                                (reader, splits) ->
+                                                        splits.forEach(
+                                                                split ->
+                                                                        owners.put(
+                                                                                split
+                                                                                        .getTableBucket(),
+                                                                                reader))));
+        return owners;
+    }
+
+    private static void assertBalancedOwners(
+            Map<TableBucket, Integer> owners, int parallelism, int total) {
+        assertThat(owners).hasSize(total);
+        int[] counts = new int[parallelism];
+        owners.values().forEach(reader -> counts[reader]++);
+        assertThat(Arrays.stream(counts).max().getAsInt() - Arrays.stream(counts).min().getAsInt())
+                .isLessThanOrEqualTo(1);
+    }
+
+    private static void reportOwnedBuckets(
+            FlussSourceEnumerator enumerator, int reader, Map<TableBucket, Integer> owners) {
+        Set<TableBucket> buckets =
+                owners.entrySet().stream()
+                        .filter(entry -> entry.getValue() == reader)
+                        .map(Map.Entry::getKey)
+                        .collect(Collectors.toSet());
+        enumerator.handleSourceEvent(reader, new ReaderSplitReportEvent(buckets));
+    }
+
     private FlussSourceEnumerator newEnumerator(
             MockSplitEnumeratorContext<FlussSplitBase> context,
             TableDiscoverer discoverer,
@@ -2535,9 +3063,11 @@ class FlussSourceEnumeratorTest {
 
     private static void registerAllReaders(
             MockSplitEnumeratorContext<FlussSplitBase> context, FlussSourceEnumerator enumerator) {
-        for (int readerId = 0; readerId < NUM_READERS; readerId++) {
+        for (int readerId = 0; readerId < context.currentParallelism(); readerId++) {
             context.registerReader(new ReaderInfo(readerId, "loc_" + readerId));
             enumerator.addReader(readerId);
+            enumerator.handleSourceEvent(
+                    readerId, new ReaderSplitReportEvent(Collections.emptySet()));
         }
     }
 
@@ -2559,21 +3089,6 @@ class FlussSourceEnumeratorTest {
                             Collections.emptyMap(),
                             Collections.singletonMap(partitionPath, requestId)));
         }
-    }
-
-    private static int findParallelismWithDifferentOwner(
-            org.apache.fluss.metadata.TableBucket tableBucket,
-            int currentParallelism,
-            int currentOwner) {
-        for (int parallelism = currentParallelism + 1;
-                parallelism <= currentParallelism + 10;
-                parallelism++) {
-            if (FlussSourceEnumerator.getSplitOwner(tableBucket, parallelism) != currentOwner) {
-                return parallelism;
-            }
-        }
-        throw new IllegalStateException(
-                "Could not find a parallelism with a different split owner");
     }
 
     /**
