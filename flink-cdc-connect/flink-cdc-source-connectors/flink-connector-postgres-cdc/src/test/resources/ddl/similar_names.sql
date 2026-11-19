@@ -82,3 +82,39 @@ INSERT INTO user_test_data
 VALUES (301, 'test_1', 'Harbin'),
        (302, 'test_2', 'Changchun'),
        (303, 'test_3', 'Shenyang');
+
+-- Cross-schema variant: the schema name is also passed to getColumns as a LIKE pattern,
+-- so a wildcard in the schema name matches other schemas too. 'sch_test' (where '_' matches any
+-- single character) also matches 'schxtest'. Both schemas contain a table with the SAME name, so
+-- a TABLE_NAME-only filter cannot tell them apart and the snapshot would mix in columns from the
+-- look-alike schema. The schema name must be checked as well.
+DROP SCHEMA IF EXISTS sch_test CASCADE;
+CREATE SCHEMA sch_test;
+DROP SCHEMA IF EXISTS schxtest CASCADE;
+CREATE SCHEMA schxtest;
+
+-- Target schema: sch_test.cross_schema_tbl
+CREATE TABLE sch_test.cross_schema_tbl (
+  id INTEGER NOT NULL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  address VARCHAR(1024)
+);
+ALTER TABLE sch_test.cross_schema_tbl REPLICA IDENTITY FULL;
+
+INSERT INTO sch_test.cross_schema_tbl
+VALUES (1001, 'sch_test_1', 'Shanghai'),
+       (1002, 'sch_test_2', 'Beijing'),
+       (1003, 'sch_test_3', 'Hangzhou');
+
+-- Look-alike schema: schxtest.cross_schema_tbl (matches 'sch_test' because '_' matches 'x')
+CREATE TABLE schxtest.cross_schema_tbl (
+  id INTEGER NOT NULL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  address VARCHAR(1024)
+);
+ALTER TABLE schxtest.cross_schema_tbl REPLICA IDENTITY FULL;
+
+INSERT INTO schxtest.cross_schema_tbl
+VALUES (2001, 'schxtest_1', 'Guangzhou'),
+       (2002, 'schxtest_2', 'Shenzhen'),
+       (2003, 'schxtest_3', 'Chengdu');

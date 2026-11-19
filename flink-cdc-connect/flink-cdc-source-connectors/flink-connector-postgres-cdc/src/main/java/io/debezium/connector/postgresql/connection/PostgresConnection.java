@@ -74,6 +74,9 @@ import java.util.regex.Pattern;
  *           when querying table 'user%data' (where % is a literal character in the table name), the
  *           LIKE pattern may also match 'user_test_data' (due to '%'). See also:
  *           https://github.com/debezium/debezium/blob/main/debezium-core/src/main/java/io/debezium/jdbc/JdbcConnection.java#L1327
+ *       <li>FLINK-39844 also filters columns by schema because JDBC metadata lookups treat schema
+ *           names as LIKE patterns. The schema and table name checks can be removed once the
+ *           decoder uses the escaped metadata lookup from Debezium 3.3.0.Final or later.
  *     </ul>
  */
 public class PostgresConnection extends JdbcConnection {
@@ -711,8 +714,16 @@ public class PostgresConnection extends JdbcConnection {
         // - When querying 'user_sink', the pattern may also match 'userbsink' (due to '_')
         // - When querying 'user%data' (where % is literal), it may match 'user_test_data' (due to
         // '%')
+        // Both the schema name and table name are passed to DatabaseMetaData#getColumns as LIKE
+        // patterns, so wildcards in either may produce columns from other schemas/tables. Verify
+        // both against the requested TableId (skipping the schema check when no schema is given).
+        // readColumnForDecoder passes the requested TableId. JdbcConnection#getColumnsDetails
+        // builds its TableId from the current row and applies the table filter before calling
+        // readTableColumn.
+        final String resultSchemaName = columnMetadata.getString(2);
         final String resultTableName = columnMetadata.getString(3);
-        if (!tableId.table().equals(resultTableName)) {
+        if (!tableId.table().equals(resultTableName)
+                || (tableId.schema() != null && !tableId.schema().equals(resultSchemaName))) {
             return Optional.empty();
         }
 
