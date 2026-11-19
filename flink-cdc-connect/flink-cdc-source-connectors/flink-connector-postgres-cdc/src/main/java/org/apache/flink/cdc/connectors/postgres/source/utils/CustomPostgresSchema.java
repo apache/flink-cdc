@@ -112,7 +112,13 @@ public class CustomPostgresSchema {
                     tables,
                     dbzConfig.databaseName(),
                     null,
-                    dbzConfig.getTableFilters().dataCollectionFilter(),
+                    // only check context tableIds
+                    (tb) ->
+                            tableIds.stream()
+                                    .anyMatch(
+                                            t ->
+                                                    t.schema().equals(tb.schema())
+                                                            && t.table().equals(tb.table())),
                     null,
                     false);
         } catch (SQLException e) {
