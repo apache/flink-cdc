@@ -40,13 +40,6 @@ class IncrementalSourceScanFetcherTest {
     private static final TableId CURRENT_SPLIT_TABLE = TableId.parse("test_db.table_a");
     private static final TableId OTHER_TABLE = TableId.parse("test_db.table_b");
 
-    /**
-     * Reproduces the NPE seen in PostgreSQL backfill when the WAL stream carries change records for
-     * a captured table other than the one currently being snapshotted. Before the fix, the fetcher
-     * passed the foreign-table record to {@code isRecordBetween}, which dereferenced a null
-     * Debezium {@code Table} from the schema cache and threw NPE. After the fix, the foreign-table
-     * record is filtered out by tableId and {@code isRecordBetween} is never invoked.
-     */
     @Test
     void testIsChangeRecordInChunkRangeFiltersOutForeignTableRecord() {
         FetchTask.Context taskContext = mock(FetchTask.Context.class);
@@ -54,13 +47,6 @@ class IncrementalSourceScanFetcherTest {
 
         when(taskContext.isDataChangeRecord(foreignTableRecord)).thenReturn(true);
         when(taskContext.getTableId(foreignTableRecord)).thenReturn(OTHER_TABLE);
-        // Mirrors the production failure mode: the record is for a table whose schema is not in
-        // the cache, so any downstream lookup explodes with NPE. The test asserts we never get
-        // here.
-        when(taskContext.isRecordBetween(any(), any(), any()))
-                .thenThrow(
-                        new NullPointerException(
-                                "Cannot invoke \"io.debezium.relational.Table.primaryKeyColumns()\" because \"table\" is null"));
 
         IncrementalSourceScanFetcher fetcher = new IncrementalSourceScanFetcher(taskContext, 0);
         fetcher.setCurrentSnapshotSplit(newSnapshotSplit(CURRENT_SPLIT_TABLE));
