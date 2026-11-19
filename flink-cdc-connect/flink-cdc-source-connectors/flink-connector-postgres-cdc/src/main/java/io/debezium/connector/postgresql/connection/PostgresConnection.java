@@ -10,13 +10,13 @@ import com.zaxxer.hikari.pool.HikariProxyConnection;
 import io.debezium.DebeziumException;
 import io.debezium.annotation.VisibleForTesting;
 import io.debezium.config.Configuration;
-import io.debezium.connector.postgresql.CustomPostgresValueConverter;
 import io.debezium.connector.postgresql.PgOid;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresSchema;
 import io.debezium.connector.postgresql.PostgresType;
 import io.debezium.connector.postgresql.PostgresValueConverter;
 import io.debezium.connector.postgresql.TypeRegistry;
+import io.debezium.connector.postgresql.connection.wal2json.DateTimeFormat;
 import io.debezium.connector.postgresql.spi.SlotState;
 import io.debezium.data.SpecialValueDecimal;
 import io.debezium.jdbc.JdbcConfiguration;
@@ -40,13 +40,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.Charset;
+import java.sql.Array;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.DateTimeException;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -199,8 +207,7 @@ public class PostgresConnection extends JdbcConnection {
         } else {
             this.typeRegistry = typeRegistry;
             final PostgresValueConverter valueConverter =
-                    CustomPostgresValueConverter.of(
-                            config, this.getDatabaseCharset(), typeRegistry);
+                    PostgresValueConverter.of(config, this.getDatabaseCharset(), typeRegistry);
             this.defaultValueConverter =
                     new PostgresDefaultValueConverter(valueConverter, this.getTimestampUtils());
         }
@@ -806,6 +813,9 @@ public class PostgresConnection extends JdbcConnection {
             LOGGER.trace("Type is: {}", type);
 
             if (type.isArrayType()) {
+                if (isTemporalArray(type)) {
+                    return readTemporalArray(rs.getArray(columnIndex), type);
+                }
                 return rs.getArray(columnIndex);
             }
 
@@ -844,6 +854,10 @@ public class PostgresConnection extends JdbcConnection {
                     // precision,
                     // read the column as a string instead and then re-parse inside the converter.
                     return rs.getString(columnIndex);
+                case PgOid.TIMESTAMP:
+                case PgOid.TIMESTAMPTZ:
+                case PgOid.DATE:
+                    return readTemporalValue(rs, columnIndex, type.getOid());
                 default:
                     Object x = rs.getObject(columnIndex);
                     if (x != null) {
@@ -857,6 +871,92 @@ public class PostgresConnection extends JdbcConnection {
         } catch (SQLException e) {
             // not a known type
             return super.getColumnValue(rs, columnIndex, column, table, schema);
+        }
+    }
+
+    static boolean isTemporalArray(PostgresType type) {
+        int oid = type.getOid();
+        return oid == PgOid.TIMESTAMP_ARRAY
+                || oid == PgOid.TIMESTAMPTZ_ARRAY
+                || oid == PgOid.DATE_ARRAY;
+    }
+
+    static List<Object> readTemporalArray(Array array, PostgresType type) {
+        if (array == null) {
+            return null;
+        }
+        int elementOid = type.getElementType().getOid();
+        List<Object> result = new ArrayList<>();
+        try (ResultSet elements = array.getResultSet()) {
+            while (elements.next()) {
+                // The array result set exposes the index in column 1 and the value in column 2.
+                result.add(readTemporalValue(elements, 2, elementOid));
+            }
+        } catch (SQLException e) {
+            throw new ConnectException("Failed to read PostgreSQL temporal array", e);
+        }
+        return result;
+    }
+
+    private static Object readTemporalValue(ResultSet rs, int columnIndex, int oid)
+            throws SQLException {
+        switch (oid) {
+            case PgOid.TIMESTAMP:
+                {
+                    // Avoid the Julian/Gregorian cutover applied by java.sql.Timestamp.
+                    final LocalDateTime localDateTime;
+                    try {
+                        localDateTime = rs.getObject(columnIndex, LocalDateTime.class);
+                    } catch (DateTimeException e) {
+                        // pgjdbc validates BC leap days before applying the era.
+                        return LocalDateTime.ofInstant(
+                                DateTimeFormat.get().timestampToInstant(rs.getString(columnIndex)),
+                                ZoneOffset.UTC);
+                    }
+                    if (LocalDateTime.MAX.equals(localDateTime)) {
+                        return PostgresValueConverter.POSITIVE_INFINITY_LOCAL_DATE_TIME;
+                    }
+                    if (LocalDateTime.MIN.equals(localDateTime)) {
+                        return PostgresValueConverter.NEGATIVE_INFINITY_LOCAL_DATE_TIME;
+                    }
+                    return localDateTime;
+                }
+            case PgOid.TIMESTAMPTZ:
+                {
+                    final OffsetDateTime offsetDateTime;
+                    try {
+                        offsetDateTime = rs.getObject(columnIndex, OffsetDateTime.class);
+                    } catch (DateTimeException e) {
+                        return DateTimeFormat.get()
+                                .timestampWithTimeZoneToOffsetDateTime(rs.getString(columnIndex))
+                                .withOffsetSameInstant(ZoneOffset.UTC);
+                    }
+                    if (OffsetDateTime.MAX.equals(offsetDateTime)) {
+                        return PostgresValueConverter.POSITIVE_INFINITY_OFFSET_DATE_TIME;
+                    }
+                    if (OffsetDateTime.MIN.equals(offsetDateTime)) {
+                        return PostgresValueConverter.NEGATIVE_INFINITY_OFFSET_DATE_TIME;
+                    }
+                    return offsetDateTime;
+                }
+            case PgOid.DATE:
+                {
+                    final LocalDate localDate;
+                    try {
+                        localDate = rs.getObject(columnIndex, LocalDate.class);
+                    } catch (DateTimeException e) {
+                        return DateTimeFormat.get().date(rs.getString(columnIndex));
+                    }
+                    if (LocalDate.MAX.equals(localDate)) {
+                        return PostgresValueConverter.POSITIVE_INFINITY_LOCAL_DATE;
+                    }
+                    if (LocalDate.MIN.equals(localDate)) {
+                        return PostgresValueConverter.NEGATIVE_INFINITY_LOCAL_DATE;
+                    }
+                    return localDate;
+                }
+            default:
+                throw new IllegalArgumentException("Unsupported temporal OID: " + oid);
         }
     }
 
