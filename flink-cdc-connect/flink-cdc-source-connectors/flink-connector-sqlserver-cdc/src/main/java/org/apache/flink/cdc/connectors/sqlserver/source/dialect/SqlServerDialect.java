@@ -40,7 +40,6 @@ import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges.TableChange;
 
 import java.sql.SQLException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -121,11 +120,7 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
         try (SqlServerConnection jdbc =
                 createSqlServerConnection(sourceConfig.getDbzConnectorConfig())) {
             // fetch table schemas
-            Map<TableId, TableChange> tableSchemas = new HashMap<>();
-            for (TableId tableId : capturedTableIds) {
-                TableChange tableSchema = queryTableSchema(jdbc, tableId);
-                tableSchemas.put(tableId, tableSchema);
-            }
+            Map<TableId, TableChange> tableSchemas = queryTableSchema(jdbc, capturedTableIds);
             return tableSchemas;
         } catch (Exception e) {
             throw new FlinkRuntimeException(
@@ -141,6 +136,17 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
         return sqlserverSchema.getTableSchema(
                 jdbc,
                 tableId,
+                sourceConfig.getDbzConnectorConfig().getTableFilters().dataCollectionFilter());
+    }
+
+    private Map<TableId, TableChange> queryTableSchema(
+            JdbcConnection jdbc, List<TableId> tableIds) {
+        if (sqlserverSchema == null) {
+            sqlserverSchema = new SqlServerSchema();
+        }
+        return sqlserverSchema.getTableSchema(
+                jdbc,
+                tableIds,
                 sourceConfig.getDbzConnectorConfig().getTableFilters().dataCollectionFilter());
     }
 
