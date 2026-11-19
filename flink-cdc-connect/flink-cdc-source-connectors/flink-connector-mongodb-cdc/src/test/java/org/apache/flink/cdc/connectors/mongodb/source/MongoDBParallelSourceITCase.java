@@ -69,12 +69,54 @@ import static org.apache.flink.util.Preconditions.checkState;
 /** IT tests for {@link MongoDBSource}. */
 @Timeout(value = 300, unit = TimeUnit.SECONDS)
 class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
+    private static final String SPACE_PASSWORD_USER = "flinkuser_space_password";
+    private static final String SPACE_PASSWORD = "password with spaces";
+    private static final String SPACE_USERNAME_AND_PASSWORD_USER = "flink user with spaces";
+
     private static final int USE_POST_LOWWATERMARK_HOOK = 1;
     private static final int USE_PRE_HIGHWATERMARK_HOOK = 2;
     private static final int USE_POST_HIGHWATERMARK_HOOK = 3;
 
     private static final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
+
+    @Test
+    void testPasswordContainingSpaces() throws Exception {
+        createMongoUser(SPACE_PASSWORD_USER, SPACE_PASSWORD);
+        testMongoDBParallelSource(
+                1,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                new String[] {"customers"},
+                false,
+                Collections.emptyMap(),
+                SPACE_PASSWORD_USER,
+                SPACE_PASSWORD);
+    }
+
+    @Test
+    void testUsernameAndPasswordContainingSpaces() throws Exception {
+        createMongoUser(SPACE_USERNAME_AND_PASSWORD_USER, SPACE_PASSWORD);
+        testMongoDBParallelSource(
+                1,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                new String[] {"customers"},
+                false,
+                Collections.emptyMap(),
+                SPACE_USERNAME_AND_PASSWORD_USER,
+                SPACE_PASSWORD);
+    }
+
+    private static void createMongoUser(String username, String password) {
+        MONGO_CONTAINER.executeCommand(
+                "db = db.getSiblingDB('admin');"
+                        + "db.createUser({user: '"
+                        + username
+                        + "', pwd: '"
+                        + password
+                        + "', roles: [{role: 'flinkrole', db: 'admin'}]});");
+    }
 
     @Test
     void testReadSingleCollectionWithSingleParallelism() throws Exception {
@@ -583,7 +625,27 @@ class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
             boolean skipSnapshotBackfill,
             Map<String, String> extraOptions)
             throws Exception {
+        testMongoDBParallelSource(
+                parallelism,
+                failoverType,
+                failoverPhase,
+                captureCustomerCollections,
+                skipSnapshotBackfill,
+                extraOptions,
+                FLINK_USER,
+                FLINK_USER_PASSWORD);
+    }
 
+    private void testMongoDBParallelSource(
+            int parallelism,
+            FailoverType failoverType,
+            FailoverPhase failoverPhase,
+            String[] captureCustomerCollections,
+            boolean skipSnapshotBackfill,
+            Map<String, String> extraOptions,
+            String username,
+            String password)
+            throws Exception {
         String customerDatabase = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("customer");
 
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
@@ -613,8 +675,8 @@ class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
                                 + " %s"
                                 + ")",
                         MONGO_CONTAINER.getHostAndPort(),
-                        FLINK_USER,
-                        FLINK_USER_PASSWORD,
+                        username,
+                        password,
                         customerDatabase,
                         getCollectionNameRegex(customerDatabase, captureCustomerCollections),
                         skipSnapshotBackfill,
