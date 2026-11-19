@@ -21,135 +21,114 @@ import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConf
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
-import io.debezium.connector.postgresql.PostgresOffsetContext;
-import io.debezium.connector.postgresql.PostgresPartition;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
-import io.debezium.relational.history.TableChanges;
 import io.debezium.relational.history.TableChanges.TableChange;
-import io.debezium.schema.SchemaChangeEvent;
-import io.debezium.util.Clock;
+import io.debezium.relational.history.TableChanges.TableChangeType;
 
 import java.sql.SQLException;
-import java.time.Instant;
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
-/** A CustomPostgresSchema similar to PostgresSchema with customization. */
+import static io.debezium.connector.postgresql.connection.PostgresConnection.escapeJdbcSearchPattern;
+
+/** Loads and caches the schemas of requested PostgreSQL tables. */
 public class CustomPostgresSchema {
 
-    // cache the schema for each table
     private final Map<TableId, TableChange> schemasByTableId = new HashMap<>();
-    private final PostgresConnection jdbcConnection;
     private final PostgresConnectorConfig dbzConfig;
 
-    public CustomPostgresSchema(
-            PostgresConnection jdbcConnection, PostgresSourceConfig sourceConfig) {
-        this.jdbcConnection = jdbcConnection;
+    public CustomPostgresSchema(PostgresSourceConfig sourceConfig) {
         this.dbzConfig = sourceConfig.getDbzConnectorConfig();
     }
 
-    public TableChange getTableSchema(TableId tableId) {
-        // read schema from cache first
-        if (!schemasByTableId.containsKey(tableId)) {
-            try {
-                readTableSchema(Collections.singletonList(tableId));
-            } catch (SQLException e) {
-                throw new FlinkRuntimeException("Failed to read table schema", e);
-            }
-        }
-        return schemasByTableId.get(tableId);
+    public TableChange getTableSchema(PostgresConnection jdbc, TableId tableId) {
+        TableChange cached = schemasByTableId.get(tableId);
+        return cached != null
+                ? cached
+                : getTableSchema(jdbc, Collections.singleton(tableId)).get(tableId);
     }
 
-    public Map<TableId, TableChange> getTableSchema(List<TableId> tableIds) {
-        // read schema from cache first
-        Map<TableId, TableChange> tableChanges = new HashMap();
+    public Map<TableId, TableChange> getTableSchema(
+            PostgresConnection jdbc, Collection<TableId> tableIds) {
+        return getTableSchema(jdbc, tableIds, false);
+    }
 
-        List<TableId> unMatchTableIds = new ArrayList<>();
+    public Map<TableId, TableChange> getInitialSnapshotTableSchemas(
+            PostgresConnection jdbc, Collection<TableId> tableIds) {
+        return getTableSchema(jdbc, tableIds, true);
+    }
+
+    private Map<TableId, TableChange> getTableSchema(
+            PostgresConnection jdbc, Collection<TableId> tableIds, boolean bulkReadColumns) {
+        Map<TableId, TableChange> tableChanges = new HashMap<>();
+        Map<String, Set<TableId>> missingBySchema = new HashMap<>();
         for (TableId tableId : tableIds) {
-            if (schemasByTableId.containsKey(tableId)) {
-                tableChanges.put(tableId, schemasByTableId.get(tableId));
+            TableChange cached = schemasByTableId.get(tableId);
+            if (cached != null) {
+                tableChanges.put(tableId, cached);
             } else {
-                unMatchTableIds.add(tableId);
+                missingBySchema
+                        .computeIfAbsent(tableId.schema(), ignored -> new HashSet<>())
+                        .add(tableId);
             }
         }
 
-        if (!unMatchTableIds.isEmpty()) {
+        if (!missingBySchema.isEmpty()) {
             try {
-                readTableSchema(unMatchTableIds);
+                readTableSchemas(jdbc, missingBySchema, tableChanges, bulkReadColumns);
             } catch (SQLException e) {
                 throw new FlinkRuntimeException("Failed to read table schema", e);
             }
-            for (TableId tableId : unMatchTableIds) {
-                if (schemasByTableId.containsKey(tableId)) {
-                    tableChanges.put(tableId, schemasByTableId.get(tableId));
-                } else {
+        }
+        return tableChanges;
+    }
+
+    private void readTableSchemas(
+            PostgresConnection jdbc,
+            Map<String, Set<TableId>> missingBySchema,
+            Map<TableId, TableChange> tableChanges,
+            boolean bulkReadColumns)
+            throws SQLException {
+        String escape = jdbc.connection().getMetaData().getSearchStringEscape();
+        Tables.TableFilter capturedTables = dbzConfig.getTableFilters().dataCollectionFilter();
+        for (Map.Entry<String, Set<TableId>> entry : missingBySchema.entrySet()) {
+            String schema = entry.getKey();
+            Set<TableId> requestedTables = entry.getValue();
+            String schemaPattern = schema == null ? null : escapeJdbcSearchPattern(schema, escape);
+            Tables.TableFilter requestedCapturedTables =
+                    tableId ->
+                            requestedTables.contains(tableId) && capturedTables.isIncluded(tableId);
+            Tables tables = new Tables();
+            if (bulkReadColumns && requestedTables.size() > 1) {
+                jdbc.readSchemaWithBulkColumns(
+                        tables, dbzConfig.databaseName(), schemaPattern, requestedCapturedTables);
+            } else {
+                jdbc.readSchema(
+                        tables,
+                        dbzConfig.databaseName(),
+                        schemaPattern,
+                        requestedCapturedTables,
+                        null,
+                        false);
+            }
+
+            for (TableId tableId : requestedTables) {
+                Table table = tables.forTable(tableId);
+                if (table == null) {
                     throw new FlinkRuntimeException(
                             String.format("Failed to read table schema of table %s", tableId));
                 }
+                TableChange change = new TableChange(TableChangeType.CREATE, table);
+                schemasByTableId.put(tableId, change);
+                tableChanges.put(tableId, change);
             }
         }
-        return tableChanges;
-    }
-
-    private List<TableChange> readTableSchema(List<TableId> tableIds) throws SQLException {
-        List<TableChange> tableChanges = new ArrayList<>();
-
-        final PostgresOffsetContext offsetContext =
-                PostgresOffsetContext.initialContext(dbzConfig, jdbcConnection, Clock.SYSTEM);
-
-        PostgresPartition partition = new PostgresPartition(dbzConfig.getLogicalName());
-
-        Tables tables = new Tables();
-        try {
-            jdbcConnection.readSchema(
-                    tables,
-                    dbzConfig.databaseName(),
-                    null,
-                    dbzConfig.getTableFilters().dataCollectionFilter(),
-                    null,
-                    false);
-        } catch (SQLException e) {
-            throw new FlinkRuntimeException("Failed to read schema", e);
-        }
-
-        // Cache all tables discovered by readSchema to avoid redundant full scans on future calls.
-        for (TableId discoveredId : tables.tableIds()) {
-            if (this.schemasByTableId.containsKey(discoveredId)) {
-                continue;
-            }
-            Table table = tables.forTable(discoveredId);
-            if (table == null) {
-                continue;
-            }
-            offsetContext.event(discoveredId, Instant.now());
-            SchemaChangeEvent schemaChangeEvent =
-                    SchemaChangeEvent.ofCreate(
-                            partition,
-                            offsetContext,
-                            dbzConfig.databaseName(),
-                            discoveredId.schema(),
-                            null,
-                            table,
-                            true);
-            for (TableChanges.TableChange tableChange : schemaChangeEvent.getTableChanges()) {
-                this.schemasByTableId.put(discoveredId, tableChange);
-            }
-        }
-
-        for (TableId tableId : tableIds) {
-            TableChange cached = this.schemasByTableId.get(tableId);
-            if (cached == null) {
-                throw new FlinkRuntimeException(
-                        String.format("Failed to read table schema of table %s", tableId));
-            }
-            tableChanges.add(cached);
-        }
-        return tableChanges;
     }
 }

@@ -54,7 +54,9 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -698,6 +700,70 @@ public class PostgresConnection extends JdbcConnection {
         return getTypeRegistry().get(nativeType).getRootType().getJdbcId();
     }
 
+    /** Reads columns in one query and builds schemas for the requested snapshot tables. */
+    public void readSchemaWithBulkColumns(
+            Tables tables,
+            String databaseCatalog,
+            String schemaNamePattern,
+            Tables.TableFilter tableFilter)
+            throws SQLException {
+        Set<TableId> tableIds = getAllTableIds(databaseCatalog, schemaNamePattern);
+        tableIds.removeIf(id -> !tableFilter.isIncluded(id));
+        if (tableIds.isEmpty()) {
+            return;
+        }
+
+        DatabaseMetaData metadata = connection().getMetaData();
+        Map<TableId, List<Column>> columnsByTable =
+                getColumnsDetails(
+                        databaseCatalog,
+                        schemaNamePattern,
+                        null,
+                        tableIds::contains,
+                        null,
+                        metadata,
+                        Collections.emptySet());
+        for (Map.Entry<TableId, List<Column>> entry : columnsByTable.entrySet()) {
+            TableId tableId = entry.getKey();
+            List<Column> columns = entry.getValue();
+            Collections.sort(columns);
+            tables.overwriteTable(
+                    tableId, columns, readPrimaryKeyOrUniqueIndexNames(metadata, tableId), null);
+        }
+    }
+
+    @Override
+    protected Map<TableId, List<Column>> getColumnsDetails(
+            String databaseCatalog,
+            String schemaNamePattern,
+            String tableName,
+            Tables.TableFilter tableFilter,
+            Tables.ColumnNameFilter columnFilter,
+            DatabaseMetaData metadata,
+            Set<TableId> viewIds)
+            throws SQLException {
+        // Debezium passes a literal table name to the JDBC search pattern.
+        String tableNamePattern =
+                tableName == null
+                        ? null
+                        : escapeJdbcSearchPattern(tableName, metadata.getSearchStringEscape());
+        return super.getColumnsDetails(
+                databaseCatalog,
+                schemaNamePattern,
+                tableNamePattern,
+                tableFilter,
+                columnFilter,
+                metadata,
+                viewIds);
+    }
+
+    public static String escapeJdbcSearchPattern(String identifier, String escape) {
+        return identifier
+                .replace(escape, escape + escape)
+                .replace("_", escape + "_")
+                .replace("%", escape + "%");
+    }
+
     @Override
     protected Optional<ColumnEditor> readTableColumn(
             ResultSet columnMetadata, TableId tableId, Tables.ColumnNameFilter columnFilter)
@@ -987,7 +1053,13 @@ public class PostgresConnection extends JdbcConnection {
      * @throws SQLException if a database exception occurred
      */
     public Set<TableId> getAllTableIds(String catalogName) throws SQLException {
-        return readTableNames(catalogName, null, null, new String[] {"TABLE", "PARTITIONED TABLE"});
+        return getAllTableIds(catalogName, null);
+    }
+
+    private Set<TableId> getAllTableIds(String catalogName, String schemaNamePattern)
+            throws SQLException {
+        return readTableNames(
+                catalogName, schemaNamePattern, null, new String[] {"TABLE", "PARTITIONED TABLE"});
     }
 
     @FunctionalInterface
