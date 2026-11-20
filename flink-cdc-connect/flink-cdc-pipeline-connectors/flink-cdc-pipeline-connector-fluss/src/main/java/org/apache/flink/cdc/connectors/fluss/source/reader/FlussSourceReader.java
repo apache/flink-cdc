@@ -22,6 +22,7 @@ import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.api.connector.source.util.ratelimit.RateLimiterStrategy;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.metrics.WrapperFlussMetricRegistry;
 import org.apache.flink.cdc.connectors.fluss.source.event.FinishedKvSnapshotConsumeEvent;
+import org.apache.flink.cdc.connectors.fluss.source.event.ReaderSplitReportEvent;
 import org.apache.flink.cdc.connectors.fluss.source.event.TableRemovalAckEvent;
 import org.apache.flink.cdc.connectors.fluss.source.event.TableSubscriptionEvent;
 import org.apache.flink.cdc.connectors.fluss.source.metrics.FlussSourceReaderMetrics;
@@ -125,6 +126,17 @@ public class FlussSourceReader<T>
         this.pendingPartitionRemovalRequests = new HashMap<>();
         this.subscribedTablePaths = new HashSet<>();
         this.subscribedPhysicalTablePaths = new HashSet<>();
+    }
+
+    @Override
+    public void start() {
+        super.start();
+        // Temporary fallback before FLIP-537: report restored splits before discovery starts.
+        readerContext.sendSourceEventToCoordinator(
+                new ReaderSplitReportEvent(
+                        stagedSplits.stream()
+                                .map(FlussSplitBase::getTableBucket)
+                                .collect(Collectors.toSet())));
     }
 
     @Override
