@@ -358,6 +358,78 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
     }
 
     @Test
+    void testBackfillDoesNotMixTablesDifferingOnlyInCase() throws Exception {
+        TestTableId upperCaseTable = new TestTableId(schemaName, "Orders");
+        TestTableId lowerCaseTable = new TestTableId(schemaName, "orders");
+        PostgresSourceConfigFactory configFactory =
+                getMockPostgresSourceConfigFactory(
+                        customDatabase, schemaName, "Orders", getSlotName(), 100, false);
+        configFactory.tableList(upperCaseTable.toString(), lowerCaseTable.toString());
+        PostgresSourceConfig sourceConfig = configFactory.create(0);
+        PostgresDialect dialect = new PostgresDialect(sourceConfig);
+        try (PostgresConnection connection = dialect.openJdbcConnection()) {
+            connection.execute(
+                    "CREATE TABLE "
+                            + upperCaseTable.toSql()
+                            + " (id BIGINT PRIMARY KEY, amount INT)",
+                    "CREATE TABLE "
+                            + lowerCaseTable.toSql()
+                            + " (id BIGINT PRIMARY KEY, amount INT)",
+                    "INSERT INTO " + upperCaseTable.toSql() + " VALUES (10, 100)",
+                    "INSERT INTO " + lowerCaseTable.toSql() + " VALUES (30, 300)");
+            connection.commit();
+        }
+
+        List<SnapshotSplit> splits = getSnapshotSplits(sourceConfig, dialect);
+        assertThat(splits).hasSize(2);
+        SnapshotSplit upperCaseSplit =
+                splits.stream()
+                        .filter(split -> "Orders".equals(split.getTableId().table()))
+                        .findFirst()
+                        .orElseThrow();
+        SnapshotSplit lowerCaseSplit =
+                splits.stream()
+                        .filter(split -> "orders".equals(split.getTableId().table()))
+                        .findFirst()
+                        .orElseThrow();
+
+        SnapshotPhaseHooks hooks = new SnapshotPhaseHooks();
+        hooks.setPreHighWatermarkAction(
+                (config, split) -> {
+                    try (PostgresConnection connection = dialect.openJdbcConnection()) {
+                        connection.execute(
+                                "INSERT INTO " + lowerCaseTable.toSql() + " VALUES (20, 999)",
+                                "UPDATE "
+                                        + upperCaseTable.toSql()
+                                        + " SET amount = 101 WHERE id = 10");
+                        connection.commit();
+                    }
+                });
+        DataType rowType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("amount", DataTypes.INT()));
+
+        List<String> upperCaseRows =
+                readTableSnapshotSplits(
+                        Collections.singletonList(upperCaseSplit),
+                        new PostgresSourceFetchTaskContext(sourceConfig, dialect),
+                        1,
+                        rowType,
+                        hooks);
+        List<String> lowerCaseRows =
+                readTableSnapshotSplits(
+                        Collections.singletonList(lowerCaseSplit),
+                        new PostgresSourceFetchTaskContext(sourceConfig, dialect),
+                        1,
+                        rowType,
+                        new SnapshotPhaseHooks());
+
+        assertThat(lowerCaseRows).containsExactlyInAnyOrder("+I[20, 999]", "+I[30, 300]");
+        assertThat(upperCaseRows).containsExactly("+I[10, 101]");
+    }
+
+    @Test
     void testHistoricalDatesInSnapshotScan() throws Exception {
         // Pre-fix, dates before 1582-10-15 are shifted by N days (e.g. 0001-01-01 by 2)
         // because the snapshot path's rs.getObject() goes through GregorianCalendar.
