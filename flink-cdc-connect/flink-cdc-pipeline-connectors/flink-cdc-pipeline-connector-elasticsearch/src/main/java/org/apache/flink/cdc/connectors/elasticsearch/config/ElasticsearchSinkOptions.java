@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.elasticsearch.config;
 
-import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.connectors.elasticsearch.v2.NetworkConfig;
 
 import org.apache.http.HttpHost;
@@ -42,7 +41,7 @@ public class ElasticsearchSinkOptions implements Serializable {
     private final int version;
     private final String username;
     private final String password;
-    private final Map<TableId, String> shardingKey;
+    private final Map<String, String> shardingKey;
     private final String shardingSeparator;
 
     /** Constructor for ElasticsearchSinkOptions. */
@@ -83,7 +82,7 @@ public class ElasticsearchSinkOptions implements Serializable {
             int version,
             String username,
             String password,
-            Map<TableId, String> shardingKey,
+            Map<String, String> shardingKey,
             String shardingSeparator) {
         this.maxBatchSize = maxBatchSize;
         this.maxInFlightRequests = maxInFlightRequests;
@@ -167,7 +166,7 @@ public class ElasticsearchSinkOptions implements Serializable {
         return password;
     }
 
-    public Map<TableId, String> getShardingKey() {
+    public Map<String, String> getShardingKey() {
         return shardingKey;
     }
 

@@ -189,6 +189,8 @@ Usage Notes
 
 * 如果写入 Elasticsearch 的 index 不存在，不会被默认创建。
 
+* `sharding.suffix.key` 按路由后的完整表 ID 字符串匹配，不将点号重新解释为字段分隔符。例如，`target_db.daily.archive:event_date` 为基础索引 `target_db.daily.archive` 指定后缀字段，路由后的表名可以是 `daily.archive`。字符串表示相同的表 ID 共用这项配置。
+
 Data Type Mapping
 ----------------
 Elasticsearch 将文档存储在 JSON 字符串中，数据类型之间的映射关系如下表所示：

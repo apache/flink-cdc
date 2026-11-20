@@ -189,6 +189,8 @@ Usage Notes
 
 * No support for automatic Elasticsearch index creation.
 
+* `sharding.suffix.key` matches the complete table ID string after routing, without interpreting dots as field separators. For example, `target_db.daily.archive:event_date` configures the suffix column for the base index `target_db.daily.archive`, including when the routed table name is `daily.archive`. Table IDs with the same string representation share this configuration.
+
 Data Type Mapping
 ----------------
 Elasticsearch stores document in a JSON string. So the data type mapping is between Flink CDC data type and JSON data type.
