@@ -136,7 +136,7 @@ class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
                         "INSERT INTO products_sink",
                         "SELECT * FROM products_source;");
 
-        submitSQLJob(sqlLines, sqlServerCdcJar, jdbcJar, mysqlDriverJar);
+        submitSQLJob(sqlLines, withJdbcJars(sqlServerCdcJar, mysqlDriverJar));
         waitUntilJobRunning(Duration.ofSeconds(30));
 
         // generate change stream

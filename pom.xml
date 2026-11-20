@@ -33,8 +33,8 @@ limitations under the License.
     <packaging>pom</packaging>
 
     <modules>
-        <module>flink-cdc-flink1-compat</module>
-        <module>flink-cdc-flink2-compat</module>
+        <module>flink-cdc-shaded-guava</module>
+        <module>flink-cdc-flink</module>
         <module>flink-cdc-cli</module>
         <module>flink-cdc-common</module>
         <module>flink-cdc-composer</module>
@@ -72,11 +72,42 @@ limitations under the License.
         <!-- dependencies versions -->
         <flink.1.x.version>1.20.3</flink.1.x.version>
         <flink.2.x.version>2.2.0</flink.2.x.version>
+        <!-- Line-scoped Flink versions: each version thin module pins its Flink line
+             here so the generation baseline above can move to a newer minor (e.g.
+             flink.2.x.version -> 2.3) without dragging the older line's thin module
+             along. Nothing else references these: flink-cdc-flink{1,2}-common track
+             the generation baseline, thin modules track their line. -->
+        <flink.1.20.version>1.20.3</flink.1.20.version>
+        <flink.2.2.version>2.2.0</flink.2.2.version>
         <flink.version>${flink.1.x.version}</flink.version>
-        <flink.major.version>1.20</flink.major.version>
-        <flink.1.x.shaded.guava.version>31.1-jre-17.0</flink.1.x.shaded.guava.version>
-        <flink.2.x.shaded.guava.version>33.4.0-jre-20.0</flink.2.x.shaded.guava.version>
-        <shaded.guava.version>${flink.1.x.shaded.guava.version}</shaded.guava.version>
+        <flink.compat.artifactId>flink-cdc-flink1-common</flink.compat.artifactId>
+        <!-- The Flink line this build targets. It drives the coordinates of every
+             per-version artifact (the dist jar and the connector fat jars carry it
+             in their artifactId) and the per-line artifact selection of the e2e
+             tests. The flink2 profile overrides it; a CI job may override it further
+             for a same-generation minor (e.g. -Dflink.line=2.3, with that line's
+             artifacts installed in the local repository). -->
+        <flink.line>1.20</flink.line>
+        <flink.dist.artifactId>flink-cdc-dist-flink-${flink.line}</flink.dist.artifactId>
+        <!-- Set to true by the flink2 profile for connectors whose external
+             dependency line has no Flink 2.x artifact (starrocks, hudi). -->
+        <connector.generation.skip>false</connector.generation.skip>
+        <!-- Suffix of the per-version source connector fat jar artifactIds, derived
+             from the Flink line of the build. -->
+        <source.fatjar.suffix>-flink-${flink.line}</source.fatjar.suffix>
+        <!-- Suffix of the per-version pipeline connector fat jar artifactIds,
+             derived from the Flink line of the build. -->
+        <pipeline.fatjar.suffix>-flink-${flink.line}</pipeline.fatjar.suffix>
+        <!-- External jdbc connector line used by the source e2e tests, per Flink
+             generation; flipped by the flink2 profile. The 1.20 line
+             is an all-in-one jar, the 2.x line splits into core and dialect jars. -->
+        <jdbc.connector.artifactId>flink-connector-jdbc</jdbc.connector.artifactId>
+        <jdbc.connector.version.1.20>3.3.0-1.20</jdbc.connector.version.1.20>
+        <jdbc.connector.version.2.x>4.1.0-2.2</jdbc.connector.version.2.x>
+        <source.e2e.jdbc.version>${jdbc.connector.version.1.20}</source.e2e.jdbc.version>
+        <!-- MySQL dialect jar for the 2.x jdbc line (unused by the all-in-one 1.20
+             jar, copied for a uniform dependency-copy section). -->
+        <jdbc.dialect.mysql.version>3.4.0-1.20</jdbc.dialect.mysql.version>
         <flink.shaded.version>17.0</flink.shaded.version>
         <debezium.version>1.9.8.Final</debezium.version>
         <tikv.version>3.2.0</tikv.version>
@@ -116,6 +147,7 @@ limitations under the License.
         <maven.compiler.source>${source.java.version}</maven.compiler.source>
         <maven.compiler.target>${target.java.version}</maven.compiler.target>
         <flink.kafka.connector.version>3.3.0-1.20</flink.kafka.connector.version>
+        <flink.connector.elasticsearch.version>3.1.0-1.20</flink.connector.elasticsearch.version>
         <paimon.flink.major.version>1.20</paimon.flink.major.version>
         <fluss.flink.major.version>1.20</fluss.flink.major.version>
     </properties>
@@ -299,12 +331,12 @@ limitations under the License.
         </dependency>
 
         <dependency>
-            <groupId>org.apache.flink</groupId>
-            <artifactId>flink-shaded-guava</artifactId>
-            <version>${shaded.guava.version}</version>
-        </dependency>
-
-        <dependency>
+            <!-- Retained deliberately: although flink-cdc now owns its shaded
+                 guava, this empty jar drives the maven-shade-plugin to produce a
+                 dependency-reduced-pom for every module, pinning parent properties
+                 (e.g. ${flink.version}) to concrete values, which the release and
+                 staging deployment process relies on. The jar itself is empty, so
+                 there is no shaded package prefix to conflict with anything. -->
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-shaded-force-shading</artifactId>
             <version>${flink.shaded.version}</version>
@@ -859,9 +891,41 @@ limitations under the License.
             </build>
         </profile>
         <profile>
+            <!--
+              Default Flink generation (1.20 line). The properties mirror the root
+              pom defaults so the generation switching point stays explicit.
+              Never declare compat dependencies in this profile: the compat
+              modules are part of the reactor and would inherit a dependency on
+              themselves.
+            -->
+            <id>flink1</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <flink.version>${flink.1.x.version}</flink.version>
+                <flink.compat.artifactId>flink-cdc-flink1-common</flink.compat.artifactId>
+                <source.e2e.jdbc.version>${jdbc.connector.version.1.20}</source.e2e.jdbc.version>
+                <jdbc.dialect.mysql.version>3.4.0-1.20</jdbc.dialect.mysql.version>
+                <flink.kafka.connector.version>3.3.0-1.20</flink.kafka.connector.version>
+                <flink.connector.elasticsearch.version>3.1.0-1.20</flink.connector.elasticsearch.version>
+                <paimon.flink.major.version>1.20</paimon.flink.major.version>
+                <iceberg.flink.major.version>1.20</iceberg.flink.major.version>
+                <fluss.flink.major.version>1.20</fluss.flink.major.version>
+            </properties>
+        </profile>
+        <profile>
             <id>flink2</id>
             <properties>
+                <flink.version>${flink.2.x.version}</flink.version>
+                <flink.compat.artifactId>flink-cdc-flink2-common</flink.compat.artifactId>
+                <flink.line>2.2</flink.line>
+                <connector.generation.skip>true</connector.generation.skip>
+                <source.e2e.jdbc.version>${jdbc.connector.version.2.x}</source.e2e.jdbc.version>
+                <jdbc.connector.artifactId>flink-connector-jdbc-core</jdbc.connector.artifactId>
+                <jdbc.dialect.mysql.version>4.1.0-2.2</jdbc.dialect.mysql.version>
                 <flink.kafka.connector.version>4.0.1-2.0</flink.kafka.connector.version>
+                <flink.connector.elasticsearch.version>4.0.0-2.0</flink.connector.elasticsearch.version>
                 <paimon.flink.major.version>2.1</paimon.flink.major.version>
                 <iceberg.flink.major.version>2.0</iceberg.flink.major.version>
                 <fluss.flink.major.version>2.2</fluss.flink.major.version>
@@ -871,38 +935,11 @@ limitations under the License.
                     <plugins>
                         <plugin>
                             <groupId>org.apache.maven.plugins</groupId>
-                            <artifactId>maven-dependency-plugin</artifactId>
-                            <executions>
-                                <execution>
-                                    <id>copy-flink2-guava</id>
-                                    <phase>process-test-resources</phase>
-                                    <goals>
-                                        <goal>copy</goal>
-                                    </goals>
-                                    <configuration>
-                                        <artifactItems>
-                                            <artifactItem>
-                                                <groupId>org.apache.flink</groupId>
-                                                <artifactId>flink-shaded-guava</artifactId>
-                                                <version>${flink.2.x.shaded.guava.version}</version>
-                                                <destFileName>flink-shaded-guava.jar</destFileName>
-                                                <outputDirectory>${project.build.directory}/flink2-extra-libs</outputDirectory>
-                                            </artifactItem>
-                                        </artifactItems>
-                                    </configuration>
-                                </execution>
-                            </executions>
-                        </plugin>
-                        <plugin>
-                            <groupId>org.apache.maven.plugins</groupId>
                             <artifactId>maven-surefire-plugin</artifactId>
                             <configuration>
                                 <systemPropertyVariables>
                                     <flink.profile>flink2</flink.profile>
                                 </systemPropertyVariables>
-                                <additionalClasspathElements>
-                                    <additionalClasspathElement>${project.build.directory}/flink2-extra-libs/flink-shaded-guava.jar</additionalClasspathElement>
-                                </additionalClasspathElements>
                             </configuration>
                         </plugin>
                     </plugins>

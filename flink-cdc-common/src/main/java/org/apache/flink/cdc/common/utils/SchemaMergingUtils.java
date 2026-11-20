@@ -66,10 +66,9 @@ import org.apache.flink.cdc.common.types.VarCharType;
 import org.apache.flink.cdc.common.types.VariantType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
 import org.apache.flink.cdc.common.types.variant.Variant;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
-import org.apache.flink.shaded.guava31.com.google.common.collect.Streams;
-import org.apache.flink.shaded.guava31.com.google.common.io.BaseEncoding;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.ImmutableList;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.Streams;
+import org.apache.flink.cdc.shaded.guava.com.google.common.io.BaseEncoding;
 
 import javax.annotation.Nullable;
 

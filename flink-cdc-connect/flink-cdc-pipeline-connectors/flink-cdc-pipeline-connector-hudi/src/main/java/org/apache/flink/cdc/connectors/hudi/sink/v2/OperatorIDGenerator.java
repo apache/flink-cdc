@@ -17,9 +17,8 @@
 
 package org.apache.flink.cdc.connectors.hudi.sink.v2;
 
+import org.apache.flink.cdc.shaded.guava.com.google.common.hash.Hashing;
 import org.apache.flink.runtime.jobgraph.OperatorID;
-
-import org.apache.flink.shaded.guava31.com.google.common.hash.Hashing;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 

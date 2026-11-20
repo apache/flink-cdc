@@ -28,8 +28,6 @@ limitations under the License.
     <artifactId>flink-cdc-source-e2e-tests</artifactId>
 
     <properties>
-        <flink-1.20>1.20.3</flink-1.20>
-        <jdbc.version-1.20>3.3.0-1.20</jdbc.version-1.20>
         <mysql.driver.version>8.0.27</mysql.driver.version>
         <postgresql.driver.version>42.7.3</postgresql.driver.version>
     </properties>
@@ -240,9 +238,21 @@ limitations under the License.
 
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-connector-jdbc</artifactId>
-                            <version>${jdbc.version-1.20}</version>
-                            <destFileName>jdbc-connector_${flink-1.20}.jar</destFileName>
+                            <artifactId>${jdbc.connector.artifactId}</artifactId>
+                            <version>${source.e2e.jdbc.version}</version>
+                            <destFileName>jdbc-connector_${flink.version}.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <!-- MySQL dialect jar for the 2.x jdbc line, which splits the
+                             all-in-one 1.20 connector into core and dialect artifacts. -->
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-connector-jdbc-mysql</artifactId>
+                            <version>${jdbc.dialect.mysql.version}</version>
+                            <destFileName>jdbc-connector-mysql-dialect_${flink.version}.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>
@@ -250,7 +260,7 @@ limitations under the License.
 
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-sql-connector-mysql-cdc</artifactId>
+                            <artifactId>flink-sql-connector-mysql-cdc${source.fatjar.suffix}</artifactId>
                             <version>${project.version}</version>
                             <destFileName>mysql-cdc-connector.jar</destFileName>
                             <type>jar</type>
@@ -260,7 +270,7 @@ limitations under the License.
 
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-sql-connector-postgres-cdc</artifactId>
+                            <artifactId>flink-sql-connector-postgres-cdc${source.fatjar.suffix}</artifactId>
                             <version>${project.version}</version>
                             <destFileName>postgres-cdc-connector.jar</destFileName>
                             <type>jar</type>
@@ -270,7 +280,7 @@ limitations under the License.
 
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-sql-connector-mongodb-cdc</artifactId>
+                            <artifactId>flink-sql-connector-mongodb-cdc${source.fatjar.suffix}</artifactId>
                             <version>${project.version}</version>
                             <destFileName>mongodb-cdc-connector.jar</destFileName>
                             <type>jar</type>
@@ -280,7 +290,7 @@ limitations under the License.
 
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-sql-connector-oracle-cdc</artifactId>
+                            <artifactId>flink-sql-connector-oracle-cdc${source.fatjar.suffix}</artifactId>
                             <version>${project.version}</version>
                             <destFileName>oracle-cdc-connector.jar</destFileName>
                             <type>jar</type>
@@ -290,7 +300,7 @@ limitations under the License.
 
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-sql-connector-sqlserver-cdc</artifactId>
+                            <artifactId>flink-sql-connector-sqlserver-cdc${source.fatjar.suffix}</artifactId>
                             <version>${project.version}</version>
                             <destFileName>sqlserver-cdc-connector.jar</destFileName>
                             <type>jar</type>
@@ -300,7 +310,7 @@ limitations under the License.
 
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-sql-connector-tidb-cdc</artifactId>
+                            <artifactId>flink-sql-connector-tidb-cdc${source.fatjar.suffix}</artifactId>
                             <version>${project.version}</version>
                             <destFileName>tidb-cdc-connector.jar</destFileName>
                             <type>jar</type>
@@ -310,7 +320,7 @@ limitations under the License.
 
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-sql-connector-db2-cdc</artifactId>
+                            <artifactId>flink-sql-connector-db2-cdc${source.fatjar.suffix}</artifactId>
                             <version>${project.version}</version>
                             <destFileName>db2-cdc-connector.jar</destFileName>
                             <type>jar</type>
@@ -320,7 +330,7 @@ limitations under the License.
 
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-sql-connector-vitess-cdc</artifactId>
+                            <artifactId>flink-sql-connector-vitess-cdc${source.fatjar.suffix}</artifactId>
                             <version>${project.version}</version>
                             <destFileName>vitess-cdc-connector.jar</destFileName>
                             <type>jar</type>
@@ -330,7 +340,7 @@ limitations under the License.
 
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-sql-connector-oceanbase-cdc</artifactId>
+                            <artifactId>flink-sql-connector-oceanbase-cdc${source.fatjar.suffix}</artifactId>
                             <version>${project.version}</version>
                             <destFileName>oceanbase-cdc-connector.jar</destFileName>
                             <type>jar</type>

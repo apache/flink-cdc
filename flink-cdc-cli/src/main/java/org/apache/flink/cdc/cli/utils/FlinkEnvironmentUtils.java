@@ -20,13 +20,12 @@ package org.apache.flink.cdc.cli.utils;
 import org.apache.flink.cdc.cli.CliFrontendOptions;
 import org.apache.flink.cdc.cli.parser.YamlPipelineDefinitionParser;
 import org.apache.flink.cdc.common.utils.StringUtils;
+import org.apache.flink.cdc.shaded.guava.com.google.common.base.Joiner;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.DeploymentOptions;
 import org.apache.flink.core.execution.RestoreModeAdapter;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
-
-import org.apache.flink.shaded.guava31.com.google.common.base.Joiner;
 
 import org.apache.commons.cli.CommandLine;
 import org.slf4j.Logger;

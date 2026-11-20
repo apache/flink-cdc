@@ -28,10 +28,9 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
-
-import org.apache.flink.shaded.guava31.com.google.common.cache.Cache;
-import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
-import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
+import org.apache.flink.cdc.shaded.guava.com.google.common.cache.Cache;
+import org.apache.flink.cdc.shaded.guava.com.google.common.cache.CacheBuilder;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.Lists;
 
 import com.oceanbase.connector.flink.table.DataChangeRecord;
 import com.oceanbase.connector.flink.table.Record;

@@ -60,14 +60,14 @@ Flink CDC is organized around the Pipeline abstraction: a user-defined data pipe
 - `flink-cdc-runtime` — Runtime implementation of the Pipeline: operators for reading, routing, transforming (expression evaluation via Calcite + Janino), and writing CDC events.
 - `flink-cdc-composer` — Pipeline assembly and deployment layer. Translates a `PipelineDefinition` into a runnable Flink job, wiring sources, operators, and sinks together. Supports Flink-native, Kubernetes, and YARN deployment.
 - `flink-cdc-cli` — Command-line entry point (`flink-cdc.sh`). Parses YAML pipeline definitions and delegates to `flink-cdc-composer`.
-- `flink-cdc-dist` — Distribution packaging. Produces the `flink-cdc-<version>-bin` release archive.
+- `flink-cdc-dist` — Distribution module. It shades the pipeline core with the Flink compatibility layer and assembles the `flink-cdc-<version>-flink-<flinkVer>-bin` release archive. The module's artifactId is line-parameterized (`flink-cdc-dist-flink-${flink.line}`): each Flink line build produces its own distribution from this single module.
 
 ### Flink Version Compatibility
 
 Currently, Flink CDC supports two Flink generations simultaneously:
 
-- `flink-cdc-flink1-compat` — Flink 1.x compatibility layer (currently 1.20.3). Default profile.
-- `flink-cdc-flink2-compat` — Flink 2.x compatibility layer (currently 2.2.0). Activated via `-Pflink2`.
+- `flink-cdc-flink1-common` (under the `flink-cdc-flink` aggregate) — Flink 1.x compatibility layer (currently 1.20.3). Used by the default build.
+- `flink-cdc-flink2-common` (under the `flink-cdc-flink` aggregate) — Flink 2.x compatibility layer (currently 2.2.0). Used by the `-Pflink2` build.
 
 All modules that depend on Flink APIs must declare their Flink dependencies as `provided` and reference `${flink.version}`, which is resolved by the active profile.
 Please verify your changes in both Flink 1.20 (LTS) and Flink 2.x (latest).
@@ -76,7 +76,7 @@ Please verify your changes in both Flink 1.20 (LTS) and Flink 2.x (latest).
 
 Connectors are split into two categories:
 
-- Source Connectors (`flink-cdc-connect/flink-cdc-source-connectors/`) are CDC sources for DataStream and Flink SQL jobs.
+- Source Connectors (`flink-cdc-connect/flink-cdc-source-connectors/`) are CDC sources for DataStream and Flink SQL jobs. Each `flink-sql-connector-<X>-cdc` module produces one fat jar per build; its artifactId is line-parameterized (`flink-sql-connector-<X>-cdc${source.fatjar.suffix}`), so each Flink line build produces that line's fat jar from the single module.
 - Pipeline Connectors (`flink-cdc-connect/flink-cdc-pipeline-connectors/`) are Pipeline connectors for the YAML API.
 
 ### Tests
@@ -99,9 +99,10 @@ Write unit tests and integration tests in the corresponding submodules. End-to-e
 - **Forbidden imports** (enforced by Checkstyle):
   - JUnit 4 (`org.junit.*` except `org.junit.jupiter.*`) — use JUnit 5 Jupiter instead
   - `org.junit.jupiter.api.Assertions` and `org.hamcrest` — use AssertJ instead
-  - `com.google.common.*` — use `flink-shaded-guava` instead
+  - `com.google.common.*` — use `flink-cdc-shaded-guava` instead
   - `com.google.common.base.Preconditions` — use Flink CDC's `Preconditions`
   - `com.google.common.annotations.VisibleForTesting` — use `@VisibleForTesting` from `org.apache.flink.cdc.common.annotation`
+- **Version-sensitive Flink APIs:** route calls through the Adapters in `flink-cdc-flink/flink1-common` / `flink-cdc-flink2-common` (or the `flink-cdc-flink-1.20` / `flink-cdc-flink-2.2` thin modules) instead of adding direct imports of version-sensitive `org.apache.flink.*` classes or reflection into `org.apache.flink` internals. Existing imports of the shadowed compat classes are exempt; unrelated third-party shadowing (`org.apache.calcite.sql.type.*`, `org.tikv.*`) is unaffected.
 - **API stability annotations:** User-facing API types should carry stability annotations, and methods/fields/constructors only need explicit annotations when they differ from the enclosing type or when needed.
   - `@Public` — stable across major versions
   - `@PublicEvolving` — may change in minor versions

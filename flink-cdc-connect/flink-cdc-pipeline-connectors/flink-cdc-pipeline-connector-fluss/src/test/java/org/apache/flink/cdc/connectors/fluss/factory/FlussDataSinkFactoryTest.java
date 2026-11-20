@@ -27,9 +27,8 @@ import org.apache.flink.cdc.connectors.fluss.sink.FlussDataSink;
 import org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions;
 import org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.SinkPartitioningStrategy;
 import org.apache.flink.cdc.connectors.fluss.sink.FlussHashFunctionProvider;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.ImmutableMap;
 import org.apache.flink.table.api.ValidationException;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;

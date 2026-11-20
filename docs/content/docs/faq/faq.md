@@ -25,9 +25,9 @@ under the License.
 -->
 ## General FAQ
 
-### Q1: Why can't I download Flink-sql-connector-mysql-cdc-2.2-snapshot jar, why doesn't Maven warehouse rely on XXX snapshot?
+### Q1: Why can't I download Flink-sql-connector-mysql-cdc-flink-1.20-2.2-snapshot jar, why doesn't Maven warehouse rely on XXX snapshot?
 
-Like the mainstream Maven project version management, XXX snapshot version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as flink-sql-connector-mysql-cdc-2.1.0.jar, the released version will be available in the Maven central warehouse.
+Like the mainstream Maven project version management, XXX snapshot version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as flink-sql-connector-mysql-cdc-flink-1.20-3.8.0.jar, the released version will be available in the Maven central warehouse.
 
 ### Q2: When should I use Flink SQL connector XXX Jar? When should I use Flink connector XXX jar? What's the difference between the two?
 

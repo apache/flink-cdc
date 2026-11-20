@@ -17,9 +17,9 @@
 
 package io.debezium.relational;
 
-import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
-import org.apache.flink.shaded.guava31.com.google.common.cache.CacheLoader;
-import org.apache.flink.shaded.guava31.com.google.common.cache.LoadingCache;
+import org.apache.flink.cdc.shaded.guava.com.google.common.cache.CacheBuilder;
+import org.apache.flink.cdc.shaded.guava.com.google.common.cache.CacheLoader;
+import org.apache.flink.cdc.shaded.guava.com.google.common.cache.LoadingCache;
 
 import io.debezium.relational.Tables.TableFilter;
 

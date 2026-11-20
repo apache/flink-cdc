@@ -44,6 +44,7 @@ import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.streaming.runtime.tasks.ExceptionInChainedOperatorException;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 
 import javax.annotation.Nullable;
@@ -420,12 +421,6 @@ public class PreTransformOperator extends AbstractStreamOperatorAdapter<Event>
      * "pre-transform" error.
      */
     private static boolean isChainedOperatorException(Exception e) {
-        try {
-            return Class.forName(
-                            "org.apache.flink.streaming.runtime.tasks.ExceptionInChainedOperatorException")
-                    .isInstance(e);
-        } catch (ClassNotFoundException ignored) {
-            return false;
-        }
+        return e instanceof ExceptionInChainedOperatorException;
     }
 }

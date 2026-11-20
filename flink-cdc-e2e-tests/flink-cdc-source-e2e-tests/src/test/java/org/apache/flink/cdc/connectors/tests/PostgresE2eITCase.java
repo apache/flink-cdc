@@ -210,7 +210,7 @@ class PostgresE2eITCase extends FlinkContainerTestEnvironment {
 
     void testPostgresCDC(List<String> sqlLines) throws Exception {
 
-        submitSQLJob(sqlLines, postgresCdcJar, jdbcJar, mysqlDriverJar);
+        submitSQLJob(sqlLines, withJdbcJars(postgresCdcJar, mysqlDriverJar));
         waitUntilJobRunning(Duration.ofSeconds(30));
         // wait a bit to make sure the replication slot is ready
         Thread.sleep(30000);

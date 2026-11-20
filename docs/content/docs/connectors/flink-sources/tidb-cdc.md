@@ -47,9 +47,9 @@ To set up the TiDB CDC connector, the following table provides dependency inform
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-tidb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-tidb-cdc-flink-1.20](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc-flink-1.20) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** Refer to [flink-sql-connector-tidb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc), more released versions will be available in the Maven central warehouse.
+**Note:** Refer to [flink-sql-connector-tidb-cdc-flink-1.20](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc-flink-1.20), more released versions will be available in the Maven central warehouse.
 
 How to create a TiDB CDC table
 ----------------

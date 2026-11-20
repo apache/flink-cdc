@@ -21,9 +21,8 @@ import org.apache.flink.cdc.cli.utils.ConfigurationUtils;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.composer.PipelineExecution;
+import org.apache.flink.cdc.shaded.guava.com.google.common.base.Joiner;
 import org.apache.flink.core.fs.Path;
-
-import org.apache.flink.shaded.guava31.com.google.common.base.Joiner;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;

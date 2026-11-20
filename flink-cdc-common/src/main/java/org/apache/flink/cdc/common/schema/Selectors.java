@@ -19,9 +19,8 @@ package org.apache.flink.cdc.common.schema;
 
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.utils.Predicates;
-
-import org.apache.flink.shaded.guava31.com.google.common.cache.Cache;
-import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
+import org.apache.flink.cdc.shaded.guava.com.google.common.cache.Cache;
+import org.apache.flink.cdc.shaded.guava.com.google.common.cache.CacheBuilder;
 
 import java.time.Duration;
 import java.util.ArrayList;

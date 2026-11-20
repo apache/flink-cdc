@@ -119,11 +119,16 @@ def traverse_module(path)
   module_name = File.basename path
   return if EXCLUDED_MODULES.include?(module_name)
 
-  jar_file = File.join path, 'target', "#{module_name}-#{REVISION_NUMBER}.jar"
-  if File.exist? jar_file
-    check_jar_license jar_file, module_name
+  # Line-parameterized modules produce jars whose artifactIds carry a Flink line
+  # suffix (e.g. flink-sql-connector-tidb-cdc-flink-1.20-<revision>.jar), so match
+  # by glob instead of the exact directory name.
+  jars = Dir.glob(File.join(path, 'target', "#{module_name}*-#{REVISION_NUMBER}.jar"))
+            .reject { |f| File.basename(f).start_with?('original-') }
+            .reject { |f| File.basename(f) =~ /-(tests|sources|javadoc)-#{REVISION_NUMBER}\.jar$/ }
+  if jars.any?
+    jars.each { |jar| check_jar_license jar, module_name }
   elsif NOTICE_EXPECTATIONS.key?(module_name)
-    @notice_issues << "#{jar_file}: packaged JAR is missing"
+    @notice_issues << "#{File.join(path, 'target', "#{module_name}-#{REVISION_NUMBER}.jar")}: packaged JAR is missing"
   end
 
   File.read(File.join(path, 'pom.xml')).scan(%r{<module>(.*)</module>}).map(&:first).each do |submodule|

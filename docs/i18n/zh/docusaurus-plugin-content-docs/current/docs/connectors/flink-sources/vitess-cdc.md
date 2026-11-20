@@ -46,9 +46,9 @@ Vitess CDC 连接器允许从 Vitess 集群读取增量数据。该连接器目�
 
 ### SQL Client JAR
 
-下载 [flink-sql-connector-vitess-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-vitess-cdc) 到 `<FLINK_HOME>/lib/` 目录下。
+下载 [flink-sql-connector-vitess-cdc-flink-1.20](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-vitess-cdc-flink-1.20) 到 `<FLINK_HOME>/lib/` 目录下。
 
-**注意：** 参考 [flink-sql-connector-vitess-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-vitess-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
+**注意：** 参考 [flink-sql-connector-vitess-cdc-flink-1.20](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-vitess-cdc-flink-1.20) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
 设置 Vitess 服务器
 ----------------

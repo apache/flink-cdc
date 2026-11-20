@@ -34,9 +34,8 @@ import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseColumn;
 import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseTable;
 import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseContainer;
 import org.apache.flink.cdc.connectors.oceanbase.utils.OceanBaseTestMySQLCatalog;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
-import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.ImmutableMap;
+import org.apache.flink.cdc.shaded.guava.com.google.common.collect.Lists;
 
 import com.oceanbase.connector.flink.OceanBaseConnectorOptions;
 import org.junit.jupiter.api.AfterAll;

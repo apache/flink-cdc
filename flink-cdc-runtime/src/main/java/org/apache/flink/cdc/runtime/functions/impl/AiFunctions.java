@@ -26,8 +26,7 @@ import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.types.variant.BinaryVariant;
 import org.apache.flink.cdc.common.types.variant.BinaryVariantInternalBuilder;
 import org.apache.flink.cdc.runtime.ai.AiTextFunctionDef;
-
-import org.apache.flink.shaded.guava31.com.google.common.primitives.Floats;
+import org.apache.flink.cdc.shaded.guava.com.google.common.primitives.Floats;
 
 import java.io.IOException;
 import java.util.List;

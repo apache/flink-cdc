@@ -113,6 +113,7 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
     protected final UniqueDatabase mysqlInventoryDatabase =
             new UniqueDatabase(MYSQL, "mysql_inventory", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
     protected Path jdbcJar;
+    protected Path jdbcDialectJar;
 
     private GenericContainer<?> jobManager;
     private GenericContainer<?> taskManager;
@@ -130,6 +131,7 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
     public void before() {
         mysqlInventoryDatabase.createAndInitialize();
         jdbcJar = TestUtils.getResource(getJdbcConnectorResourceName());
+        jdbcDialectJar = TestUtils.getResource(getJdbcDialectResourceName());
 
         String flinkProperties = getFlinkProperties(flinkVersion);
 
@@ -316,6 +318,25 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
 
     protected String getJdbcConnectorResourceName() {
         return String.format("jdbc-connector_%s.jar", flinkVersion);
+    }
+
+    protected String getJdbcDialectResourceName() {
+        return String.format("jdbc-connector-mysql-dialect_%s.jar", flinkVersion);
+    }
+
+    /**
+     * Assembles the jar list for a SQL job submission: the given jars plus the active generation's
+     * jdbc connector jar. On the Flink 2.x line the split-out MySQL dialect jar is added too; the
+     * 1.20 connector is all-in-one and must not be paired with the dialect jar (same-FQCN classes).
+     */
+    protected Path[] withJdbcJars(Path... jars) {
+        List<Path> result = new ArrayList<>();
+        result.add(jdbcJar);
+        if (flinkVersion.startsWith("2.")) {
+            result.add(jdbcDialectJar);
+        }
+        result.addAll(Arrays.asList(jars));
+        return result.toArray(new Path[0]);
     }
 
     private static Version parseVersion(String version) {
