@@ -348,6 +348,6 @@ public class OracleAlterTableParserListener extends BaseParserListener {
 
     private org.apache.flink.cdc.common.event.TableId toCdcTableId(TableId dbzTableId) {
         return org.apache.flink.cdc.common.event.TableId.tableId(
-                dbzTableId.schema(), dbzTableId.table());
+                dbzTableId.catalog(), dbzTableId.schema(), dbzTableId.table());
     }
 }
