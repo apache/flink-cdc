@@ -41,8 +41,14 @@ import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventType;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
+import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
+import io.debezium.relational.ddl.DdlParserListener.TableEvent;
+import io.debezium.relational.history.HistoryRecord;
+import io.debezium.text.MultipleParsingExceptions;
+import io.debezium.text.ParsingException;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
@@ -50,6 +56,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -325,7 +332,47 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         } else if (RecordUtils.isSchemaChangeEvent(sourceRecord)) {
             if (RecordUtils.isTableChangeRecord(sourceRecord)) {
                 TableId tableId = RecordUtils.getTableId(sourceRecord);
-                return capturedTableFilter.test(tableId);
+                boolean isCaptured = capturedTableFilter.test(tableId);
+                if (tableId.table().contains(",")) {
+                    // SourceInfo may aggregate table names. Parse the DDL instead of splitting
+                    // names, since a quoted table name can itself contain commas.
+                    try {
+                        HistoryRecord historyRecord = RecordUtils.getHistoryRecord(sourceRecord);
+                        MySqlAntlrDdlParser parser = new MySqlAntlrDdlParser();
+                        parser.setCurrentDatabase(
+                                historyRecord
+                                        .document()
+                                        .getString(HistoryRecord.Fields.DATABASE_NAME));
+                        parser.parse(
+                                historyRecord
+                                        .document()
+                                        .getString(HistoryRecord.Fields.DDL_STATEMENTS),
+                                new Tables());
+                        List<TableId> parsedTableIds = new ArrayList<>();
+                        parser.getDdlChanges()
+                                .getEventsByDatabase(
+                                        (database, events) ->
+                                                events.stream()
+                                                        .filter(
+                                                                event ->
+                                                                        event instanceof TableEvent)
+                                                        .map(
+                                                                event ->
+                                                                        ((TableEvent) event)
+                                                                                .tableId())
+                                                        .forEach(parsedTableIds::add));
+                        if (!parsedTableIds.isEmpty()) {
+                            return parsedTableIds.stream().anyMatch(capturedTableFilter);
+                        }
+                        // ALTER and RENAME may need existing schemas to emit table events.
+                    } catch (IOException e) {
+                        throw new FlinkRuntimeException("Failed to parse schema change record", e);
+                    } catch (ParsingException | MultipleParsingExceptions e) {
+                        // Without reliable table identities, retain the original filter semantics.
+                        return isCaptured;
+                    }
+                }
+                return isCaptured;
             } else {
                 // Not related to changes in table structure, like `CREATE/DROP DATABASE`, skip it
                 return false;
