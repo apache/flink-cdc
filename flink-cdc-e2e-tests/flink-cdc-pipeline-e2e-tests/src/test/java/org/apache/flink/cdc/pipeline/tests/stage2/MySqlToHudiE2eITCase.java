@@ -457,7 +457,6 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
         try {
             JobResult jobResult =
                     getRestClusterClient().requestJobResult(jobId).get(30, TimeUnit.SECONDS);
-            message.append(", applicationStatus=").append(jobResult.getApplicationStatus());
             jobResult
                     .getSerializedThrowable()
                     .ifPresent(

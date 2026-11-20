@@ -58,6 +58,7 @@ class SqlServerConnectorITCase extends SqlServerTestBase {
 
     void setup(boolean parallelismSnapshot) {
         TestValuesTableFactory.clearAllData();
+        tEnv.getConfig().set("table.exec.sink.require-on-conflict", "false");
 
         if (parallelismSnapshot) {
             env.setParallelism(4);
