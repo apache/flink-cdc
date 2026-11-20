@@ -26,15 +26,27 @@ import com.starrocks.connector.flink.catalog.StarRocksColumn;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 /** An enriched {@code StarRocksCatalog} with more schema evolution abilities. */
 public class StarRocksEnrichedCatalog extends StarRocksCatalog {
     public StarRocksEnrichedCatalog(String jdbcUrl, String username, String password) {
         super(jdbcUrl, username, password);
+        this.jdbcUrl = jdbcUrl;
+        this.username = username;
+        this.password = password;
     }
+
+    private final String jdbcUrl;
+    private final String username;
+    private final String password;
 
     private static final Logger LOG = LoggerFactory.getLogger(StarRocksEnrichedCatalog.class);
 
@@ -159,15 +171,11 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
     }
 
     private void executeUpdateStatement(String sql) throws StarRocksCatalogException {
-        try {
-            Method m =
-                    getClass()
-                            .getSuperclass()
-                            .getDeclaredMethod("executeUpdateStatement", String.class);
-            m.setAccessible(true);
-            m.invoke(this, sql);
-        } catch (InvocationTargetException | NoSuchMethodException | IllegalAccessException e) {
-            throw new RuntimeException(e);
+        try (Connection connection = DriverManager.getConnection(jdbcUrl, username, password);
+                Statement statement = connection.createStatement()) {
+            statement.executeUpdate(sql);
+        } catch (SQLException e) {
+            throw new StarRocksCatalogException("Failed to execute SQL statement", e);
         }
     }
 
@@ -218,5 +226,164 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
             default:
                 return dataType;
         }
+    }
+
+    public void alterColumnPosition(
+            String databaseName,
+            String tableName,
+            StarRocksColumn column,
+            boolean isKey,
+            String precedingColumn,
+            long timeoutSecond) {
+        checkTableArgument(databaseName, tableName);
+        // The upstream catalog does not load COLUMN_DEFAULT. Preserve it when restating the column.
+        StarRocksColumn completeColumn = loadColumnDefault(databaseName, tableName, column);
+        String sql =
+                buildAlterColumnPositionSql(
+                        databaseName, tableName, completeColumn, isKey, precedingColumn);
+        String previousJobId = getLastColumnAlterJobId(databaseName, tableName);
+        executeUpdateStatement(sql);
+        waitForColumnReorder(databaseName, tableName, previousJobId, timeoutSecond);
+    }
+
+    private void waitForColumnReorder(
+            String databaseName, String tableName, String previousJobId, long timeoutSecond) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSecond);
+        String sql =
+                "SHOW ALTER TABLE COLUMN FROM "
+                        + quoteIdentifier(databaseName)
+                        + " WHERE TableName = '"
+                        + escapeLiteral(tableName)
+                        + "' ORDER BY JobId DESC LIMIT 1";
+        while (System.nanoTime() < deadline) {
+            try (Connection connection = DriverManager.getConnection(jdbcUrl, username, password);
+                    Statement statement = connection.createStatement();
+                    ResultSet result = statement.executeQuery(sql)) {
+                if (result.next() && !result.getString("JobId").equals(previousJobId)) {
+                    String state = result.getString("State");
+                    if ("FINISHED".equalsIgnoreCase(state)) {
+                        return;
+                    }
+                    if ("CANCELLED".equalsIgnoreCase(state)) {
+                        throw new StarRocksCatalogException(
+                                "Column reorder was cancelled: " + result.getString("Msg"));
+                    }
+                }
+            } catch (SQLException e) {
+                throw new StarRocksCatalogException("Failed to query column reorder state", e);
+            }
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new StarRocksCatalogException(
+                        "Interrupted while waiting for column reorder", e);
+            }
+        }
+        throw new StarRocksCatalogException("Column reorder did not finish before timeout");
+    }
+
+    private static String quoteIdentifier(String identifier) {
+        return "`" + identifier.replace("`", "``") + "`";
+    }
+
+    private static String escapeLiteral(String value) {
+        return value.replace("\\", "\\\\").replace("'", "''");
+    }
+
+    private static String formatDefaultValue(String value, String dataType) {
+        if ("DATETIME".equalsIgnoreCase(dataType)
+                && ("CURRENT_TIMESTAMP".equalsIgnoreCase(value)
+                        || "CURRENT_TIMESTAMP()".equalsIgnoreCase(value))) {
+            return value;
+        }
+        return "'" + escapeLiteral(value) + "'";
+    }
+
+    private String getLastColumnAlterJobId(String databaseName, String tableName) {
+        String sql =
+                "SHOW ALTER TABLE COLUMN FROM "
+                        + quoteIdentifier(databaseName)
+                        + " WHERE TableName = '"
+                        + escapeLiteral(tableName)
+                        + "' ORDER BY JobId DESC LIMIT 1";
+        try (Connection connection = DriverManager.getConnection(jdbcUrl, username, password);
+                Statement statement = connection.createStatement();
+                ResultSet result = statement.executeQuery(sql)) {
+            return result.next() ? result.getString("JobId") : null;
+        } catch (SQLException e) {
+            throw new StarRocksCatalogException("Failed to query last column alter job", e);
+        }
+    }
+
+    private StarRocksColumn loadColumnDefault(
+            String databaseName, String tableName, StarRocksColumn column) {
+        String sql =
+                "SELECT COLUMN_DEFAULT FROM information_schema.COLUMNS "
+                        + "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?";
+        try (Connection connection = DriverManager.getConnection(jdbcUrl, username, password);
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, databaseName);
+            statement.setString(2, tableName);
+            statement.setString(3, column.getColumnName());
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) {
+                    throw new StarRocksCatalogException("Column to reorder no longer exists");
+                }
+                return new StarRocksColumn.Builder()
+                        .setColumnName(column.getColumnName())
+                        .setOrdinalPosition(column.getOrdinalPosition())
+                        .setDataType(column.getDataType())
+                        .setColumnSize(column.getColumnSize().orElse(null))
+                        .setDecimalDigits(column.getDecimalDigits().orElse(null))
+                        .setNullable(column.isNullable())
+                        .setColumnComment(column.getColumnComment().orElse(null))
+                        .setDefaultValue(result.getString("COLUMN_DEFAULT"))
+                        .build();
+            }
+        } catch (SQLException e) {
+            throw new StarRocksCatalogException(
+                    "Failed to load column default before reordering", e);
+        }
+    }
+
+    String buildAlterColumnPositionSql(
+            String databaseName,
+            String tableName,
+            StarRocksColumn column,
+            boolean isKey,
+            String precedingColumn) {
+        String type =
+                getFullColumnType(
+                        column.getDataType(), column.getColumnSize(), column.getDecimalDigits());
+        StringBuilder definition = new StringBuilder(type);
+        if (isKey) {
+            definition.append(" KEY");
+        }
+        definition.append(column.isNullable() ? " NULL" : " NOT NULL");
+        column.getDefaultValue()
+                .ifPresent(
+                        value ->
+                                definition
+                                        .append(" DEFAULT ")
+                                        .append(formatDefaultValue(value, column.getDataType())));
+        column.getColumnComment()
+                .ifPresent(
+                        comment ->
+                                definition
+                                        .append(" COMMENT '")
+                                        .append(escapeLiteral(comment))
+                                        .append("'"));
+        return "ALTER TABLE "
+                + quoteIdentifier(databaseName)
+                + "."
+                + quoteIdentifier(tableName)
+                + " MODIFY COLUMN "
+                + quoteIdentifier(column.getColumnName())
+                + " "
+                + definition
+                + (precedingColumn == null
+                        ? " FIRST"
+                        : " AFTER " + quoteIdentifier(precedingColumn));
     }
 }

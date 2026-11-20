@@ -216,6 +216,8 @@ public class SchemaDerivator {
             case RENAME_COLUMN:
                 return lenientizeRenameColumnEvent(
                         oldSchema, (RenameColumnEvent) schemaChangeEvent, tableId);
+            case REORDER_COLUMN:
+                return Stream.empty();
             default:
                 return Stream.of(schemaChangeEvent);
         }

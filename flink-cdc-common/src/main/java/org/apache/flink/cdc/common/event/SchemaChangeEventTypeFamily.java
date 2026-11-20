@@ -26,6 +26,7 @@ import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TAB
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.RENAME_COLUMN;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.REORDER_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.TRUNCATE_TABLE;
 
 /**
@@ -45,12 +46,14 @@ public class SchemaChangeEventTypeFamily {
 
     public static final SchemaChangeEventType[] RENAME = {RENAME_COLUMN};
 
+    public static final SchemaChangeEventType[] REORDER = {REORDER_COLUMN};
+
     public static final SchemaChangeEventType[] TABLE = {
         CREATE_TABLE, DROP_TABLE, TRUNCATE_TABLE, ALTER_TABLE_COMMENT
     };
 
     public static final SchemaChangeEventType[] COLUMN = {
-        ADD_COLUMN, ALTER_COLUMN_TYPE, DROP_COLUMN, RENAME_COLUMN
+        ADD_COLUMN, ALTER_COLUMN_TYPE, DROP_COLUMN, RENAME_COLUMN, REORDER_COLUMN
     };
 
     public static final SchemaChangeEventType[] ALL = {
@@ -61,7 +64,8 @@ public class SchemaChangeEventTypeFamily {
         DROP_TABLE,
         RENAME_COLUMN,
         TRUNCATE_TABLE,
-        ALTER_TABLE_COMMENT
+        ALTER_TABLE_COMMENT,
+        REORDER_COLUMN
     };
 
     public static final SchemaChangeEventType[] NONE = {};
@@ -78,6 +82,8 @@ public class SchemaChangeEventTypeFamily {
                 return DROP;
             case "rename":
                 return RENAME;
+            case "reorder":
+                return REORDER;
             case "table":
                 return TABLE;
             case "column":

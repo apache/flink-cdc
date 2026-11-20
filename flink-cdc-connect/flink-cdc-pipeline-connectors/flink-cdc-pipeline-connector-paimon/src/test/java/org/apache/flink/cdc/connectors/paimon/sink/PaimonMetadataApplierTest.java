@@ -19,9 +19,12 @@ package org.apache.flink.cdc.connectors.paimon.sink;
 
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.ColumnPosition;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.pipeline.ExistingTableSchemaExpansionMode;
@@ -58,6 +61,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 /** Tests for {@link PaimonMetadataApplier}. */
 class PaimonMetadataApplierTest {
@@ -83,6 +87,96 @@ class PaimonMetadataApplierTest {
                                     .getContextClassLoader()
                                     .getResource("hive-conf-dir"))
                     .getPath();
+
+    @Test
+    void testReorderColumnSupportsAllPositionsAndPreservesFieldDefinitions()
+            throws Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    Catalog.TableNotExistException {
+        initialize("filesystem");
+        PaimonMetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
+        TableId tableId = TableId.parse("test.reorder_all_positions");
+        metadataApplier.applySchemaChange(
+                new CreateTableEvent(
+                        tableId,
+                        Schema.newBuilder()
+                                .physicalColumn(
+                                        "a", org.apache.flink.cdc.common.types.DataTypes.INT())
+                                .physicalColumn(
+                                        "b", org.apache.flink.cdc.common.types.DataTypes.STRING())
+                                .physicalColumn(
+                                        "c", org.apache.flink.cdc.common.types.DataTypes.BIGINT())
+                                .physicalColumn(
+                                        "d", org.apache.flink.cdc.common.types.DataTypes.BOOLEAN())
+                                .physicalColumn(
+                                        "e", org.apache.flink.cdc.common.types.DataTypes.DOUBLE())
+                                .build()));
+
+        metadataApplier.applySchemaChange(
+                new ReorderColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                new ReorderColumnEvent.ColumnMove("c", ColumnPosition.FIRST, null),
+                                new ReorderColumnEvent.ColumnMove("a", ColumnPosition.AFTER, "d"),
+                                new ReorderColumnEvent.ColumnMove("e", ColumnPosition.BEFORE, "d"),
+                                new ReorderColumnEvent.ColumnMove(
+                                        "b", ColumnPosition.LAST, null))));
+
+        assertThat(catalog.getTable(Identifier.fromString(tableId.identifier())).rowType())
+                .isEqualTo(
+                        new RowType(
+                                Arrays.asList(
+                                        new DataField(2, "c", DataTypes.BIGINT()),
+                                        new DataField(4, "e", DataTypes.DOUBLE()),
+                                        new DataField(3, "d", DataTypes.BOOLEAN()),
+                                        new DataField(0, "a", DataTypes.INT()),
+                                        new DataField(1, "b", DataTypes.STRING()))));
+        assertThat(metadataApplier.getSupportedSchemaEvolutionTypes())
+                .contains(SchemaChangeEventType.REORDER_COLUMN);
+    }
+
+    @Test
+    void testReorderColumnOmitsSequentialNoOpsAndIsIdempotent()
+            throws Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    Catalog.TableNotExistException {
+        initialize("filesystem");
+        MetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
+        TableId tableId = TableId.parse("test.reorder_sequential_no_op");
+        metadataApplier.applySchemaChange(
+                new CreateTableEvent(
+                        tableId,
+                        Schema.newBuilder()
+                                .physicalColumn(
+                                        "a", org.apache.flink.cdc.common.types.DataTypes.INT())
+                                .physicalColumn(
+                                        "b", org.apache.flink.cdc.common.types.DataTypes.STRING())
+                                .physicalColumn(
+                                        "c", org.apache.flink.cdc.common.types.DataTypes.BIGINT())
+                                .build()));
+        ReorderColumnEvent reorderEvent =
+                new ReorderColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                new ReorderColumnEvent.ColumnMove("c", ColumnPosition.FIRST, null),
+                                new ReorderColumnEvent.ColumnMove("b", ColumnPosition.LAST, null)));
+
+        metadataApplier.applySchemaChange(reorderEvent);
+        RowType reorderedRowType =
+                catalog.getTable(Identifier.fromString(tableId.identifier())).rowType();
+        assertThat(reorderedRowType)
+                .isEqualTo(
+                        new RowType(
+                                Arrays.asList(
+                                        new DataField(2, "c", DataTypes.BIGINT()),
+                                        new DataField(0, "a", DataTypes.INT()),
+                                        new DataField(1, "b", DataTypes.STRING()))));
+
+        assertThatCode(() -> metadataApplier.applySchemaChange(reorderEvent))
+                .doesNotThrowAnyException();
+        assertThat(catalog.getTable(Identifier.fromString(tableId.identifier())).rowType())
+                .isEqualTo(reorderedRowType);
+    }
 
     private void initialize(String metastore)
             throws Catalog.DatabaseNotEmptyException, Catalog.DatabaseNotExistException {

@@ -1272,4 +1272,13 @@ class SchemaMergingUtilsTest {
     private static byte[] binOf(String str) {
         return str.getBytes();
     }
+
+    @Test
+    void testDeduceSchemaChangeIgnoresColumnOrder() {
+        Schema evolvedSchema = of("id", INT, "name", VARCHAR(17), "age", BIGINT);
+        Schema reorderedSchema = of("age", BIGINT, "id", INT, "name", VARCHAR(17));
+
+        Assertions.assertThat(getSchemaDifference(TABLE_ID, evolvedSchema, reorderedSchema))
+                .isEmpty();
+    }
 }

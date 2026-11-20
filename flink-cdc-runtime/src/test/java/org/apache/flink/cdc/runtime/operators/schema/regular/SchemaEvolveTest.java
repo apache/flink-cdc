@@ -27,6 +27,7 @@ import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
@@ -56,6 +57,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
@@ -349,6 +351,475 @@ class SchemaEvolveTest {
 
             harness.clearOutputRecords();
         }
+        harness.close();
+    }
+
+    @Test
+    void testEvolveReorderColumnSchema() throws Exception {
+        TableId tableId = CUSTOMERS_TABLE_ID;
+        Schema schemaV1 =
+                Schema.newBuilder()
+                        .physicalColumn("id", INT)
+                        .physicalColumn("name", STRING)
+                        .physicalColumn("age", SMALLINT)
+                        .primaryKey("id")
+                        .build();
+        Schema schemaV2 =
+                Schema.newBuilder()
+                        .physicalColumn("id", INT)
+                        .physicalColumn("name", STRING)
+                        .physicalColumn("age", SMALLINT)
+                        .physicalColumn("score", BIGINT)
+                        .physicalColumn("height", DOUBLE)
+                        .primaryKey("id")
+                        .build();
+        Schema reorderedSchema =
+                Schema.newBuilder()
+                        .physicalColumn("height", DOUBLE)
+                        .physicalColumn("id", INT)
+                        .physicalColumn("age", SMALLINT)
+                        .physicalColumn("score", BIGINT)
+                        .physicalColumn("name", STRING)
+                        .primaryKey("id")
+                        .build();
+
+        SchemaChangeBehavior behavior = SchemaChangeBehavior.EVOLVE;
+        SchemaOperator schemaOperator =
+                new SchemaOperator(
+                        new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30), behavior);
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndBehavior(
+                        schemaOperator, 17, Duration.ofSeconds(3), behavior);
+        harness.open();
+
+        processEvent(
+                schemaOperator,
+                Arrays.asList(
+                        new CreateTableEvent(tableId, schemaV1),
+                        new AddColumnEvent(
+                                tableId,
+                                Arrays.asList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("score", BIGINT)),
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("height", DOUBLE)))),
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                buildRecord(
+                                        INT,
+                                        1,
+                                        STRING,
+                                        "Alice",
+                                        SMALLINT,
+                                        (short) 17,
+                                        BIGINT,
+                                        99L,
+                                        DOUBLE,
+                                        170.5))));
+        harness.clearOutputRecords();
+
+        List<Event> reorderEvents =
+                Arrays.asList(
+                        new ReorderColumnEvent(
+                                tableId,
+                                Arrays.asList(
+                                        ReorderColumnEvent.ColumnMove.first("height"),
+                                        ReorderColumnEvent.ColumnMove.last("name"))),
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                buildRecord(
+                                        DOUBLE,
+                                        181.25,
+                                        INT,
+                                        2,
+                                        SMALLINT,
+                                        (short) 18,
+                                        BIGINT,
+                                        101L,
+                                        STRING,
+                                        "Bob")));
+
+        processEvent(schemaOperator, reorderEvents);
+
+        Assertions.assertThat(
+                        harness.getOutputRecords().stream()
+                                .map(StreamRecord::getValue)
+                                .collect(Collectors.toList()))
+                .isEqualTo(
+                        ListUtils.union(
+                                Collections.singletonList(
+                                        new FlushEvent(
+                                                0,
+                                                Collections.singletonList(tableId),
+                                                SchemaChangeEventType.REORDER_COLUMN)),
+                                reorderEvents));
+        Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(reorderedSchema);
+        Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(reorderedSchema);
+
+        harness.close();
+    }
+
+    @Test
+    void testUnsupportedReorderColumnFailsEvolve() throws Exception {
+        TableId tableId = CUSTOMERS_TABLE_ID;
+        Schema initialSchema = reorderInitialSchema();
+        ReorderColumnEvent reorderColumnEvent = reorderAgeFirst(tableId);
+        SchemaChangeBehavior behavior = SchemaChangeBehavior.EVOLVE;
+        SchemaOperator schemaOperator =
+                new SchemaOperator(
+                        new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30), behavior);
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndFineGrainedBehaviorWithError(
+                        schemaOperator,
+                        17,
+                        Duration.ZERO,
+                        behavior,
+                        Arrays.stream(SchemaChangeEventTypeFamily.ALL).collect(Collectors.toSet()),
+                        Collections.singleton(SchemaChangeEventType.REORDER_COLUMN));
+        harness.open();
+
+        processEvent(
+                schemaOperator,
+                Collections.singletonList(new CreateTableEvent(tableId, initialSchema)));
+        harness.clearOutputRecords();
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                processEvent(
+                                        schemaOperator,
+                                        Collections.singletonList(reorderColumnEvent)))
+                .isExactlyInstanceOf(IllegalStateException.class)
+                .cause()
+                .isExactlyInstanceOf(ExecutionException.class)
+                .cause()
+                .isExactlyInstanceOf(FlinkRuntimeException.class)
+                .hasMessage("Failed to apply schema change event.")
+                .cause()
+                .isExactlyInstanceOf(UnsupportedSchemaChangeEventException.class)
+                .satisfies(
+                        error -> {
+                            SchemaEvolveException failure = (SchemaEvolveException) error;
+                            Assertions.assertThat(failure.getApplyingEvent())
+                                    .isEqualTo(reorderColumnEvent);
+                            Assertions.assertThat(failure.getExceptionMessage())
+                                    .isEqualTo("Sink doesn't support such schema change event.");
+                        });
+
+        Assertions.assertThat(harness.getAttemptedSchemaChangeEvents())
+                .contains(reorderColumnEvent);
+        Assertions.assertThat(
+                        harness.getOutputRecords().stream()
+                                .map(StreamRecord::getValue)
+                                .collect(Collectors.toList()))
+                .containsExactly(
+                        new FlushEvent(
+                                0,
+                                Collections.singletonList(tableId),
+                                SchemaChangeEventType.REORDER_COLUMN));
+        Assertions.assertThat(harness.isJobFailed()).isTrue();
+        Assertions.assertThat(harness.getJobFailureCause())
+                .cause()
+                .isExactlyInstanceOf(UnsupportedSchemaChangeEventException.class)
+                .satisfies(
+                        error -> {
+                            SchemaEvolveException failure = (SchemaEvolveException) error;
+                            Assertions.assertThat(failure.getApplyingEvent())
+                                    .isEqualTo(reorderColumnEvent);
+                            Assertions.assertThat(failure.getExceptionMessage())
+                                    .isEqualTo("Sink doesn't support such schema change event.");
+                        });
+        harness.close();
+    }
+
+    @Test
+    void testExplicitlyExcludedReorderColumnIsNotApplied() throws Exception {
+        TableId tableId = CUSTOMERS_TABLE_ID;
+        Schema initialSchema = reorderInitialSchema();
+        Schema reorderedSchema = ageFirstSchema();
+        ReorderColumnEvent reorderColumnEvent = reorderAgeFirst(tableId);
+        SchemaChangeBehavior behavior = SchemaChangeBehavior.LENIENT;
+        SchemaOperator schemaOperator =
+                new SchemaOperator(
+                        new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30), behavior);
+        Set<SchemaChangeEventType> acceptedEventTypes =
+                Arrays.stream(SchemaChangeEventTypeFamily.ALL)
+                        .filter(
+                                type ->
+                                        type != SchemaChangeEventType.REORDER_COLUMN
+                                                && type != SchemaChangeEventType.DROP_TABLE
+                                                && type != SchemaChangeEventType.TRUNCATE_TABLE)
+                        .collect(Collectors.toSet());
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndFineGrainedBehaviorWithError(
+                        schemaOperator,
+                        17,
+                        Duration.ZERO,
+                        behavior,
+                        acceptedEventTypes,
+                        Collections.singleton(SchemaChangeEventType.REORDER_COLUMN));
+        harness.open();
+
+        processEvent(
+                schemaOperator,
+                Collections.singletonList(new CreateTableEvent(tableId, initialSchema)));
+        harness.clearOutputRecords();
+        processEvent(
+                schemaOperator, Arrays.asList(reorderColumnEvent, insertInAgeFirstOrder(tableId)));
+
+        Assertions.assertThat(harness.getAttemptedSchemaChangeEvents())
+                .doesNotContain(reorderColumnEvent);
+        Assertions.assertThat(harness.isJobFailed()).isFalse();
+        Assertions.assertThat(
+                        harness.getOutputRecords().stream()
+                                .map(StreamRecord::getValue)
+                                .collect(Collectors.toList()))
+                .containsExactly(
+                        new FlushEvent(
+                                0,
+                                Collections.singletonList(tableId),
+                                SchemaChangeEventType.REORDER_COLUMN),
+                        insertInInitialOrder(tableId));
+        Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(reorderedSchema);
+        Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(initialSchema);
+        harness.close();
+    }
+
+    @Test
+    void testLenientIgnoresReorderColumnAndKeepsDataAligned() throws Exception {
+        TableId tableId = CUSTOMERS_TABLE_ID;
+        Schema initialSchema = reorderInitialSchema();
+        Schema reorderedSchema = ageFirstSchema();
+        ReorderColumnEvent reorderColumnEvent = reorderAgeFirst(tableId);
+        SchemaChangeBehavior behavior = SchemaChangeBehavior.LENIENT;
+        SchemaOperator schemaOperator =
+                new SchemaOperator(
+                        new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30), behavior);
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndFineGrainedBehaviorWithError(
+                        schemaOperator,
+                        17,
+                        Duration.ZERO,
+                        behavior,
+                        Arrays.stream(SchemaChangeEventTypeFamily.ALL).collect(Collectors.toSet()),
+                        Collections.singleton(SchemaChangeEventType.REORDER_COLUMN));
+        harness.open();
+
+        processEvent(
+                schemaOperator,
+                Collections.singletonList(new CreateTableEvent(tableId, initialSchema)));
+        harness.clearOutputRecords();
+        processEvent(
+                schemaOperator, Arrays.asList(reorderColumnEvent, insertInAgeFirstOrder(tableId)));
+
+        Assertions.assertThat(harness.getAttemptedSchemaChangeEvents())
+                .doesNotContain(reorderColumnEvent);
+        Assertions.assertThat(harness.isJobFailed()).isFalse();
+        Assertions.assertThat(
+                        harness.getOutputRecords().stream()
+                                .map(StreamRecord::getValue)
+                                .collect(Collectors.toList()))
+                .containsExactly(
+                        new FlushEvent(
+                                0,
+                                Collections.singletonList(tableId),
+                                SchemaChangeEventType.REORDER_COLUMN),
+                        insertInInitialOrder(tableId));
+        Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(reorderedSchema);
+        Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(initialSchema);
+        harness.close();
+    }
+
+    @Test
+    void testExcludedCompoundReorderWithUnchangedFinalOrderKeepsDataAligned() throws Exception {
+        TableId tableId = CUSTOMERS_TABLE_ID;
+        Schema initialSchema = reorderInitialSchema();
+        ReorderColumnEvent moveNameFirst =
+                new ReorderColumnEvent(
+                        tableId,
+                        Collections.singletonList(ReorderColumnEvent.ColumnMove.first("name")));
+        ReorderColumnEvent moveIdFirst =
+                new ReorderColumnEvent(
+                        tableId,
+                        Collections.singletonList(ReorderColumnEvent.ColumnMove.first("id")));
+        SchemaChangeBehavior behavior = SchemaChangeBehavior.LENIENT;
+        SchemaOperator schemaOperator =
+                new SchemaOperator(
+                        new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30), behavior);
+        Set<SchemaChangeEventType> acceptedEventTypes =
+                Arrays.stream(SchemaChangeEventTypeFamily.ALL)
+                        .filter(type -> type != SchemaChangeEventType.REORDER_COLUMN)
+                        .collect(Collectors.toSet());
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndFineGrainedBehaviorWithError(
+                        schemaOperator,
+                        17,
+                        Duration.ZERO,
+                        behavior,
+                        acceptedEventTypes,
+                        Collections.singleton(SchemaChangeEventType.REORDER_COLUMN));
+        harness.open();
+
+        processEvent(
+                schemaOperator,
+                Collections.singletonList(new CreateTableEvent(tableId, initialSchema)));
+        harness.clearOutputRecords();
+        processEvent(
+                schemaOperator,
+                Arrays.asList(moveNameFirst, moveIdFirst, insertInInitialOrder(tableId)));
+
+        Assertions.assertThat(harness.getAttemptedSchemaChangeEvents())
+                .doesNotContain(moveNameFirst, moveIdFirst);
+        Assertions.assertThat(harness.isJobFailed()).isFalse();
+        Assertions.assertThat(
+                        harness.getOutputRecords().stream()
+                                .map(StreamRecord::getValue)
+                                .collect(Collectors.toList()))
+                .containsExactly(
+                        new FlushEvent(
+                                0,
+                                Collections.singletonList(tableId),
+                                SchemaChangeEventType.REORDER_COLUMN),
+                        new FlushEvent(
+                                0,
+                                Collections.singletonList(tableId),
+                                SchemaChangeEventType.REORDER_COLUMN),
+                        insertInInitialOrder(tableId));
+        Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(initialSchema);
+        Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(initialSchema);
+        harness.close();
+    }
+
+    @Test
+    void testExcludedReorderOfExcludedColumnsKeepsVisibleDataAligned() throws Exception {
+        TableId tableId = CUSTOMERS_TABLE_ID;
+        Schema initialSchema = reorderInitialSchema();
+        AddColumnEvent addHiddenX =
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                AddColumnEvent.first(Column.physicalColumn("hidden_x", INT))));
+        AddColumnEvent addHiddenY =
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                AddColumnEvent.first(Column.physicalColumn("hidden_y", INT))));
+        ReorderColumnEvent moveHiddenXAfterName =
+                new ReorderColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                ReorderColumnEvent.ColumnMove.after("hidden_x", "name")));
+        Schema sourceSchema =
+                Schema.newBuilder()
+                        .physicalColumn("hidden_y", INT)
+                        .physicalColumn("id", INT)
+                        .physicalColumn("name", STRING)
+                        .physicalColumn("hidden_x", INT)
+                        .physicalColumn("age", SMALLINT)
+                        .primaryKey("id")
+                        .build();
+        DataChangeEvent sourceInsert =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        buildRecord(INT, 20, INT, 2, STRING, "Bob", INT, 10, SMALLINT, (short) 18));
+        SchemaChangeBehavior behavior = SchemaChangeBehavior.LENIENT;
+        SchemaOperator schemaOperator =
+                new SchemaOperator(
+                        new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30), behavior);
+        Set<SchemaChangeEventType> acceptedEventTypes =
+                Arrays.stream(SchemaChangeEventTypeFamily.ALL)
+                        .filter(
+                                type ->
+                                        type != SchemaChangeEventType.ADD_COLUMN
+                                                && type != SchemaChangeEventType.REORDER_COLUMN)
+                        .collect(Collectors.toSet());
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndFineGrainedBehaviorWithError(
+                        schemaOperator,
+                        17,
+                        Duration.ZERO,
+                        behavior,
+                        acceptedEventTypes,
+                        Sets.newHashSet(
+                                SchemaChangeEventType.ADD_COLUMN,
+                                SchemaChangeEventType.REORDER_COLUMN));
+        harness.open();
+
+        processEvent(
+                schemaOperator,
+                Collections.singletonList(new CreateTableEvent(tableId, initialSchema)));
+        harness.clearOutputRecords();
+        processEvent(
+                schemaOperator,
+                Arrays.asList(addHiddenX, addHiddenY, moveHiddenXAfterName, sourceInsert));
+
+        Assertions.assertThat(harness.getAttemptedSchemaChangeEvents())
+                .doesNotContain(addHiddenX, addHiddenY, moveHiddenXAfterName);
+        Assertions.assertThat(harness.isJobFailed()).isFalse();
+        Assertions.assertThat(
+                        harness.getOutputRecords().stream()
+                                .map(StreamRecord::getValue)
+                                .collect(Collectors.toList()))
+                .containsExactly(
+                        new FlushEvent(
+                                0,
+                                Collections.singletonList(tableId),
+                                SchemaChangeEventType.ADD_COLUMN),
+                        new FlushEvent(
+                                0,
+                                Collections.singletonList(tableId),
+                                SchemaChangeEventType.ADD_COLUMN),
+                        new FlushEvent(
+                                0,
+                                Collections.singletonList(tableId),
+                                SchemaChangeEventType.REORDER_COLUMN),
+                        insertInInitialOrder(tableId));
+        Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(sourceSchema);
+        Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(initialSchema);
+        harness.close();
+    }
+
+    @Test
+    void testTryEvolveContinuesAfterUnsupportedReorderColumn() throws Exception {
+        TableId tableId = CUSTOMERS_TABLE_ID;
+        Schema initialSchema = reorderInitialSchema();
+        Schema reorderedSchema = ageFirstSchema();
+        ReorderColumnEvent reorderColumnEvent = reorderAgeFirst(tableId);
+        SchemaChangeBehavior behavior = SchemaChangeBehavior.TRY_EVOLVE;
+        SchemaOperator schemaOperator =
+                new SchemaOperator(
+                        new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30), behavior);
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndFineGrainedBehaviorWithError(
+                        schemaOperator,
+                        17,
+                        Duration.ZERO,
+                        behavior,
+                        Arrays.stream(SchemaChangeEventTypeFamily.ALL).collect(Collectors.toSet()),
+                        Collections.singleton(SchemaChangeEventType.REORDER_COLUMN));
+        harness.open();
+
+        processEvent(
+                schemaOperator,
+                Collections.singletonList(new CreateTableEvent(tableId, initialSchema)));
+        harness.clearOutputRecords();
+        processEvent(
+                schemaOperator, Arrays.asList(reorderColumnEvent, insertInAgeFirstOrder(tableId)));
+
+        Assertions.assertThat(harness.getAttemptedSchemaChangeEvents())
+                .contains(reorderColumnEvent);
+        Assertions.assertThat(harness.isJobFailed()).isFalse();
+        Assertions.assertThat(
+                        harness.getOutputRecords().stream()
+                                .map(StreamRecord::getValue)
+                                .collect(Collectors.toList()))
+                .containsExactly(
+                        new FlushEvent(
+                                0,
+                                Collections.singletonList(tableId),
+                                SchemaChangeEventType.REORDER_COLUMN),
+                        insertInInitialOrder(tableId));
+        Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(reorderedSchema);
+        Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(initialSchema);
         harness.close();
     }
 
@@ -2569,6 +3040,39 @@ class SchemaEvolveTest {
 
             harness.clearOutputRecords();
         }
+    }
+
+    private Schema reorderInitialSchema() {
+        return Schema.newBuilder()
+                .physicalColumn("id", INT)
+                .physicalColumn("name", STRING)
+                .physicalColumn("age", SMALLINT)
+                .primaryKey("id")
+                .build();
+    }
+
+    private Schema ageFirstSchema() {
+        return Schema.newBuilder()
+                .physicalColumn("age", SMALLINT)
+                .physicalColumn("id", INT)
+                .physicalColumn("name", STRING)
+                .primaryKey("id")
+                .build();
+    }
+
+    private ReorderColumnEvent reorderAgeFirst(TableId tableId) {
+        return new ReorderColumnEvent(
+                tableId, Collections.singletonList(ReorderColumnEvent.ColumnMove.first("age")));
+    }
+
+    private DataChangeEvent insertInAgeFirstOrder(TableId tableId) {
+        return DataChangeEvent.insertEvent(
+                tableId, buildRecord(SMALLINT, (short) 18, INT, 2, STRING, "Bob"));
+    }
+
+    private DataChangeEvent insertInInitialOrder(TableId tableId) {
+        return DataChangeEvent.insertEvent(
+                tableId, buildRecord(INT, 2, STRING, "Bob", SMALLINT, (short) 18));
     }
 
     private RecordData buildRecord(final Object... args) {

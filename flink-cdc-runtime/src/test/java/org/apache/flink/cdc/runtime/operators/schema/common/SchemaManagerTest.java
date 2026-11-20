@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -208,6 +209,66 @@ class SchemaManagerTest {
                                     .physicalColumn("id", DataTypes.INT())
                                     .physicalColumn("new_name", DataTypes.STRING())
                                     .physicalColumn("phone", DataTypes.BIGINT())
+                                    .primaryKey("id")
+                                    .build());
+        }
+    }
+
+    @Test
+    void testHandlingReorderColumnEvent() {
+        {
+            SchemaManager schemaManager = new SchemaManager();
+            schemaManager.applyOriginalSchemaChange(
+                    new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA));
+            schemaManager.applyOriginalSchemaChange(
+                    new ReorderColumnEvent(
+                            CUSTOMERS,
+                            Arrays.asList(
+                                    ReorderColumnEvent.ColumnMove.first("phone"),
+                                    ReorderColumnEvent.ColumnMove.after("name", "id"))));
+            assertThat(schemaManager.getLatestOriginalSchema(CUSTOMERS))
+                    .contains(
+                            Schema.newBuilder()
+                                    .physicalColumn("phone", DataTypes.BIGINT())
+                                    .physicalColumn("id", DataTypes.INT())
+                                    .physicalColumn("name", DataTypes.STRING())
+                                    .primaryKey("id")
+                                    .build());
+            assertThat(schemaManager.getOriginalSchema(CUSTOMERS, 0)).isEqualTo(CUSTOMERS_SCHEMA);
+            assertThat(schemaManager.getOriginalSchema(CUSTOMERS, 1))
+                    .isEqualTo(
+                            Schema.newBuilder()
+                                    .physicalColumn("phone", DataTypes.BIGINT())
+                                    .physicalColumn("id", DataTypes.INT())
+                                    .physicalColumn("name", DataTypes.STRING())
+                                    .primaryKey("id")
+                                    .build());
+        }
+        {
+            SchemaManager schemaManager = new SchemaManager();
+            schemaManager.applyEvolvedSchemaChange(
+                    new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA));
+            schemaManager.applyEvolvedSchemaChange(
+                    new ReorderColumnEvent(
+                            CUSTOMERS,
+                            Arrays.asList(
+                                    ReorderColumnEvent.ColumnMove.first("phone"),
+                                    ReorderColumnEvent.ColumnMove.after("name", "id"))));
+            assertThat(schemaManager.getLatestEvolvedSchema(CUSTOMERS))
+                    .contains(
+                            Schema.newBuilder()
+                                    .physicalColumn("phone", DataTypes.BIGINT())
+                                    .physicalColumn("id", DataTypes.INT())
+                                    .physicalColumn("name", DataTypes.STRING())
+                                    .primaryKey("id")
+                                    .build());
+            assertThat(schemaManager.getEvolvedSchema(CUSTOMERS, 0)).isEqualTo(CUSTOMERS_SCHEMA);
+            assertThat(schemaManager.getEvolvedSchema(CUSTOMERS, 1))
+                    .isEqualTo(
+                            Schema.newBuilder()
+                                    .physicalColumn("phone", DataTypes.BIGINT())
+                                    .physicalColumn("id", DataTypes.INT())
+                                    .physicalColumn("name", DataTypes.STRING())
                                     .primaryKey("id")
                                     .build());
         }

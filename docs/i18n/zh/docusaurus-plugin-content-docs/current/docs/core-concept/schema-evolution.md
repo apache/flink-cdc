@@ -138,6 +138,7 @@ sink:
 | `drop.column`       | 删除某一列。       |
 | `drop.table`        | 删除某张表。       |
 | `rename.column`     | 修改某一列的名字。    |
+| `reorder.column`    | 调整已有列的顺序。 |
 | `truncate.table`    | 清除某张表中的全部数据。 |
 
 支持部分匹配。例如，将 `drop` 传入上面的选项相当于同时传入 `drop.column` 和 `drop.table`。
@@ -148,6 +149,12 @@ sink:
 
 ```yaml
 sink:
-  include.schema.changes: [create.table, column] # 匹配了 CreateTable、AddColumn、AlterColumnType、RenameColumn、和 DropColumn 事件
+  include.schema.changes: [create.table, column] # 匹配了 CreateTable、AddColumn、AlterColumnType、RenameColumn、ReorderColumn 和 DropColumn 事件
   exclude.schema.changes: [drop.column] # 排除了 DropColumn 事件
 ```
+
+### 列顺序变更
+
+MySQL Pipeline Source 会为带有 `FIRST` 或 `AFTER` 子句的 `MODIFY COLUMN`、`CHANGE COLUMN` 语句生成 `ReorderColumnEvent`。同一 DDL 中的重命名、类型变更和列移动按语句顺序处理。`reorder` 和 `column` 事件族均包含 `reorder.column`。
+
+Kafka 会更新序列化使用的 Schema；Paimon 会调整物理列顺序；StarRocks 仅接受主键列仍位于最前且主键之间顺序不变的移动。Doris、Fluss、Iceberg、MaxCompute 和 OceanBase 会明确拒绝物理列重排。在 `EVOLVE` 模式下，不支持的移动会使作业失败，而不是静默写入错位字段。在 `TRY_EVOLVE` 模式下，框架保留 Sink Schema，并将后续记录映射到该 Schema。`LENIENT` 模式不会调整 Sink 列顺序，记录值仍映射到原有列顺序。显式排除 `reorder.column` 时，也会保留 Sink 列顺序。

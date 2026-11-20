@@ -19,9 +19,11 @@ package org.apache.flink.cdc.connectors.kafka.json.canal;
 
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.ColumnPosition;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
@@ -41,6 +43,9 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
+import java.util.Collections;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link CanalJsonSerializationSchema}. */
 class CanalJsonSerializationSchemaTest {
@@ -241,5 +246,52 @@ class CanalJsonSerializationSchemaTest {
         Assertions.assertThat(rowNode.isObject()).isTrue();
         Assertions.assertThat(rowNode.has("f1")).isTrue();
         Assertions.assertThat(rowNode.has("f2")).isTrue();
+    }
+
+    @Test
+    void testSerializeAfterColumnReorder() throws Exception {
+        ObjectMapper mapper = JacksonMapperFactory.createObjectMapper();
+        SerializationSchema<Event> serializationSchema =
+                ChangeLogJsonFormatFactory.createSerializationSchema(
+                        new Configuration(),
+                        JsonSerializationType.CANAL_JSON,
+                        ZoneId.systemDefault());
+        serializationSchema.open(new MockInitializationContext());
+
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("city", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        assertThat(serializationSchema.serialize(new CreateTableEvent(TABLE_1, schema))).isNull();
+        assertThat(
+                        serializationSchema.serialize(
+                                new ReorderColumnEvent(
+                                        TABLE_1,
+                                        Collections.singletonList(
+                                                new ReorderColumnEvent.ColumnMove(
+                                                        "city", ColumnPosition.AFTER, "id")))))
+                .isNull();
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        RowType.of(DataTypes.INT(), DataTypes.STRING(), DataTypes.STRING()));
+        byte[] bytes =
+                serializationSchema.serialize(
+                        DataChangeEvent.insertEvent(
+                                TABLE_1,
+                                generator.generate(
+                                        new Object[] {
+                                            7,
+                                            BinaryStringData.fromString("Hangzhou"),
+                                            BinaryStringData.fromString("Alice")
+                                        })));
+
+        JsonNode data = mapper.readTree(bytes).path("data").get(0);
+        assertThat(data.path("name").asText()).isEqualTo("Alice");
+        assertThat(data.path("id").asInt()).isEqualTo(7);
+        assertThat(data.path("city").asText()).isEqualTo("Hangzhou");
     }
 }

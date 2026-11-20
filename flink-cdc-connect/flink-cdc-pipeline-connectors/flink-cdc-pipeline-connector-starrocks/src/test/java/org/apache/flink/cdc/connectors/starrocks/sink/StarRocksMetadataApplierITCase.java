@@ -22,12 +22,14 @@ import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.ColumnPosition;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
@@ -729,5 +731,58 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                                 + StarRocksUtils.DEFAULT_DATETIME);
 
         assertEqualsInOrder(expected, actual);
+    }
+
+    @Test
+    void testStarRocksReorderColumn() throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        StarRocksContainer.STARROCKS_DATABASE_NAME,
+                        StarRocksContainer.STARROCKS_TABLE_NAME);
+        Schema oldSchema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("a", DataTypes.INT(), null))
+                        .column(new PhysicalColumn("b", DataTypes.INT(), null))
+                        .column(new PhysicalColumn("c", DataTypes.INT(), null))
+                        .column(new PhysicalColumn("d", DataTypes.INT(), null))
+                        .primaryKey("id")
+                        .build();
+        Schema reorderedSchema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("c", DataTypes.INT(), null))
+                        .column(new PhysicalColumn("a", DataTypes.INT(), null))
+                        .column(new PhysicalColumn("d", DataTypes.INT(), null))
+                        .column(new PhysicalColumn("b", DataTypes.INT(), null))
+                        .primaryKey("id")
+                        .build();
+        ReorderColumnEvent reorderEvent =
+                new ReorderColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                new ReorderColumnEvent.ColumnMove("c", ColumnPosition.AFTER, "id"),
+                                new ReorderColumnEvent.ColumnMove("b", ColumnPosition.LAST, null)));
+
+        runJobWithEvents(
+                Arrays.asList(
+                        new CreateTableEvent(tableId, oldSchema),
+                        DataChangeEvent.insertEvent(
+                                tableId, generate(oldSchema, 1, 10, 20, 30, 40)),
+                        reorderEvent,
+                        DataChangeEvent.insertEvent(
+                                tableId, generate(reorderedSchema, 2, 300, 100, 400, 200))));
+
+        assertEqualsInOrder(
+                Arrays.asList(
+                        "id | int | NO | true | null",
+                        "c | int | YES | false | null",
+                        "a | int | YES | false | null",
+                        "d | int | YES | false | null",
+                        "b | int | YES | false | null"),
+                inspectTableSchema(tableId));
+        assertEqualsInAnyOrder(
+                Arrays.asList("1 | 30 | 10 | 40 | 20", "2 | 300 | 100 | 400 | 200"),
+                fetchTableContent(tableId, 5));
     }
 }

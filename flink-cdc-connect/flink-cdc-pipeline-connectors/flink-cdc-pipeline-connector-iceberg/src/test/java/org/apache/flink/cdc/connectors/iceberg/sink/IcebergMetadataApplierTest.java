@@ -19,10 +19,14 @@ package org.apache.flink.cdc.connectors.iceberg.sink;
 
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.ColumnPosition;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.schema.PhysicalColumn;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
@@ -52,6 +56,7 @@ import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** A test for {@link IcebergMetadataApplier}. */
 public class IcebergMetadataApplierTest {
@@ -723,5 +728,28 @@ public class IcebergMetadataApplierTest {
                                         .build()),
                         new HashSet<>(Collections.singletonList(1)));
         assertThat(table.schema().sameSchema(schemaAfterAddColumn)).isTrue();
+    }
+
+    @Test
+    void testRejectReorderColumnEvent() {
+        Map<String, String> catalogOptions =
+                ImmutableMap.of(
+                        "type",
+                        "hadoop",
+                        "warehouse",
+                        new File(temporaryFolder.toFile(), UUID.randomUUID().toString())
+                                .toString());
+        IcebergMetadataApplier metadataApplier = new IcebergMetadataApplier(catalogOptions);
+        ReorderColumnEvent reorderEvent =
+                new ReorderColumnEvent(
+                        TableId.tableId("ns", "schema", "table"),
+                        Collections.singletonList(
+                                new ReorderColumnEvent.ColumnMove(
+                                        "name", ColumnPosition.FIRST, null)));
+
+        assertThatThrownBy(() -> metadataApplier.applySchemaChange(reorderEvent))
+                .isExactlyInstanceOf(UnsupportedSchemaChangeEventException.class)
+                .extracting(error -> ((SchemaEvolveException) error).getApplyingEvent())
+                .isEqualTo(reorderEvent);
     }
 }

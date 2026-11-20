@@ -25,13 +25,14 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.utils.Preconditions;
 
 import javax.annotation.Nonnull;
 
-/** Visitor clas for all {@link SchemaChangeEvent}s and returns a specific typed object. */
+/** Visitor class for all {@link SchemaChangeEvent}s and returns a specific typed object. */
 @Internal
 public class SchemaChangeEventVisitor {
     public static <T, E extends Throwable> T visit(
@@ -44,6 +45,34 @@ public class SchemaChangeEventVisitor {
             @Nonnull VisitorHandler<RenameColumnEvent, T, E> renameColumnEventVisitor,
             @Nonnull VisitorHandler<TruncateTableEvent, T, E> truncateTableEventVisitor,
             @Nonnull VisitorHandler<AlterTableCommentEvent, T, E> alterTableCommentEventVisitor)
+            throws E {
+        return visit(
+                event,
+                addColumnVisitor,
+                alterColumnTypeEventVisitor,
+                createTableEventVisitor,
+                dropColumnEventVisitor,
+                dropTableEventVisitor,
+                renameColumnEventVisitor,
+                truncateTableEventVisitor,
+                alterTableCommentEventVisitor,
+                reorderColumnEvent -> {
+                    throw new org.apache.flink.cdc.common.exceptions
+                            .UnsupportedSchemaChangeEventException(reorderColumnEvent);
+                });
+    }
+
+    public static <T, E extends Throwable> T visit(
+            SchemaChangeEvent event,
+            @Nonnull VisitorHandler<AddColumnEvent, T, E> addColumnVisitor,
+            @Nonnull VisitorHandler<AlterColumnTypeEvent, T, E> alterColumnTypeEventVisitor,
+            @Nonnull VisitorHandler<CreateTableEvent, T, E> createTableEventVisitor,
+            @Nonnull VisitorHandler<DropColumnEvent, T, E> dropColumnEventVisitor,
+            @Nonnull VisitorHandler<DropTableEvent, T, E> dropTableEventVisitor,
+            @Nonnull VisitorHandler<RenameColumnEvent, T, E> renameColumnEventVisitor,
+            @Nonnull VisitorHandler<TruncateTableEvent, T, E> truncateTableEventVisitor,
+            @Nonnull VisitorHandler<AlterTableCommentEvent, T, E> alterTableCommentEventVisitor,
+            @Nonnull VisitorHandler<ReorderColumnEvent, T, E> reorderColumnEventVisitor)
             throws E {
         if (event instanceof AddColumnEvent) {
             Preconditions.checkNotNull(addColumnVisitor);
@@ -69,6 +98,9 @@ public class SchemaChangeEventVisitor {
         } else if (event instanceof AlterTableCommentEvent) {
             Preconditions.checkNotNull(alterTableCommentEventVisitor);
             return alterTableCommentEventVisitor.visit((AlterTableCommentEvent) event);
+        } else if (event instanceof ReorderColumnEvent) {
+            Preconditions.checkNotNull(reorderColumnEventVisitor);
+            return reorderColumnEventVisitor.visit((ReorderColumnEvent) event);
         } else {
             throw new IllegalArgumentException(
                     "Unknown schema change event type " + event.getType());
@@ -86,6 +118,34 @@ public class SchemaChangeEventVisitor {
             @Nonnull VoidVisitorHandler<TruncateTableEvent, E> truncateTableEventVisitor,
             @Nonnull VoidVisitorHandler<AlterTableCommentEvent, E> alterTableCommentEventHandler)
             throws E {
+        voidVisit(
+                event,
+                addColumnVisitor,
+                alterColumnTypeEventVisitor,
+                createTableEventVisitor,
+                dropColumnEventVisitor,
+                dropTableEventVisitor,
+                renameColumnEventVisitor,
+                truncateTableEventVisitor,
+                alterTableCommentEventHandler,
+                reorderColumnEvent -> {
+                    throw new org.apache.flink.cdc.common.exceptions
+                            .UnsupportedSchemaChangeEventException(reorderColumnEvent);
+                });
+    }
+
+    public static <E extends Throwable> void voidVisit(
+            SchemaChangeEvent event,
+            @Nonnull VoidVisitorHandler<AddColumnEvent, E> addColumnVisitor,
+            @Nonnull VoidVisitorHandler<AlterColumnTypeEvent, E> alterColumnTypeEventVisitor,
+            @Nonnull VoidVisitorHandler<CreateTableEvent, E> createTableEventVisitor,
+            @Nonnull VoidVisitorHandler<DropColumnEvent, E> dropColumnEventVisitor,
+            @Nonnull VoidVisitorHandler<DropTableEvent, E> dropTableEventVisitor,
+            @Nonnull VoidVisitorHandler<RenameColumnEvent, E> renameColumnEventVisitor,
+            @Nonnull VoidVisitorHandler<TruncateTableEvent, E> truncateTableEventVisitor,
+            @Nonnull VoidVisitorHandler<AlterTableCommentEvent, E> alterTableCommentEventHandler,
+            @Nonnull VoidVisitorHandler<ReorderColumnEvent, E> reorderColumnEventVisitor)
+            throws E {
         visit(
                 event,
                 wrapVoidVisitor(addColumnVisitor),
@@ -95,7 +155,8 @@ public class SchemaChangeEventVisitor {
                 wrapVoidVisitor(dropTableEventVisitor),
                 wrapVoidVisitor(renameColumnEventVisitor),
                 wrapVoidVisitor(truncateTableEventVisitor),
-                wrapVoidVisitor(alterTableCommentEventHandler));
+                wrapVoidVisitor(alterTableCommentEventHandler),
+                wrapVoidVisitor(reorderColumnEventVisitor));
     }
 
     private static <EVT extends SchemaChangeEvent, E extends Throwable>

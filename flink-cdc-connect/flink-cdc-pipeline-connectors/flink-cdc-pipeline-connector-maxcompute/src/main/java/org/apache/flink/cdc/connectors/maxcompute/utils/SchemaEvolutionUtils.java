@@ -19,6 +19,7 @@
 package org.apache.flink.cdc.connectors.maxcompute.utils;
 
 import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.ColumnPosition;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
@@ -118,7 +119,7 @@ public class SchemaEvolutionUtils {
                         "alter table " + getFullTableName(options, tableId) + " add columns (");
 
         for (AddColumnEvent.ColumnWithPosition addColumn : columns) {
-            if (addColumn.getPosition() == AddColumnEvent.ColumnPosition.LAST) {
+            if (addColumn.getColumnPosition() == ColumnPosition.LAST) {
                 sqlBuilder
                         .append(addColumn.getAddColumn().getName())
                         .append(" ")
@@ -133,9 +134,9 @@ public class SchemaEvolutionUtils {
             } else {
                 throw new UnsupportedOperationException(
                         "Not support position: "
-                                + addColumn.getPosition()
+                                + addColumn.getColumnPosition()
                                 + " "
-                                + addColumn.getExistedColumnName());
+                                + addColumn.getReferenceColumnName());
             }
         }
         // remove ','

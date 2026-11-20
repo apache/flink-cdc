@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -376,6 +377,25 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                         renameMap.put(oldColumnName, newColumnName);
                         changes.add(new RenameColumnEvent(currentTable, renameMap));
                     }
+                    if (newColumnName != null && ctx.FIRST() != null) {
+                        changes.add(
+                                new ReorderColumnEvent(
+                                        currentTable,
+                                        Collections.singletonList(
+                                                ReorderColumnEvent.ColumnMove.first(
+                                                        newColumnName))));
+                    } else if (newColumnName != null && ctx.afterColumn != null) {
+                        String referenceColumnName = parser.parseName(ctx.afterColumn);
+                        if (isTableIdCaseInsensitive) {
+                            referenceColumnName = referenceColumnName.toLowerCase(Locale.ROOT);
+                        }
+                        changes.add(
+                                new ReorderColumnEvent(
+                                        currentTable,
+                                        Collections.singletonList(
+                                                ReorderColumnEvent.ColumnMove.after(
+                                                        newColumnName, referenceColumnName))));
+                    }
                     listeners.remove(columnDefinitionListener);
                 },
                 columnDefinitionListener);
@@ -431,6 +451,24 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                             new AlterColumnTypeEvent(currentTable, typeMapping);
                     alterColumnTypeEvent.addColumnComment(columnName, column.comment());
                     changes.add(alterColumnTypeEvent);
+                    if (columnName != null && ctx.FIRST() != null) {
+                        changes.add(
+                                new ReorderColumnEvent(
+                                        currentTable,
+                                        Collections.singletonList(
+                                                ReorderColumnEvent.ColumnMove.first(columnName))));
+                    } else if (columnName != null && ctx.AFTER() != null) {
+                        String referenceColumnName = parser.parseName(ctx.uid(1));
+                        if (isTableIdCaseInsensitive) {
+                            referenceColumnName = referenceColumnName.toLowerCase(Locale.ROOT);
+                        }
+                        changes.add(
+                                new ReorderColumnEvent(
+                                        currentTable,
+                                        Collections.singletonList(
+                                                ReorderColumnEvent.ColumnMove.after(
+                                                        columnName, referenceColumnName))));
+                    }
                     listeners.remove(columnDefinitionListener);
                 },
                 columnDefinitionListener);

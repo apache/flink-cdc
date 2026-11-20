@@ -19,8 +19,12 @@ package org.apache.flink.cdc.common.utils;
 
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.ColumnPosition;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -32,6 +36,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -517,5 +522,348 @@ class SchemaUtilsTest {
                                                 .option("Key2", "Value2")
                                                 .build()))
                 .isExactlyInstanceOf(IllegalStateException.class);
+    }
+
+    private ReorderColumnEvent.ColumnMove moveColumnFirst(String columnName) {
+        return ReorderColumnEvent.ColumnMove.first(columnName);
+    }
+
+    private ReorderColumnEvent.ColumnMove moveColumnLast(String columnName) {
+        return ReorderColumnEvent.ColumnMove.last(columnName);
+    }
+
+    private ReorderColumnEvent.ColumnMove moveColumnBefore(
+            String columnName, String existedColumn) {
+        return ReorderColumnEvent.ColumnMove.before(columnName, existedColumn);
+    }
+
+    private ReorderColumnEvent.ColumnMove moveColumnAfter(String columnName, String existedColumn) {
+        return ReorderColumnEvent.ColumnMove.after(columnName, existedColumn);
+    }
+
+    @Test
+    void testApplyReorderColumnEventUsesMoveListOrder() {
+        TableId tableId = TableId.parse("default.default.table1");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("a", DataTypes.INT())
+                        .physicalColumn("b", DataTypes.INT())
+                        .physicalColumn("c", DataTypes.INT())
+                        .build();
+
+        Schema forward =
+                SchemaUtils.applySchemaChangeEvent(
+                        schema,
+                        new ReorderColumnEvent(
+                                tableId,
+                                Arrays.asList(
+                                        ReorderColumnEvent.ColumnMove.after("a", "id"),
+                                        ReorderColumnEvent.ColumnMove.after("c", "id"))));
+        Schema reversed =
+                SchemaUtils.applySchemaChangeEvent(
+                        schema,
+                        new ReorderColumnEvent(
+                                tableId,
+                                Arrays.asList(
+                                        ReorderColumnEvent.ColumnMove.after("c", "id"),
+                                        ReorderColumnEvent.ColumnMove.after("a", "id"))));
+
+        Assertions.assertThat(forward.getColumnNames()).containsExactly("id", "c", "a", "b");
+        Assertions.assertThat(reversed.getColumnNames()).containsExactly("id", "a", "c", "b");
+    }
+
+    @Test
+    void testApplyReorderColumnEvent() {
+        TableId tableId = TableId.parse("default.default.table1");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("age", DataTypes.INT())
+                        .physicalColumn("region", DataTypes.STRING())
+                        .build();
+
+        schema =
+                SchemaUtils.applySchemaChangeEvent(
+                        schema,
+                        new ReorderColumnEvent(
+                                tableId,
+                                Arrays.asList(
+                                        moveColumnLast("name"), moveColumnAfter("id", "age"))));
+        Assertions.assertThat(schema.getColumnNames())
+                .containsExactly("age", "id", "region", "name");
+
+        schema =
+                SchemaUtils.applySchemaChangeEvent(
+                        schema,
+                        new ReorderColumnEvent(
+                                tableId,
+                                Arrays.asList(
+                                        moveColumnFirst("region"),
+                                        moveColumnBefore("name", "age"))));
+        Assertions.assertThat(schema.getColumnNames())
+                .containsExactly("region", "name", "age", "id");
+    }
+
+    @Test
+    void testApplyReorderColumnEventRejectsInvalidMove() {
+        TableId tableId = TableId.parse("default.default.table1");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("age", DataTypes.INT())
+                        .build();
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                SchemaUtils.applySchemaChangeEvent(
+                                        schema, new ReorderColumnEvent(tableId, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("columnMoves must not be null");
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                SchemaUtils.applySchemaChangeEvent(
+                                        schema,
+                                        new ReorderColumnEvent(
+                                                tableId, Collections.singletonList(null))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Column move must not be null");
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                SchemaUtils.applySchemaChangeEvent(
+                                        schema,
+                                        new ReorderColumnEvent(
+                                                tableId,
+                                                Collections.singletonList(
+                                                        new ReorderColumnEvent.ColumnMove(
+                                                                null,
+                                                                ColumnPosition.FIRST,
+                                                                null)))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("columnName must not be null");
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                SchemaUtils.applySchemaChangeEvent(
+                                        schema,
+                                        new ReorderColumnEvent(
+                                                tableId,
+                                                Collections.singletonList(
+                                                        new ReorderColumnEvent.ColumnMove(
+                                                                "id", null, null)))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("position must not be null");
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                SchemaUtils.applySchemaChangeEvent(
+                                        schema,
+                                        new ReorderColumnEvent(
+                                                tableId,
+                                                Collections.singletonList(
+                                                        moveColumnBefore("missing", "id")))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("column missing does not exist");
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                SchemaUtils.applySchemaChangeEvent(
+                                        schema,
+                                        new ReorderColumnEvent(
+                                                tableId,
+                                                Collections.singletonList(
+                                                        moveColumnAfter("id", "missing")))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("referenced column missing does not exist");
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                SchemaUtils.applySchemaChangeEvent(
+                                        schema,
+                                        new ReorderColumnEvent(
+                                                tableId,
+                                                Collections.singletonList(
+                                                        moveColumnBefore("id", "id")))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot reference itself");
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                SchemaUtils.applySchemaChangeEvent(
+                                        schema,
+                                        new ReorderColumnEvent(
+                                                tableId,
+                                                Arrays.asList(
+                                                        moveColumnFirst("id"),
+                                                        moveColumnAfter("id", "name")))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("multiple moves for column id");
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                SchemaUtils.applySchemaChangeEvent(
+                                        schema,
+                                        new ReorderColumnEvent(
+                                                tableId,
+                                                Arrays.asList(
+                                                        moveColumnAfter("id", "name"),
+                                                        moveColumnAfter("name", "age")))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot move column id relative to moved column name");
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                SchemaUtils.applySchemaChangeEvent(
+                                        schema,
+                                        new ReorderColumnEvent(
+                                                tableId,
+                                                Collections.singletonList(
+                                                        new ReorderColumnEvent.ColumnMove(
+                                                                "id",
+                                                                ColumnPosition.FIRST,
+                                                                "name")))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must not define referenceColumnName");
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                SchemaUtils.applySchemaChangeEvent(
+                                        schema,
+                                        new ReorderColumnEvent(
+                                                tableId,
+                                                Collections.singletonList(
+                                                        new ReorderColumnEvent.ColumnMove(
+                                                                "id",
+                                                                ColumnPosition.AFTER,
+                                                                null)))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must define referenceColumnName");
+    }
+
+    @Test
+    void testApplyReorderColumnEventIsReplayableWithStableAnchors() {
+        TableId tableId = TableId.parse("default.default.table1");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("A", DataTypes.INT())
+                        .physicalColumn("B", DataTypes.INT())
+                        .physicalColumn("C", DataTypes.INT())
+                        .physicalColumn("D", DataTypes.INT())
+                        .build();
+        ReorderColumnEvent reorderColumnEvent =
+                new ReorderColumnEvent(
+                        tableId, Arrays.asList(moveColumnFirst("D"), moveColumnAfter("B", "C")));
+
+        Schema reorderedSchema = SchemaUtils.applySchemaChangeEvent(schema, reorderColumnEvent);
+        Schema replayedSchema =
+                SchemaUtils.applySchemaChangeEvent(reorderedSchema, reorderColumnEvent);
+
+        Assertions.assertThat(reorderedSchema.getColumnNames()).containsExactly("D", "A", "C", "B");
+        Assertions.assertThat(replayedSchema).isEqualTo(reorderedSchema);
+    }
+
+    @Test
+    void testTransformReorderColumnEvent() {
+        TableId tableId = TableId.parse("default.default.table1");
+        ReorderColumnEvent reorderColumnEvent =
+                new ReorderColumnEvent(
+                        tableId,
+                        Arrays.asList(moveColumnBefore("region", "name"), moveColumnLast("id")));
+
+        Assertions.assertThat(
+                        SchemaUtils.transformSchemaChangeEvent(
+                                true, Arrays.asList("id", "name", "region"), reorderColumnEvent))
+                .contains(reorderColumnEvent);
+        Assertions.assertThat(
+                        SchemaUtils.transformSchemaChangeEvent(
+                                false, Arrays.asList("id", "name", "region"), reorderColumnEvent))
+                .isEmpty();
+    }
+
+    @Test
+    void testReorderColumnEventRedundancy() {
+        TableId tableId = TableId.parse("default.default.table1");
+        ReorderColumnEvent reorderColumnEvent =
+                new ReorderColumnEvent(
+                        tableId, Collections.singletonList(moveColumnAfter("id", "name")));
+
+        Schema reorderedSchema =
+                Schema.newBuilder()
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("id", DataTypes.INT())
+                        .build();
+        Schema originalSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .build();
+
+        Assertions.assertThat(
+                        SchemaUtils.isSchemaChangeEventRedundant(
+                                reorderedSchema, reorderColumnEvent))
+                .isTrue();
+        Assertions.assertThat(
+                        SchemaUtils.isSchemaChangeEventRedundant(
+                                originalSchema, reorderColumnEvent))
+                .isFalse();
+    }
+
+    @Test
+    void testReorderColumnEventRedundantWithMissingColumn() {
+        TableId tableId = TableId.parse("default.default.table1");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .build();
+        ReorderColumnEvent reorderWithMissingColumn =
+                new ReorderColumnEvent(
+                        tableId, Collections.singletonList(moveColumnAfter("nonexistent", "id")));
+
+        Assertions.assertThat(
+                        SchemaUtils.isSchemaChangeEventRedundant(schema, reorderWithMissingColumn))
+                .isFalse();
+    }
+
+    @Test
+    void testReorderColumnEventWithEmptyMoves() {
+        TableId tableId = TableId.parse("default.default.table1");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .build();
+        ReorderColumnEvent emptyReorderEvent =
+                new ReorderColumnEvent(tableId, Collections.emptyList());
+
+        Schema result = SchemaUtils.applySchemaChangeEvent(schema, emptyReorderEvent);
+        Assertions.assertThat(result).isEqualTo(schema);
+        Assertions.assertThat(SchemaUtils.isSchemaChangeEventRedundant(schema, emptyReorderEvent))
+                .isTrue();
+    }
+
+    @Test
+    void testReorderColumnTypeRegistration() {
+        TableId tableId = TableId.parse("default.default.table1");
+        ReorderColumnEvent reorderColumnEvent =
+                new ReorderColumnEvent(
+                        tableId, Collections.singletonList(moveColumnAfter("id", "name")));
+
+        Assertions.assertThat(reorderColumnEvent.getType())
+                .isEqualTo(SchemaChangeEventType.REORDER_COLUMN);
+        Assertions.assertThat(SchemaChangeEventType.ofEvent(reorderColumnEvent))
+                .isEqualTo(SchemaChangeEventType.REORDER_COLUMN);
+        Assertions.assertThat(SchemaChangeEventType.ofTag("reorder.column"))
+                .isEqualTo(SchemaChangeEventType.REORDER_COLUMN);
+        Assertions.assertThat(SchemaChangeEventTypeFamily.ofTag("column"))
+                .contains(SchemaChangeEventType.REORDER_COLUMN);
+        Assertions.assertThat(SchemaChangeEventTypeFamily.ofTag("reorder"))
+                .contains(SchemaChangeEventType.REORDER_COLUMN);
+        Assertions.assertThat(SchemaChangeEventTypeFamily.ALL)
+                .contains(SchemaChangeEventType.REORDER_COLUMN);
     }
 }

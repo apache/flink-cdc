@@ -30,6 +30,7 @@ import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.model.AiModelClient;
@@ -42,6 +43,7 @@ import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformChangeInfo;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformer;
 import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
+import org.apache.flink.cdc.runtime.operators.transform.ReorderColumnEventTransformer;
 import org.apache.flink.cdc.runtime.operators.transform.TransformContext;
 import org.apache.flink.cdc.runtime.operators.transform.TransformExpressionCompiler;
 import org.apache.flink.cdc.runtime.operators.transform.TransformFilter;
@@ -565,8 +567,16 @@ public class AsyncPostTransformFunction extends RichAsyncFunction<Event, Event>
         Optional<SchemaChangeEvent> outputEvent;
         if (tableInfo.hasAsterisk) {
             // See comments in PreTransformOperator#cacheChangeSchema method.
-            outputEvent =
-                    SchemaUtils.transformSchemaChangeEvent(true, columnNamesBeforeChange, event);
+            if (event instanceof ReorderColumnEvent) {
+                outputEvent =
+                        ReorderColumnEventTransformer.transformReorderColumnEvent(
+                                        (ReorderColumnEvent) event, prevPostSchema, nextPostSchema)
+                                .map(SchemaChangeEvent.class::cast);
+            } else {
+                outputEvent =
+                        SchemaUtils.transformSchemaChangeEvent(
+                                true, columnNamesBeforeChange, event);
+            }
         } else {
             outputEvent =
                     SchemaUtils.transformSchemaChangeEvent(

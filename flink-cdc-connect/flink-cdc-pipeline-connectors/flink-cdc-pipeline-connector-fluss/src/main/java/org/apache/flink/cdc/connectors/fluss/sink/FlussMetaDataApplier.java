@@ -19,12 +19,15 @@ package org.apache.flink.cdc.connectors.fluss.sink;
 
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.ColumnPosition;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.ExistingTableSchemaExpansionSupport;
@@ -147,6 +150,9 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
 
     @Override
     public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
+        if (schemaChangeEvent instanceof ReorderColumnEvent) {
+            throw new UnsupportedSchemaChangeEventException(schemaChangeEvent);
+        }
         LOG.info("fluss metadata applier receive schemaChangeEvent {}", schemaChangeEvent);
         if (schemaChangeEvent instanceof CreateTableEvent) {
             CreateTableEvent createTableEvent = (CreateTableEvent) schemaChangeEvent;
@@ -210,11 +216,10 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
         event.getAddedColumns()
                 .forEach(
                         columnWithPosition -> {
-                            if (columnWithPosition.getPosition()
-                                    != AddColumnEvent.ColumnPosition.LAST) {
+                            if (columnWithPosition.getColumnPosition() != ColumnPosition.LAST) {
                                 throw new IllegalArgumentException(
                                         "Fluss metadata applier only supports LAST position for adding columns now but receives "
-                                                + columnWithPosition.getPosition()
+                                                + columnWithPosition.getColumnPosition()
                                                 + ". Consider using 'schema.change.behavior' configuration with 'LENIENT' mode to handle schema changes more flexibly.");
                             }
 

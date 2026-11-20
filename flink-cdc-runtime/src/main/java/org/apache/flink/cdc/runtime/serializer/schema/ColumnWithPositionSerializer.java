@@ -33,6 +33,8 @@ import org.apache.flink.core.memory.DataOutputView;
 import java.io.IOException;
 
 /** A {@link TypeSerializer} for {@link AddColumnEvent.ColumnWithPosition}. */
+// This serializer deliberately uses the legacy API to preserve its established wire format.
+@SuppressWarnings("deprecation")
 public class ColumnWithPositionSerializer
         extends TypeSerializerSingleton<AddColumnEvent.ColumnWithPosition> {
 
