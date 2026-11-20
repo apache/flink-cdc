@@ -127,7 +127,7 @@ public class InternalObjectConverter {
 
         @Override
         public Function<Object, TimeData> visit(TimeType timeType) {
-            return CommonConverter::convertToTimeData;
+            return value -> CommonConverter.convertToTimeData(value, timeType.getPrecision());
         }
 
         @Override
