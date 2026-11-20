@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.pipeline.tests.stage2;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.doris.sink.utils.DorisContainer;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -680,6 +681,21 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
 
     @Test
     public void testSchemaEvolution() throws Exception {
+        testSchemaEvolution(false, false);
+    }
+
+    @Test
+    void testSchemaEvolutionAfterSavepointRestore() throws Exception {
+        testSchemaEvolution(true, false);
+    }
+
+    @Test
+    void testDropAndRecreateTable() throws Exception {
+        testSchemaEvolution(false, true);
+    }
+
+    private void testSchemaEvolution(boolean restoreBeforeDrop, boolean recreateAfterDrop)
+            throws Exception {
         String databaseName = mysqlInventoryDatabase.getDatabaseName();
         String pipelineJob =
                 String.format(
@@ -713,7 +729,8 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path dorisCdcConnector = TestUtils.getResource("doris-cdc-pipeline-connector.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, dorisCdcConnector, mysqlDriverJar);
+        JobID jobId =
+                submitPipelineJob(pipelineJob, mysqlCdcJar, dorisCdcConnector, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
 
         LOG.info("Verifying snapshot data from `products`...");
@@ -945,6 +962,29 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                     7,
                     Collections.singletonList("1 | pasta | noodles | 0.0 | null | null | null"));
 
+            if (restoreBeforeDrop) {
+                String savepointPath = stopJobWithSavepoint(jobId);
+                jobId =
+                        submitPipelineJob(
+                                pipelineJob,
+                                savepointPath,
+                                false,
+                                mysqlCdcJar,
+                                dorisCdcConnector,
+                                mysqlDriverJar);
+                waitUntilJobRunning(jobId, Duration.ofSeconds(30));
+                stat.execute("UPDATE customers SET name = 'restore_fence' WHERE id = 101;");
+                validateSinkResult(
+                        databaseName,
+                        "customers",
+                        4,
+                        Arrays.asList(
+                                "101 | restore_fence | Shanghai | 123567891234",
+                                "102 | user_2 | Shanghai | 123567891234",
+                                "103 | user_3 | Shanghai | 123567891234",
+                                "104 | user_4 | Shanghai | 123567891234"));
+            }
+
             stat.execute("DROP TABLE products;");
             Thread.sleep(5000L);
             Assertions.assertThatThrownBy(
@@ -960,6 +1000,37 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                             })
                     .isExactlyInstanceOf(SQLSyntaxErrorException.class)
                     .hasMessageContaining("errCode = 2, detailMessage = Unknown table 'products'");
+            waitUntilJobRunning(jobId, Duration.ofSeconds(30));
+
+            stat.execute("UPDATE customers SET name = 'after_drop' WHERE id = 101;");
+            validateSinkResult(
+                    databaseName,
+                    "customers",
+                    4,
+                    Arrays.asList(
+                            "101 | after_drop | Shanghai | 123567891234",
+                            "102 | user_2 | Shanghai | 123567891234",
+                            "103 | user_3 | Shanghai | 123567891234",
+                            "104 | user_4 | Shanghai | 123567891234"));
+
+            if (recreateAfterDrop) {
+                stat.execute(
+                        "CREATE TABLE products (id BIGINT NOT NULL PRIMARY KEY, name VARCHAR(255));");
+                stat.execute("INSERT INTO products VALUES (2001, 'recreated');");
+                validateSinkSchema(
+                        databaseName,
+                        "products",
+                        Arrays.asList(
+                                "id | BIGINT | Yes | true | null",
+                                "name | VARCHAR(765) | Yes | false | null"));
+                validateSinkResult(
+                        databaseName, "products", 2, Collections.singletonList("2001 | recreated"));
+                stat.execute("UPDATE products SET name = 'updated' WHERE id = 2001;");
+                validateSinkResult(
+                        databaseName, "products", 2, Collections.singletonList("2001 | updated"));
+                stat.execute("DELETE FROM products WHERE id = 2001;");
+                validateSinkResult(databaseName, "products", 2, Collections.emptyList());
+            }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to trigger schema change.", e);
         }
