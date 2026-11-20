@@ -53,8 +53,11 @@ import io.debezium.schema.TopicSelector;
 import javax.annotation.Nullable;
 
 import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static io.debezium.connector.postgresql.PostgresConnectorConfig.PLUGIN_NAME;
 import static io.debezium.connector.postgresql.PostgresConnectorConfig.SLOT_NAME;
@@ -70,6 +73,7 @@ public class PostgresDialect implements JdbcDataSourceDialect {
     private final PostgresSourceConfig sourceConfig;
     private transient Tables.TableFilter filters;
     private transient CustomPostgresSchema schema;
+    private transient Map<String, Set<TableId>> initialSnapshotTablesBySchema;
     @Nullable private PostgresStreamFetchTask streamFetchTask;
 
     public PostgresDialect(PostgresSourceConfig sourceConfig) {
@@ -195,9 +199,7 @@ public class PostgresDialect implements JdbcDataSourceDialect {
         final List<TableId> capturedTableIds = discoverDataCollections(sourceConfig);
 
         try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
-            // fetch table schemas
-            Map<TableId, TableChange> tableSchemas = queryTableSchema(jdbc, capturedTableIds);
-            return tableSchemas;
+            return tableSchemas().getTableSchema((PostgresConnection) jdbc, capturedTableIds);
         } catch (Exception e) {
             throw new FlinkRuntimeException(
                     "Error to discover table schemas: " + e.getMessage(), e);
@@ -211,18 +213,36 @@ public class PostgresDialect implements JdbcDataSourceDialect {
 
     @Override
     public TableChange queryTableSchema(JdbcConnection jdbc, TableId tableId) {
-        if (schema == null) {
-            schema = new CustomPostgresSchema((PostgresConnection) jdbc, sourceConfig);
+        PostgresConnection connection = (PostgresConnection) jdbc;
+        CustomPostgresSchema tableSchemas = tableSchemas();
+        Set<TableId> initialTables =
+                initialSnapshotTablesBySchema == null
+                        ? null
+                        : initialSnapshotTablesBySchema.get(tableId.schema());
+        if (initialTables != null && initialTables.contains(tableId)) {
+            Map<TableId, TableChange> tableChanges =
+                    tableSchemas.getInitialSnapshotTableSchemas(connection, initialTables);
+            initialSnapshotTablesBySchema.remove(tableId.schema());
+            return tableChanges.get(tableId);
         }
-        return schema.getTableSchema(tableId);
+        return tableSchemas.getTableSchema(connection, tableId);
     }
 
-    private Map<TableId, TableChange> queryTableSchema(
-            JdbcConnection jdbc, List<TableId> tableIds) {
-        if (schema == null) {
-            schema = new CustomPostgresSchema((PostgresConnection) jdbc, sourceConfig);
+    void setInitialSnapshotTables(List<TableId> tableIds) {
+        schema = null;
+        initialSnapshotTablesBySchema = new HashMap<>();
+        for (TableId tableId : tableIds) {
+            initialSnapshotTablesBySchema
+                    .computeIfAbsent(tableId.schema(), ignored -> new HashSet<>())
+                    .add(tableId);
         }
-        return schema.getTableSchema(tableIds);
+    }
+
+    private CustomPostgresSchema tableSchemas() {
+        if (schema == null) {
+            schema = new CustomPostgresSchema(sourceConfig);
+        }
+        return schema;
     }
 
     @Override
