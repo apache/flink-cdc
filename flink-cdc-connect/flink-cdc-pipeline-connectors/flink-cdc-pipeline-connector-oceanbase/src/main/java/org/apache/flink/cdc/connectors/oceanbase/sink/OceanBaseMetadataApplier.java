@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
@@ -45,8 +46,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** Supports {@link OceanBaseDataSink} to schema evolution. */
 public class OceanBaseMetadataApplier implements MetadataApplier {
@@ -54,6 +57,7 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
     private static final Logger LOG = LoggerFactory.getLogger(OceanBaseMetadataApplier.class);
 
     private final OceanBaseCatalog catalog;
+    private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
 
     public OceanBaseMetadataApplier(OceanBaseConnectorOptions connectorOptions) {
         try {
@@ -62,6 +66,24 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
         } catch (Exception e) {
             throw new OceanBaseCatalogException("Fail to init OceanBaseMetadataApplier.", e);
         }
+        this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
+    }
+
+    @Override
+    public MetadataApplier setAcceptedSchemaEvolutionTypes(
+            Set<SchemaChangeEventType> schemaEvolutionTypes) {
+        this.enabledSchemaEvolutionTypes = schemaEvolutionTypes;
+        return this;
+    }
+
+    @Override
+    public boolean acceptsSchemaEvolutionType(SchemaChangeEventType schemaChangeEventType) {
+        return enabledSchemaEvolutionTypes.contains(schemaChangeEventType);
+    }
+
+    @Override
+    public Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes() {
+        return EnumSet.allOf(SchemaChangeEventType.class);
     }
 
     @Override
