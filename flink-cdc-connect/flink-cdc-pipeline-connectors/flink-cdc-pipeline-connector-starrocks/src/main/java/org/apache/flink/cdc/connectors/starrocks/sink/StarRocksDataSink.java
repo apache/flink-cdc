@@ -76,7 +76,11 @@ public class StarRocksDataSink implements DataSink, Serializable {
                         sinkOptions.getJdbcUrl(),
                         sinkOptions.getUsername(),
                         sinkOptions.getPassword());
-        return new StarRocksMetadataApplier(catalog, tableCreateConfig, schemaChangeConfig);
+        return new StarRocksMetadataApplier(
+                catalog,
+                tableCreateConfig,
+                schemaChangeConfig,
+                sinkOptions.isMultiTableTransactionEnabled());
     }
 
     @VisibleForTesting
