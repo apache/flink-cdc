@@ -63,6 +63,10 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     protected boolean assignUnboundedChunkFirst =
             JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
                     .defaultValue();
+    protected boolean releaseSnapshotMetadataEnabled =
+            JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED.defaultValue();
+    protected double scanRateLimitRecordsPerSecond =
+            JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue();
 
     /** Integer port number of the database server. */
     public JdbcSourceConfigFactory hostname(String hostname) {
@@ -263,6 +267,22 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
      */
     public JdbcSourceConfigFactory assignUnboundedChunkFirst(boolean assignUnboundedChunkFirst) {
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
+        return this;
+    }
+
+    /**
+     * Whether to release the snapshot split metadata held by the source coordinator once the stream
+     * split is assembled and checkpoint-covered. Defaults to false.
+     */
+    public JdbcSourceConfigFactory releaseSnapshotMetadataEnabled(
+            boolean releaseSnapshotMetadataEnabled) {
+        this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
+        return this;
+    }
+
+    public JdbcSourceConfigFactory scanRateLimitRecordsPerSecond(
+            double scanRateLimitRecordsPerSecond) {
+        this.scanRateLimitRecordsPerSecond = scanRateLimitRecordsPerSecond;
         return this;
     }
 

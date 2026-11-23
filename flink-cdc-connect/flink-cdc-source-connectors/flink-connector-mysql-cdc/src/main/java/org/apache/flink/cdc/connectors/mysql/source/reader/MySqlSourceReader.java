@@ -18,10 +18,13 @@
 package org.apache.flink.cdc.connectors.mysql.source.reader;
 
 import org.apache.flink.api.connector.source.SourceEvent;
+import org.apache.flink.api.connector.source.util.ratelimit.RateLimiterStrategy;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
+import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions;
 import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitAssignedEvent;
+import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitMetaAssembledEvent;
 import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitMetaEvent;
 import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitMetaRequestEvent;
 import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitUpdateAckEvent;
@@ -43,7 +46,7 @@ import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.connectors.mysql.source.utils.ChunkUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.connector.base.source.reader.SingleThreadMultiplexSourceReaderBase;
+import org.apache.flink.connector.base.source.reader.SingleThreadMultiplexSourceReaderBaseAdapter;
 import org.apache.flink.connector.base.source.reader.fetcher.SingleThreadFetcherManager;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
@@ -68,7 +71,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlBinlog
 
 /** The source reader for MySQL source splits. */
 public class MySqlSourceReader<T>
-        extends SingleThreadMultiplexSourceReaderBase<
+        extends SingleThreadMultiplexSourceReaderBaseAdapter<
                 SourceRecords, T, MySqlSplit, MySqlSplitState> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceReader.class);
@@ -81,6 +84,16 @@ public class MySqlSourceReader<T>
     private final MySqlRecordEmitter<T> recordEmitter;
     private final MySqlPartition partition;
 
+    /**
+     * Generation the reader learned from its served meta groups, echoed in {@link
+     * BinlogSplitMetaAssembledEvent} so the coordinator can drop a stale signal from a failed
+     * attempt. Stays {@link BinlogSplitMetaAssembledEvent#COMPLETE_WITHOUT_META_GENERATION} for an
+     * inline split that requested none. Not checkpointed: on restart it resets to that sentinel,
+     * which is safe because a reader reports the sentinel only while it holds a complete split.
+     */
+    private long binlogAssignmentGeneration =
+            BinlogSplitMetaAssembledEvent.COMPLETE_WITHOUT_META_GENERATION;
+
     public MySqlSourceReader(
             Supplier<MySqlSplitReader> splitReaderSupplier,
             MySqlRecordEmitter<T> recordEmitter,
@@ -90,8 +103,15 @@ public class MySqlSourceReader<T>
         super(
                 new SingleThreadFetcherManager<>(splitReaderSupplier::get),
                 recordEmitter,
+                null,
                 config,
-                context.getSourceReaderContext());
+                context.getSourceReaderContext(),
+                sourceConfig.getScanRateLimitRecordsPerSecond()
+                                == MySqlSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND
+                                        .defaultValue()
+                        ? null
+                        : RateLimiterStrategy.perSecond(
+                                sourceConfig.getScanRateLimitRecordsPerSecond()));
         this.recordEmitter = recordEmitter;
         this.sourceConfig = sourceConfig;
         this.finishedUnackedSplits = new HashMap<>();
@@ -276,6 +296,12 @@ public class MySqlSourceReader<T>
                 // the binlog split is suspended
                 if (binlogSplit.isSuspended()) {
                     suspendedBinlogSplit = binlogSplit;
+                    // A suspended split can be restored directly from a checkpoint after region
+                    // failover. In that case there is no running binlog reader to finish and send
+                    // this request from onSplitFinished(), so request the latest finished split
+                    // count here to resume the update protocol.
+                    context.sendSourceEventToCoordinator(
+                            new LatestFinishedSplitsNumberRequestEvent());
                 } else if (!binlogSplit.isCompletedSplit()) {
                     uncompletedBinlogSplits.put(binlogSplit.splitId(), binlogSplit);
                     requestBinlogSplitMetaIfNeeded(binlogSplit);
@@ -285,6 +311,11 @@ public class MySqlSourceReader<T>
                             discoverTableSchemasForBinlogSplit(
                                     binlogSplit, sourceConfig, checkNewlyAddedTableSchema);
                     unfinishedSplits.add(mySqlBinlogSplit);
+                    // binlog split is complete: tell the enumerator so it can release the snapshot
+                    // metadata. Also fires on restore of a complete split, which is fine. The
+                    // generation ties this signal to the current assignment.
+                    context.sendSourceEventToCoordinator(
+                            new BinlogSplitMetaAssembledEvent(binlogAssignmentGeneration));
                 }
                 LOG.info(
                         "Source reader {} received the binlog split : {}.", subtaskId, binlogSplit);
@@ -400,6 +431,9 @@ public class MySqlSourceReader<T>
     private void fillMetadataForBinlogSplit(BinlogSplitMetaEvent metadataEvent) {
         MySqlBinlogSplit binlogSplit = uncompletedBinlogSplits.get(metadataEvent.getSplitId());
         if (binlogSplit != null) {
+            // Track the generation this metadata was served under, so the assembled event we send
+            // once the split is complete is tied to the current assignment.
+            this.binlogAssignmentGeneration = metadataEvent.getBinlogAssignmentGeneration();
             final int receivedMetaGroupId = metadataEvent.getMetaGroupId();
             final int receivedTotalFinishedSplitSize = metadataEvent.getTotalFinishedSplitSize();
             final int expectedMetaGroupId =

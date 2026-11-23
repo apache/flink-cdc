@@ -65,7 +65,9 @@ public class OracleSourceConfig extends JdbcSourceConfig {
             String chunkKeyColumn,
             boolean skipSnapshotBackfill,
             boolean scanNewlyAddedTableEnabled,
-            boolean assignUnboundedChunkFirst) {
+            boolean assignUnboundedChunkFirst,
+            boolean releaseSnapshotMetadataEnabled,
+            double scanRateLimitRecordsPerSecond) {
         super(
                 startupOptions,
                 databaseList,
@@ -92,7 +94,9 @@ public class OracleSourceConfig extends JdbcSourceConfig {
                 chunkKeyColumn,
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                releaseSnapshotMetadataEnabled,
+                scanRateLimitRecordsPerSecond);
         this.url = url;
     }
 

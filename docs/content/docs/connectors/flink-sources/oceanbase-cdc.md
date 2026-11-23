@@ -1,9 +1,9 @@
 ---
 title: "OceanBase"
-weight: 9
-type: docs
-aliases:
-- /connectors/flink-sources/oceanbase-cdc
+slug: "/docs/connectors/flink-sources/oceanbase-cdc"
+sidebar_position: 9
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -102,7 +102,13 @@ In order to set up the OceanBase CDC connector, the following table provides dep
 
 ### Maven dependency
 
-{{< artifact flink-connector-oceanbase-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-oceanbase-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -138,7 +144,7 @@ Deploy OceanBase database and Binlog service
 Usage Documentation
 ----------------
 
-**Notes**：
+**Notes**:
 - The current version of the **oceanbase-cdc connector** is built on top of the **mysql-cdc connector**, with **only minor internal implementation changes**.
    - **External interfaces** and **configuration parameters** are **fully consistent** with those of the mysql-cdc connector.
    - For detailed usage instructions, refer to the [**MySQL CDC Usage Documentation**](mysql-cdc.md).
@@ -260,9 +266,9 @@ Connector Options
                 (1) source can be parallel during snapshot reading, 
                 (2) source can perform checkpoints in the chunk granularity during snapshot reading, 
                 (3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.
-              If you would like the source run in parallel, each parallel reader should have an unique server id, so 
+              If you would like the source to run in parallel, each parallel reader should have a unique server id, so
               the 'server-id' must be a range like '5400-6400', and the range must be larger than the parallelism.
-              Please see <a href="./mysql-cdc.md#incremental-snapshot-reading">Incremental Snapshot Reading</a>section for more detailed information.
+              Please see <a href="../mysql-cdc/#incremental-snapshot-reading">Incremental Snapshot Reading</a>section for more detailed information.
           </td>
     </tr>
     <tr>
@@ -287,7 +293,7 @@ Connector Options
           <td>The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table.
             By default, the chunk key is the first column of the primary key. A column that is not part of the primary key can be used as a chunk key, but this may lead to slower query performance.
             <br>
-            <b>Warning:</b> Using a non-primary key column as a chunk key may lead to data inconsistencies. Please see <a href="./mysql-cdc.md#warning">Warning</a> for details.
+            <b>Warning:</b> Using a non-primary key column as a chunk key may lead to data inconsistencies. Please see <a href="../mysql-cdc/#warning">Warning</a> for details.
           </td>
     </tr>
     <tr>
@@ -296,7 +302,7 @@ Connector Options
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
       <td>Optional startup mode for OceanBase CDC consumer, valid enumerations are "initial", "earliest-offset", "latest-offset", "specific-offset", "timestamp" and "snapshot".
-           Please see <a href="./mysql-cdc.md#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
+           Please see <a href="../mysql-cdc/#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.file</td>
@@ -486,6 +492,17 @@ During a snapshot operation, the connector will query each included table to pro
         For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
       </td>
     </tr>
+    <tr>
+      <td>scan.rate-limit.records-per-second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">-1</td>
+      <td>Double</td>
+      <td>
+        The maximum number of records emitted per second, the default value: -1, means no rate limiting.(only for flink2.x)<br>
+        This option only takes effect when `scan.incremental.snapshot.enabled` is `true`. The legacy non-incremental source does not support rate limiting, and configuring this option with incremental snapshot disabled fails validation.<br>
+        WARNING: Incremental/binlog phase: Rate limiting can cause the connector to fall behind the upstream change stream, risking binlog/WAL purging before the connector catches up (data loss for MySQL, replication slot issues for PostgreSQL).
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
@@ -620,7 +637,7 @@ Data Type Mapping
     <thead>
       <tr>
         <th class="text-left" style="width:30%;">OceanBase type<a href="https://en.oceanbase.com/docs/common-oceanbase-database-10000000001974954"></a></th>
-        <th class="text-left" style="width:10%;">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left" style="width:10%;">Flink SQL type</th>
         <th class="text-left" style="width:60%;">NOTE</th>
       </tr>
     </thead>
@@ -854,7 +871,7 @@ Data Type Mapping
       </td>
       <td>
       The spatial data types will be converted into STRING with a fixed Json format.
-      Please see <a href="#patial-data-types-mapping ">Spatial Data Types Mapping</a> section for more detailed information.
+      Please see <a href="#spatial-data-types-mapping">Spatial Data Types Mapping</a> section for more detailed information.
       </td>
     </tr>
     </tbody>
@@ -920,5 +937,3 @@ The example for different spatial data types mapping is as follows:
     </tbody>
 </table>
 </div>
-
-{{< top >}}

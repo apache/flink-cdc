@@ -26,6 +26,7 @@ import org.apache.flink.configuration.StateRecoveryOptions;
 import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.runtime.checkpoint.CheckpointException;
+import org.apache.flink.runtime.messages.FlinkJobNotFoundException;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -519,6 +520,11 @@ class NewlyAddedTableITCase extends PostgresTestBase {
 
             // trigger failover after some snapshot data read finished
             if (failoverPhase == PostgresTestUtils.FailoverPhase.SNAPSHOT) {
+                // Wait until the job is RUNNING before triggering snapshot-phase failover.
+                // On JM failover, revoking leadership before the JobMaster leader election
+                // is established tears down the MiniCluster HA services with
+                // "high availability services are shut down".
+                PostgresTestUtils.waitUntilJobRunning(tableResult);
                 PostgresTestUtils.triggerFailover(
                         failoverType,
                         jobClient.getJobID(),
@@ -608,6 +614,7 @@ class NewlyAddedTableITCase extends PostgresTestBase {
                         jobClient.getJobID(),
                         miniClusterResource.get().getMiniCluster(),
                         () -> sleepMs(100));
+                PostgresTestUtils.waitUntilJobRunning(tableResult);
             }
 
             fetchedDataList.addAll(expectedWalLogDataThisRound);
@@ -718,6 +725,11 @@ class NewlyAddedTableITCase extends PostgresTestBase {
 
             // trigger failover after some snapshot data read finished
             if (failoverPhase == PostgresTestUtils.FailoverPhase.SNAPSHOT) {
+                // Wait until the job is RUNNING before triggering snapshot-phase failover.
+                // On JM failover, revoking leadership before the JobMaster leader election
+                // is established tears down the MiniCluster HA services with
+                // "high availability services are shut down".
+                PostgresTestUtils.waitUntilJobRunning(tableResult);
                 PostgresTestUtils.triggerFailover(
                         failoverType,
                         jobClient.getJobID(),
@@ -739,6 +751,7 @@ class NewlyAddedTableITCase extends PostgresTestBase {
                         jobClient.getJobID(),
                         miniClusterResource.get().getMiniCluster(),
                         () -> sleepMs(100));
+                PostgresTestUtils.waitUntilJobRunning(tableResult);
             }
             makeSecondPartWalLogForAddressTable(getConnection(), newlyAddedTable);
 
@@ -903,10 +916,16 @@ class NewlyAddedTableITCase extends PostgresTestBase {
                         .triggerSavepoint(savepointDirectory, SavepointFormatType.DEFAULT)
                         .get();
             } catch (Exception e) {
-                Optional<CheckpointException> exception =
+                Optional<CheckpointException> checkpointException =
                         ExceptionUtils.findThrowable(e, CheckpointException.class);
-                if (exception.isPresent()
-                        && exception.get().getMessage().contains("Checkpoint triggering task")) {
+                Optional<FlinkJobNotFoundException> jobNotFoundException =
+                        ExceptionUtils.findThrowable(e, FlinkJobNotFoundException.class);
+                if ((checkpointException.isPresent()
+                                && checkpointException
+                                        .get()
+                                        .getMessage()
+                                        .contains("Checkpoint triggering task"))
+                        || jobNotFoundException.isPresent()) {
                     Thread.sleep(100);
                     retryTimes++;
                 } else {
@@ -927,7 +946,11 @@ class NewlyAddedTableITCase extends PostgresTestBase {
                 StreamExecutionEnvironment.getExecutionEnvironment(configuration);
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
-        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 3, 100L);
+        // A single TM failover fails all subtasks of the pipelined region, and racing
+        // "disconnect from JobManager"/"TaskExecutor is shutting down" failures can be
+        // counted individually against the restart budget. Allow enough attempts so one
+        // failover never exhausts the strategy and pushes the job to FAILED.
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 10, 100L);
         return env;
     }
 

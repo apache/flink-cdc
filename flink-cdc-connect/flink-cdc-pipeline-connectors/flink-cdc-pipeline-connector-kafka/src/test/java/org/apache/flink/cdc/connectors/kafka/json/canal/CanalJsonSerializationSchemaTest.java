@@ -133,6 +133,20 @@ class CanalJsonSerializationSchemaTest {
                         "{\"old\":[{\"col1\":\"1\",\"col2\":\"1\"}],\"data\":[{\"col1\":\"1\",\"col2\":\"x\"}],\"type\":\"UPDATE\",\"database\":\"default_schema\",\"table\":\"table1\",\"pkNames\":[\"col1\"]}");
         actual = mapper.readTree(serializationSchema.serialize(updateEvent));
         Assertions.assertThat(actual).isEqualTo(expected);
+
+        DataChangeEvent replaceEvent =
+                DataChangeEvent.replaceEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("y")
+                                }));
+        expected =
+                mapper.readTree(
+                        "{\"old\":null,\"data\":[{\"col1\":\"1\",\"col2\":\"y\"}],\"type\":\"UPDATE\",\"database\":\"default_schema\",\"table\":\"table1\",\"pkNames\":[\"col1\"]}");
+        actual = mapper.readTree(serializationSchema.serialize(replaceEvent));
+        Assertions.assertThat(actual).isEqualTo(expected);
     }
 
     @Test

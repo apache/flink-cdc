@@ -1,9 +1,9 @@
 ---
 title: "PolarDB-X Tutorial"
-weight: 5
-type: docs
-aliases:
-- /connectors/flink-sources/tutorials/mongodb-tutorial.html
+slug: "/docs/connectors/flink-sources/tutorials/polardbx-tutorial"
+sidebar_position: 5
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -35,7 +35,7 @@ In the following sections, we will describe how to use Flink PolarDB-X CDC to im
 All exercises in this tutorial are performed in the Flink SQL CLI, and the entire process uses standard SQL syntax, without a single line of Java/Scala code or IDE installation.
 
 ## Preparation
-Prepare a Linux or MacOS computer with Docker installed.
+Prepare a Linux or macOS computer with Docker installed.
 
 ### Starting components required
 The components required in this demo are all managed in containers, so we will use `docker-compose` to start them.
@@ -77,7 +77,7 @@ services:
       - '/var/run/docker.sock:/var/run/docker.sock'
 ```
 The Docker Compose environment consists of the following containers:
-- PolarDB-X: the `products`,`orders` tables will be store in the database. They will be joined enrich the orders.
+- PolarDB-X: the `products` and `orders` tables are stored in this database and joined to enrich the orders.
 - Elasticsearch: mainly used as a data sink to store enriched orders.
 - Kibana: used to visualize the data in Elasticsearch.
 
@@ -89,12 +89,12 @@ This command automatically starts all the containers defined in the Docker Compo
 We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kibana is running normally.
 
 ### Preparing Flink and JAR package required
-1. Download [Flink 1.18.0](https://archive.apache.org/dist/flink/flink-1.18.0/flink-1.18.0-bin-scala_2.12.tgz) and unzip it to the directory `flink-1.18.0`
-2. Download following JAR package required and put them under `flink-1.18.0/lib/`:
+1. Download [Flink 1.20.5](https://archive.apache.org/dist/flink/flink-1.20.5/flink-1.20.5-bin-scala_2.12.tgz) and unzip it to the directory `flink-1.20.5`
+2. Download following JAR package required and put them under `flink-1.20.5/lib/`:
 
    **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
-    - flink-sql-connector-mysql-cdc-3.0-SNAPSHOT.jar
-    - [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
+    - [flink-sql-connector-mysql-cdc-3.7.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-mysql-cdc/3.7.0-1.20/flink-sql-connector-mysql-cdc-3.7.0-1.20.jar)
+    - [flink-sql-connector-elasticsearch7-3.1.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.1.0-1.20/flink-sql-connector-elasticsearch7-3.1.0-1.20.jar)
    
 ### Preparing data in databases
 #### Preparing data in PolarDB-X
@@ -119,7 +119,7 @@ We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kib
    (default,"hammer","14oz carpenter's hammer"),
    (default,"hammer","16oz carpenter's hammer"),
    (default,"rocks","box of assorted rocks"),
-   (default,"jacket","water resistent black wind breaker"),
+   (default,"jacket","water resistant black wind breaker"),
    (default,"spare tire","24 inch spare tire");
    
    
@@ -142,7 +142,7 @@ We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kib
 
 1. Use the following command to change to the Flink directory:
     ```
-    cd flink-1.18.0
+    cd flink-1.20.5
     ```
    
 2. Use the following command to start a Flink cluster:
@@ -152,7 +152,7 @@ We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kib
 
    Then we can visit [http://localhost:8081/](http://localhost:8081/) to see if Flink is running normally, and the web page looks like:
 
-   {{< img src="/fig/mysql-postgres-tutorial/flink-ui.png" alt="Flink UI" >}}
+   <img src="@@BASE_URL@@fig/mysql-postgres-tutorial/flink-ui.png" alt="Flink UI" class="doc-image">
 
 3. Use the following command to start a Flink SQL CLI:
     ```shell
@@ -160,7 +160,7 @@ We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kib
     ```
    We should see the welcome screen of the CLI client.
 
-   {{< img src="/fig/mysql-postgres-tutorial/flink-sql-client.png" alt="Flink SQL Client" >}}
+   <img src="@@BASE_URL@@fig/mysql-postgres-tutorial/flink-sql-client.png" alt="Flink SQL Client" class="doc-image">
 
 ## Creating tables using Flink DDL in Flink SQL CLI
 First, enable checkpoints every 3 seconds
@@ -250,11 +250,11 @@ Flink SQL> INSERT INTO enriched_orders
 Now, the enriched orders should be shown in Kibana.
 Visit [http://localhost:5601/app/kibana#/management/kibana/index_pattern](http://localhost:5601/app/kibana#/management/kibana/index_pattern) to create an index pattern `enriched_orders`.
 
-{{< img src="/fig/mysql-postgres-tutorial/kibana-create-index-pattern.png" alt="Create Index Pattern" >}}
+<img src="@@BASE_URL@@fig/mysql-postgres-tutorial/kibana-create-index-pattern.png" alt="Create Index Pattern" class="doc-image">
 
 Visit [http://localhost:5601/app/kibana#/discover](http://localhost:5601/app/kibana#/discover) to find the enriched orders.
 
-{{< img src="/fig/mysql-postgres-tutorial/kibana-detailed-orders.png" alt="Find enriched Orders" >}}
+<img src="@@BASE_URL@@fig/mysql-postgres-tutorial/kibana-detailed-orders.png" alt="Find enriched Orders" class="doc-image">
 
 Next, do some change in the databases, and then the enriched orders shown in Kibana will be updated after each step in real time.
 1. Insert a new order in PolarDB-X
@@ -274,16 +274,14 @@ Next, do some change in the databases, and then the enriched orders shown in Kib
    DELETE FROM orders WHERE order_id = 10004;
    ```
    The changes of enriched orders in Kibana are as follows:
-   {{< img src="/fig/mysql-postgres-tutorial/kibana-detailed-orders-changes.gif" alt="Enriched Orders Changes" >}}
-   
+   <img src="@@BASE_URL@@fig/mysql-postgres-tutorial/kibana-detailed-orders-changes.gif" alt="Enriched Orders Changes" class="doc-image">
+
 ## Clean up
 After finishing the tutorial, run the following command to stop all containers in the directory of `docker-compose.yml`:
 ```shell
 docker-compose down
 ```
-Run the following command to stop the Flink cluster in the directory of Flink `flink-1.18.0`:
+Run the following command to stop the Flink cluster in the directory of Flink `flink-1.20.5`:
 ```shell
 ./bin/stop-cluster.sh
 ```
-
-{{< top >}}

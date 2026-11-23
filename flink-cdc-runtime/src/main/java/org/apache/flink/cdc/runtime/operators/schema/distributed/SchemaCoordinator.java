@@ -21,6 +21,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.ExistingTableSchemaExpansionMode;
 import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
@@ -39,6 +40,7 @@ import org.apache.flink.cdc.runtime.operators.schema.distributed.event.SchemaCha
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
+import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.HashBasedTable;
@@ -48,6 +50,8 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.Table;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -64,6 +68,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -77,6 +82,13 @@ public class SchemaCoordinator extends SchemaRegistry {
 
     /** Atomic finite state machine to track global schema evolving state. */
     private transient AtomicReference<RequestStatus> evolvingStatus;
+
+    /**
+     * Preserves the first failure observed while a schema evolution is in progress, so that a later
+     * attempt's failure won't replace the original cause that left the coordinator in an invalid
+     * state.
+     */
+    private transient AtomicReference<Throwable> firstSchemaEvolutionFailure;
 
     /** Request futures from pending schema mappers. */
     private transient Map<
@@ -102,7 +114,7 @@ public class SchemaCoordinator extends SchemaRegistry {
             alreadyHandledSchemaChangeEvents;
 
     /** Executor service to execute schema change. */
-    private final ExecutorService schemaChangeThreadPool;
+    private transient ExecutorService schemaChangeThreadPool;
 
     public SchemaCoordinator(
             String operatorName,
@@ -113,6 +125,28 @@ public class SchemaCoordinator extends SchemaRegistry {
             RouteMode routeMode,
             SchemaChangeBehavior schemaChangeBehavior,
             Duration rpcTimeout) {
+        this(
+                operatorName,
+                context,
+                coordinatorExecutor,
+                metadataApplier,
+                routingRules,
+                routeMode,
+                schemaChangeBehavior,
+                ExistingTableSchemaExpansionMode.DISABLED,
+                rpcTimeout);
+    }
+
+    public SchemaCoordinator(
+            String operatorName,
+            OperatorCoordinator.Context context,
+            ExecutorService coordinatorExecutor,
+            MetadataApplier metadataApplier,
+            List<RouteRule> routingRules,
+            RouteMode routeMode,
+            SchemaChangeBehavior schemaChangeBehavior,
+            ExistingTableSchemaExpansionMode existingTableSchemaExpansionMode,
+            Duration rpcTimeout) {
         super(
                 context,
                 operatorName,
@@ -121,6 +155,7 @@ public class SchemaCoordinator extends SchemaRegistry {
                 routingRules,
                 routeMode,
                 schemaChangeBehavior,
+                existingTableSchemaExpansionMode,
                 rpcTimeout);
         this.schemaChangeThreadPool = Executors.newSingleThreadExecutor();
     }
@@ -129,15 +164,41 @@ public class SchemaCoordinator extends SchemaRegistry {
     // Lifecycle methods
     // -----------------
     @Override
-    public void start() throws Exception {
-        super.start();
+    protected void initialize() {
+        if (pendingRequests != null) {
+            pendingRequests.forEach(
+                    (index, tuple) ->
+                            tuple.f1.completeExceptionally(
+                                    new FlinkRuntimeException(
+                                            "Schema coordinator request was cancelled by checkpoint reset.")));
+        }
         this.evolvingStatus = new AtomicReference<>(RequestStatus.IDLE);
+        this.firstSchemaEvolutionFailure = new AtomicReference<>();
         this.pendingRequests = new ConcurrentHashMap<>();
         this.flushedSinkWriters = ConcurrentHashMap.newKeySet();
         this.upstreamSchemaTable = HashBasedTable.create();
         this.alreadyHandledSchemaChangeEvents = HashMultimap.create();
-        LOG.info(
-                "Started SchemaRegistry for {}. Parallelism: {}", operatorName, currentParallelism);
+        if (schemaChangeThreadPool == null || schemaChangeThreadPool.isShutdown()) {
+            schemaChangeThreadPool = Executors.newSingleThreadExecutor();
+        }
+    }
+
+    @Override
+    protected void shutdown() throws Exception {
+        schemaChangeThreadPool.shutdownNow();
+        if (!schemaChangeThreadPool.awaitTermination(
+                rpcTimeout.toMillis(), TimeUnit.MILLISECONDS)) {
+            throw new TimeoutException("Schema change executor did not terminate during reset.");
+        }
+    }
+
+    @Override
+    protected void handleUnrecoverableError(String taskDescription, Throwable t) {
+        super.handleUnrecoverableError(taskDescription, t);
+        if (pendingRequests != null) {
+            pendingRequests.forEach((index, tuple) -> tuple.f1.completeExceptionally(t));
+        }
+        LOG.info("Current upstream table state: {}", upstreamSchemaTable);
     }
 
     @Override
@@ -145,6 +206,19 @@ public class SchemaCoordinator extends SchemaRegistry {
         super.close();
         if (schemaChangeThreadPool != null && !schemaChangeThreadPool.isShutdown()) {
             schemaChangeThreadPool.shutdownNow();
+        }
+    }
+
+    @Override
+    public void executionAttemptFailed(
+            int subTaskId, int attemptNumber, @Nullable Throwable reason) {
+        if (reason != null) {
+            // Preserve the first failure per subtask to avoid a later attempt overwriting the
+            // original cause that left the coordinator in an invalid state.
+            failedReasons.putIfAbsent(subTaskId, reason);
+            if (hasOngoingSchemaEvolution()) {
+                firstSchemaEvolutionFailure.compareAndSet(null, reason);
+            }
         }
     }
 
@@ -208,16 +282,6 @@ public class SchemaCoordinator extends SchemaRegistry {
         flushedSinkWriters.add(event.getSinkSubTaskId());
     }
 
-    @Override
-    protected void handleUnrecoverableError(String taskDescription, Throwable t) {
-        super.handleUnrecoverableError(taskDescription, t);
-        LOG.info("Current upstream table state: {}", upstreamSchemaTable);
-        pendingRequests.forEach(
-                (index, tuple) -> {
-                    tuple.f1.completeExceptionally(t);
-                });
-    }
-
     // -------------------------
     // Schema evolving logic
     // -------------------------
@@ -267,10 +331,12 @@ public class SchemaCoordinator extends SchemaRegistry {
         pendingRequests.put(request.getSinkSubTaskId(), Tuple2.of(request, responseFuture));
 
         if (pendingRequests.size() == 1) {
-            Preconditions.checkState(
+            safeCheckState(
                     evolvingStatus.compareAndSet(
                             RequestStatus.IDLE, RequestStatus.WAITING_FOR_FLUSH),
-                    "Unexpected evolving status: " + evolvingStatus.get());
+                    request.getSinkSubTaskId());
+            failedReasons.clear();
+            firstSchemaEvolutionFailure.set(null);
             LOG.info(
                     "Received the very-first schema change request {}. Switching from IDLE to WAITING_FOR_FLUSH.",
                     request);
@@ -278,10 +344,10 @@ public class SchemaCoordinator extends SchemaRegistry {
 
         // No else if, since currentParallelism might be == 1
         if (pendingRequests.size() == currentParallelism) {
-            Preconditions.checkState(
+            safeCheckState(
                     evolvingStatus.compareAndSet(
                             RequestStatus.WAITING_FOR_FLUSH, RequestStatus.EVOLVING),
-                    "Unexpected evolving status: " + evolvingStatus.get());
+                    request.getSinkSubTaskId());
             LOG.info(
                     "Received the last required schema change request {}. Switching from WAITING_FOR_FLUSH to EVOLVING.",
                     request);
@@ -300,6 +366,31 @@ public class SchemaCoordinator extends SchemaRegistry {
                         }
                     });
         }
+    }
+
+    private void safeCheckState(boolean condition, int sinkSubTaskId) throws Exception {
+        if (condition) {
+            return;
+        }
+
+        IllegalStateException stateError =
+                new IllegalStateException("Unexpected evolving status: " + evolvingStatus.get());
+        Throwable originalFailure = firstSchemaEvolutionFailure.get();
+        if (originalFailure == null) {
+            originalFailure = failedReasons.get(sinkSubTaskId);
+        }
+        if (originalFailure == null && !failedReasons.isEmpty()) {
+            originalFailure = failedReasons.values().iterator().next();
+        }
+        if (originalFailure == null) {
+            throw stateError;
+        }
+
+        originalFailure.addSuppressed(stateError);
+        LOG.warn(
+                "Preserving the original subtask failure instead of reporting a secondary schema evolution state error.",
+                originalFailure);
+        ExceptionUtils.rethrowException(originalFailure);
     }
 
     /**
@@ -465,19 +556,19 @@ public class SchemaCoordinator extends SchemaRegistry {
 
     private boolean applyAndUpdateEvolvedSchemaChange(SchemaChangeEvent schemaChangeEvent) {
         try {
-            metadataApplier.applySchemaChange(schemaChangeEvent);
+            boolean shouldApplyOriginalCreateTable =
+                    expandExistingTableSchemaIfNeeded(schemaChangeEvent);
+            if (shouldApplyOriginalCreateTable) {
+                metadataApplier.applySchemaChange(schemaChangeEvent);
+            }
             schemaManager.applyEvolvedSchemaChange(schemaChangeEvent);
             LOG.info(
                     "Successfully applied schema change event {} to external system.",
                     schemaChangeEvent);
             return true;
         } catch (Throwable t) {
-            handleUnrecoverableError(
-                    "Apply schema change event - " + schemaChangeEvent,
-                    new FlinkRuntimeException(
-                            "Failed to apply schema change event " + schemaChangeEvent + ".", t));
-            context.failJob(t);
-            throw t;
+            throw new FlinkRuntimeException(
+                    "Failed to apply schema change event " + schemaChangeEvent + ".", t);
         }
     }
 
@@ -500,5 +591,17 @@ public class SchemaCoordinator extends SchemaRegistry {
     @VisibleForTesting
     public void emplaceOriginalSchema(TableId tableId, Integer subTaskId, Schema schema) {
         upstreamSchemaTable.put(tableId, subTaskId, schema);
+    }
+
+    private boolean hasOngoingSchemaEvolution() {
+        return evolvingStatus != null
+                && (evolvingStatus.get() != RequestStatus.IDLE
+                        || (pendingRequests != null && !pendingRequests.isEmpty())
+                        || (flushedSinkWriters != null && !flushedSinkWriters.isEmpty()));
+    }
+
+    @VisibleForTesting
+    boolean isSchemaEvolutionInProgress() {
+        return evolvingStatus != null && evolvingStatus.get() == RequestStatus.EVOLVING;
     }
 }

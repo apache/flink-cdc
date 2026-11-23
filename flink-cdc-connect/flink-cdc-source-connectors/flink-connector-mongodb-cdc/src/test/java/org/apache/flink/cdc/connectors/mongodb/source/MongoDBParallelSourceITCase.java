@@ -49,7 +49,9 @@ import org.junit.jupiter.api.Timeout;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -127,6 +129,54 @@ class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
     void testJobManagerFailoverInStreamPhase() throws Exception {
         testMongoDBParallelSource(
                 FailoverType.JM, FailoverPhase.STREAM, new String[] {"customers", "customers_1"});
+    }
+
+    @Test
+    void testCoordinatorReleasesSnapshotMetadataInGroupFetchPath() throws Exception {
+        // A small meta-group size forces the reader to fetch metadata over several groups, which
+        // is the path where the coordinator holds (and, with the option on, releases) the bulk
+        // snapshot-split metadata. No failover: this asserts the release does not drop any
+        // snapshot or change stream data.
+        testMongoDBParallelSource(
+                DEFAULT_PARALLELISM,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                new String[] {"customers", "customers_1"},
+                false,
+                releaseEnabledGroupFetchOptions());
+    }
+
+    @Test
+    void testCoordinatorReleaseSurvivesStreamPhaseFailover() throws Exception {
+        // JobManager (coordinator) failover in the stream phase after the release: the light,
+        // released state must restore correctly and lose no data.
+        testMongoDBParallelSource(
+                DEFAULT_PARALLELISM,
+                FailoverType.JM,
+                FailoverPhase.STREAM,
+                new String[] {"customers", "customers_1"},
+                false,
+                releaseEnabledGroupFetchOptions());
+    }
+
+    @Test
+    void testCoordinatorReleaseSurvivesStreamPhaseReaderFailover() throws Exception {
+        // TaskManager (reader) failover in the stream phase with the release enabled: the
+        // generation guard must reject any stale assembled report and no data is lost.
+        testMongoDBParallelSource(
+                DEFAULT_PARALLELISM,
+                FailoverType.TM,
+                FailoverPhase.STREAM,
+                new String[] {"customers", "customers_1"},
+                false,
+                releaseEnabledGroupFetchOptions());
+    }
+
+    private static Map<String, String> releaseEnabledGroupFetchOptions() {
+        Map<String, String> options = new HashMap<>();
+        options.put("chunk-meta.group.size", "1");
+        options.put("scan.incremental.snapshot.metadata.release.enabled", "true");
+        return options;
     }
 
     @Test
@@ -516,6 +566,23 @@ class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
             String[] captureCustomerCollections,
             boolean skipSnapshotBackfill)
             throws Exception {
+        testMongoDBParallelSource(
+                parallelism,
+                failoverType,
+                failoverPhase,
+                captureCustomerCollections,
+                skipSnapshotBackfill,
+                Collections.emptyMap());
+    }
+
+    private void testMongoDBParallelSource(
+            int parallelism,
+            FailoverType failoverType,
+            FailoverPhase failoverPhase,
+            String[] captureCustomerCollections,
+            boolean skipSnapshotBackfill,
+            Map<String, String> extraOptions)
+            throws Exception {
 
         String customerDatabase = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("customer");
 
@@ -543,13 +610,24 @@ class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
                                 + " 'collection' = '%s',"
                                 + " 'heartbeat.interval.ms' = '500',"
                                 + " 'scan.incremental.snapshot.backfill.skip' = '%s'"
+                                + " %s"
                                 + ")",
                         MONGO_CONTAINER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
                         customerDatabase,
                         getCollectionNameRegex(customerDatabase, captureCustomerCollections),
-                        skipSnapshotBackfill);
+                        skipSnapshotBackfill,
+                        extraOptions.isEmpty()
+                                ? ""
+                                : ","
+                                        + extraOptions.entrySet().stream()
+                                                .map(
+                                                        e ->
+                                                                String.format(
+                                                                        "'%s'='%s'",
+                                                                        e.getKey(), e.getValue()))
+                                                .collect(Collectors.joining(",")));
         // first step: check the snapshot data
         String[] snapshotForSingleTable =
                 new String[] {

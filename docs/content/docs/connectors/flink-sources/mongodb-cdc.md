@@ -1,9 +1,9 @@
 ---
 title: "MongoDB"
-weight: 6
-type: docs
-aliases:
-- /connectors/flink-sources/mongodb-cdc
+slug: "/docs/connectors/flink-sources/mongodb-cdc"
+sidebar_position: 6
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -26,16 +26,22 @@ under the License.
 
 # MongoDB CDC Connector
 
-The MongoDB CDC connector allows for reading snapshot data and incremental data from MongoDB. This document describes how to setup the MongoDB CDC connector to run SQL queries against MongoDB.
+The MongoDB CDC connector allows for reading snapshot data and incremental data from MongoDB. This document describes how to set up the MongoDB CDC connector to run SQL queries against MongoDB.
 
 Dependencies
 ------------
 
-In order to setup the MongoDB CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
+To set up the MongoDB CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
 ### Maven dependency
 
-{{< artifact flink-connector-mongodb-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-mongodb-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -309,7 +315,7 @@ Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>Whether try to generate full-mode changelog based on pre- and post-images in MongoDB. Refer to <a href="#a-name-id-003-a">Full Changelog</a>  for more details. Supports MongoDB 6.0 and above only.</td>
+      <td>Whether try to generate full-mode changelog based on pre- and post-images in MongoDB. Refer to <a href="#full-changelog">Full Changelog</a>  for more details. Supports MongoDB 6.0 and above only.</td>
     </tr>
     <tr>
       <td>scan.incremental.snapshot.enabled</td>
@@ -344,6 +350,13 @@ Connector Options
       </td>
     </tr>
     <tr>
+      <td>scan.incremental.snapshot.metadata.release.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to release the snapshot split metadata (assigned splits, finished offsets and table schemas) held by the source coordinator once the source has entered the stream phase, to reduce JobManager memory on jobs with a very large number of snapshot splits. Disabled by default. Incompatible with scan.newly-added-table.enabled: enabling both fails at startup, and a job that has released the metadata cannot later enable newly-added-table scanning. Release happens only after a successful checkpoint; if checkpointing is disabled or no checkpoint completes, the metadata is retained, so this option has no effect without checkpointing. A checkpoint or savepoint taken with this option enabled cannot be used to restore the job after downgrading to Flink CDC 3.6.0 or an earlier version.</td>
+    </tr>
+    <tr>
       <td>scan.cursor.no-timeout</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">true</td>
@@ -372,12 +385,81 @@ Connector Options
         For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
       </td>
     </tr>
+    <tr>
+      <td>mongodb.ssl.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether the connector will use SSL to connect to MongoDB instances.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.invalid.hostname.allowed</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>When SSL is enabled, this setting controls whether strict hostname checking is disabled during the connection phase. If <code>true</code>, the connection will not prevent man-in-the-middle attacks.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.keystore</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The location of the key store file. This is optional and can be used for two-way authentication between the client and the MongoDB server.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.keystore.password</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The password for the key store file. This is optional and only needed if <code>mongodb.ssl.keystore</code> is configured.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.keystore.type</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">PKCS12</td>
+      <td>String</td>
+      <td>The type of key store file. This is optional and only needed if <code>mongodb.ssl.keystore</code> is configured. Defaults to PKCS12.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.truststore</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The location of the trust store file for the server certificate verification.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.truststore.password</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The password for the trust store file. Used to check the integrity of the truststore, and unlock the truststore.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.truststore.type</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">PKCS12</td>
+      <td>String</td>
+      <td>The type of trust store file. This is optional and only needed if <code>mongodb.ssl.truststore</code> is configured. Defaults to PKCS12.</td>
+    </tr>
+    <tr>
+      <td>scan.rate-limit.records-per-second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">-1</td>
+      <td>Double</td>
+      <td>
+        The maximum number of records emitted per second, the default value: -1, means no rate limiting.(only for flink2.x)<br>
+        This option only takes effect when `scan.incremental.snapshot.enabled` is `true`. The legacy non-incremental source does not support rate limiting, and configuring this option with incremental snapshot disabled fails validation.<br>
+        WARNING: Incremental/binlog phase: Rate limiting can cause the connector to fall behind the upstream change stream, risking binlog/WAL purging before the connector catches up (data loss for MySQL, replication slot issues for PostgreSQL).
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
 
 Note: `heartbeat.interval.ms` is highly recommended setting a proper value larger than 0 **if the collection changes slowly**.
 The heartbeat event can push the `resumeToken` forward to avoid `resumeToken` being expired when we recover the Flink job from a checkpoint or savepoint.
+
+Note: The `mongodb.ssl.*` options only take effect when the incremental snapshot is enabled (`scan.incremental.snapshot.enabled` = `true`). They are ignored by the non-incremental source.
 
 Available Metadata
 ----------------
@@ -567,7 +649,7 @@ $ ./bin/flink run \
       --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**Note:** Please refer the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) for more details.
+**Note:** Please refer to [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/cli/#command-line-interface) for more details.
 
 ### DataStream Source
 
@@ -637,7 +719,7 @@ public class MongoDBIncrementalSourceExample {
 - If database regex is used, `readAnyDatabase` role is required.
 - The incremental snapshot feature only supports after MongoDB 4.0.
 
-### Full Changelog<a name="Full Changelog" id="003" ></a>
+### Full Changelog
 
 MongoDB 6.0 and above supports emitting change stream events containing document before and after the change was made (aka. pre- and post-images).
 
@@ -714,7 +796,7 @@ Data Type Mapping
 ----------------
 [BSON](https://docs.mongodb.com/manual/reference/bson-types/) short for **Binary JSON** is a binary-encoded serialization of JSON-like format used to store documents and make remote procedure calls in MongoDB.
 
-[Flink SQL Data Type](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/dev/table/types/) is similar to the SQL standard’s data type terminology which describes the logical type of a value in the table ecosystem. It can be used to declare input and/or output types of operations.
+[Flink SQL Data Type](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/dev/table/types/) is similar to the SQL standard’s data type terminology which describes the logical type of a value in the table ecosystem. It can be used to declare input and/or output types of operations.
 
 In order to enable Flink SQL to process data from heterogeneous data sources, the data types of heterogeneous data sources need to be uniformly converted to Flink SQL data types.
 
@@ -726,7 +808,7 @@ The following is the mapping of BSON type and Flink SQL type.
     <thead>
       <tr>
         <th class="text-left">BSON type<a href="https://docs.mongodb.com/manual/reference/bson-types/"></a></th>
-        <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">Flink SQL type</th>
       </tr>
     </thead>
     <tbody>
@@ -835,6 +917,4 @@ Reference
 - [Connection String Options](https://docs.mongodb.com/manual/reference/connection-string/#std-label-connections-connection-options)
 - [Document Pre- and Post-Images](https://www.mongodb.com/docs/v6.0/changeStreams/#change-streams-with-document-pre--and-post-images)
 - [BSON Types](https://docs.mongodb.com/manual/reference/bson-types/)
-- [Flink DataTypes](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/dev/table/types/)
-
-{{< top >}}
+- [Flink DataTypes](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/dev/table/types/)

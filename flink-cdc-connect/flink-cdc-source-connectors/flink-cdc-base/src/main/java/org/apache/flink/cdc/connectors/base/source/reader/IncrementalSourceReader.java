@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.base.source.reader;
 
 import org.apache.flink.api.connector.source.SourceEvent;
+import org.apache.flink.api.connector.source.util.ratelimit.RateLimiterStrategy;
 import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
@@ -28,6 +29,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.events.FinishedSnapshotS
 import org.apache.flink.cdc.connectors.base.source.meta.events.LatestFinishedSplitsNumberEvent;
 import org.apache.flink.cdc.connectors.base.source.meta.events.LatestFinishedSplitsNumberRequestEvent;
 import org.apache.flink.cdc.connectors.base.source.meta.events.StreamSplitAssignedEvent;
+import org.apache.flink.cdc.connectors.base.source.meta.events.StreamSplitMetaAssembledEvent;
 import org.apache.flink.cdc.connectors.base.source.meta.events.StreamSplitMetaEvent;
 import org.apache.flink.cdc.connectors.base.source.meta.events.StreamSplitMetaRequestEvent;
 import org.apache.flink.cdc.connectors.base.source.meta.events.StreamSplitUpdateAckEvent;
@@ -45,7 +47,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplitState;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
-import org.apache.flink.connector.base.source.reader.SingleThreadMultiplexSourceReaderBase;
+import org.apache.flink.connector.base.source.reader.SingleThreadMultiplexSourceReaderBaseAdapter;
 import org.apache.flink.connector.base.source.reader.fetcher.SingleThreadFetcherManager;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -59,10 +61,8 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -78,7 +78,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  */
 @Experimental
 public class IncrementalSourceReader<T, C extends SourceConfig>
-        extends SingleThreadMultiplexSourceReaderBase<
+        extends SingleThreadMultiplexSourceReaderBaseAdapter<
                 SourceRecords, T, SourceSplitBase, SourceSplitState> {
 
     private static final Logger LOG = LoggerFactory.getLogger(IncrementalSourceReader.class);
@@ -96,6 +96,17 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
     protected final Map<String, StreamSplit> uncompletedStreamSplits;
 
     /**
+     * The stream-split assignment generation served by the coordinator, echoed back in the {@link
+     * StreamSplitMetaAssembledEvent} so the coordinator can ignore a stale report from a
+     * failed-over assignment. Defaults to {@code COMPLETE_WITHOUT_META_GENERATION}, which the
+     * coordinator always accepts. That default still applies when a reader never requests meta
+     * groups, which covers a split restored already assembled and one that carries its metadata
+     * inline.
+     */
+    private int streamSplitMetaAssignmentGeneration =
+            StreamSplitMetaAssembledEvent.COMPLETE_WITHOUT_META_GENERATION;
+
+    /**
      * Steam split which is suspended reading in split reader and wait for
      * LatestFinishedSplitsNumberEvent from enumerator, will addSpilt and become
      * uncompletedStreamSplits later.
@@ -107,7 +118,7 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
     protected final C sourceConfig;
     protected final DataSourceDialect<C> dialect;
 
-    private final IncrementalSourceReaderContext incrementalSourceReaderContext;
+    protected final IncrementalSourceReaderContext incrementalSourceReaderContext;
 
     public IncrementalSourceReader(
             FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementQueue,
@@ -121,8 +132,13 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
         super(
                 new SingleThreadFetcherManager<>(splitReaderSupplier::get),
                 recordEmitter,
+                null,
                 config,
-                incrementalSourceReaderContext.getSourceReaderContext());
+                incrementalSourceReaderContext.getSourceReaderContext(),
+                sourceConfig.getScanRateLimitRecordsPerSecond() == -1
+                        ? null
+                        : RateLimiterStrategy.perSecond(
+                                sourceConfig.getScanRateLimitRecordsPerSecond()));
         this.sourceConfig = sourceConfig;
         this.finishedUnackedSplits = new HashMap<>();
         this.uncompletedStreamSplits = new HashMap<>();
@@ -142,6 +158,9 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
 
     @Override
     protected SourceSplitState initializedState(SourceSplitBase split) {
+        if (recordEmitter instanceof IncrementalSourceRecordEmitter) {
+            ((IncrementalSourceRecordEmitter<?>) recordEmitter).applySplit(split);
+        }
         if (split.isSnapshotSplit()) {
             return new SnapshotSplitState(split.asSnapshotSplit());
         } else {
@@ -309,6 +328,17 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
                             discoverTableSchemasForStreamSplit(
                                     streamSplit, checkNewlyAddedTableSchema);
                     unfinishedSplits.add(streamSplit);
+                    // The split is complete: it either arrived assembled (restored from a
+                    // checkpoint, or small enough to carry its metadata inline), was handed back
+                    // here after the newly-added-table process, or group fetch just finished
+                    // assembling it. Report it so the coordinator can (re-)arm the release. The
+                    // generation is the one the coordinator served the meta groups under, or
+                    // COMPLETE_WITHOUT_META_GENERATION when this reader never requested any.
+                    context.sendSourceEventToCoordinator(
+                            new StreamSplitMetaAssembledEvent(
+                                    streamSplit.splitId(),
+                                    streamSplit.getTotalFinishedSplitSize(),
+                                    streamSplitMetaAssignmentGeneration));
                 }
 
                 LOG.info(
@@ -358,28 +388,6 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
         }
     }
 
-    private Set<String> getExistedSplitsOfLastGroup(
-            List<FinishedSnapshotSplitInfo> finishedSnapshotSplits, int metaGroupSize) {
-        int splitsNumOfLastGroup =
-                finishedSnapshotSplits.size() % sourceConfig.getSplitMetaGroupSize();
-        if (splitsNumOfLastGroup != 0) {
-            int lastGroupStart =
-                    ((int) (finishedSnapshotSplits.size() / sourceConfig.getSplitMetaGroupSize()))
-                            * metaGroupSize;
-            // Keep same order with HybridSplitAssigner.createStreamSplit() to avoid
-            // 'invalid request meta group id' error
-            List<String> sortedFinishedSnapshotSplits =
-                    finishedSnapshotSplits.stream()
-                            .map(FinishedSnapshotSplitInfo::getSplitId)
-                            .sorted()
-                            .collect(Collectors.toList());
-            return new HashSet<>(
-                    sortedFinishedSnapshotSplits.subList(
-                            lastGroupStart, lastGroupStart + splitsNumOfLastGroup));
-        }
-        return new HashSet<>();
-    }
-
     @Override
     public void handleSourceEvents(SourceEvent sourceEvent) {
         if (sourceEvent instanceof FinishedSnapshotSplitsAckEvent) {
@@ -419,6 +427,8 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
     private void fillMetaDataForStreamSplit(StreamSplitMetaEvent metadataEvent) {
         StreamSplit streamSplit = uncompletedStreamSplits.get(metadataEvent.getSplitId());
         if (streamSplit != null) {
+            // remember the assignment generation to echo it back when the split is fully assembled
+            this.streamSplitMetaAssignmentGeneration = metadataEvent.getAssignmentGeneration();
             final int receivedMetaGroupId = metadataEvent.getMetaGroupId();
             final int receivedTotalFinishedSplitSize = metadataEvent.getTotalFinishedSplitSize();
             final int expectedMetaGroupId =
@@ -434,15 +444,24 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
                 streamSplit = toNormalStreamSplit(streamSplit, receivedTotalFinishedSplitSize);
                 uncompletedStreamSplits.put(streamSplit.splitId(), streamSplit);
             } else if (receivedMetaGroupId == expectedMetaGroupId) {
-                Set<String> existedSplitsOfLastGroup =
-                        getExistedSplitsOfLastGroup(
-                                streamSplit.getFinishedSnapshotSplitInfos(),
-                                sourceConfig.getSplitMetaGroupSize());
-
+                int expectedNumberOfAlreadyRetrievedElements =
+                        streamSplit.getFinishedSnapshotSplitInfos().size()
+                                % sourceConfig.getSplitMetaGroupSize();
+                List<byte[]> metaGroup = metadataEvent.getMetaGroup();
+                if (expectedNumberOfAlreadyRetrievedElements > 0) {
+                    LOG.info(
+                            "Source reader {} is discarding the first {} out of {} elements of meta group {}.",
+                            subtaskId,
+                            expectedNumberOfAlreadyRetrievedElements,
+                            metaGroup.size(),
+                            receivedMetaGroupId);
+                    metaGroup =
+                            metaGroup.subList(
+                                    expectedNumberOfAlreadyRetrievedElements, metaGroup.size());
+                }
                 List<FinishedSnapshotSplitInfo> newAddedMetadataGroup =
-                        metadataEvent.getMetaGroup().stream()
+                        metaGroup.stream()
                                 .map(sourceSplitSerializer::deserialize)
-                                .filter(r -> !existedSplitsOfLastGroup.contains(r.getSplitId()))
                                 .collect(Collectors.toList());
                 uncompletedStreamSplits.put(
                         streamSplit.splitId(),
@@ -477,6 +496,7 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
             context.sendSourceEventToCoordinator(splitMetaRequestEvent);
         } else {
             LOG.info("The meta of stream split {} has been collected success", splitId);
+            // addSplits reports the assembled metadata to the coordinator.
             this.addSplits(Collections.singletonList(streamSplit));
         }
     }

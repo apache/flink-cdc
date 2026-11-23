@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.api.common.InvalidProgramException;
 import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
+import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.cache.Cache;
@@ -31,6 +32,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The processor of the transform expression. It processes the expression of projections and
@@ -64,9 +66,12 @@ public class TransformExpressionCompiler {
                         List<Class<?>> argumentClasses = new ArrayList<>(key.getArgumentClasses());
 
                         for (UserDefinedFunctionDescriptor udfFunction : udfDescriptors) {
-                            argumentNames.add("__instanceOf" + udfFunction.getClassName());
+                            argumentNames.add("__udf_" + udfFunction.getName());
                             argumentClasses.add(Class.forName(udfFunction.getClasspath()));
                         }
+
+                        argumentNames.add(JaninoCompiler.DEFAULT_AI_MODEL_CLIENTS);
+                        argumentClasses.add(Map.class);
 
                         // Input args
                         expressionEvaluator.setParameters(
@@ -86,6 +91,9 @@ public class TransformExpressionCompiler {
                         try {
                             // Compile
                             expressionEvaluator.cook(key.getFullExpression());
+                            // Initialize Janino's lazily populated Method cache before publishing
+                            // the evaluator to concurrent cache readers.
+                            expressionEvaluator.getMethod();
                         } catch (CompileException e) {
                             throw new InvalidProgramException(
                                     String.format(

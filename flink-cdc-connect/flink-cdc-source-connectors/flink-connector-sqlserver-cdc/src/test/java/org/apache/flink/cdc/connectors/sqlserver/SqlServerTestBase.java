@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.sqlserver;
 
 import org.apache.flink.cdc.connectors.sqlserver.source.SqlServerSourceTestBase;
 import org.apache.flink.cdc.connectors.sqlserver.source.config.SqlServerSourceConfigFactory;
+import org.apache.flink.cdc.connectors.sqlserver.testutils.SqlServerTestUtils;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.AbstractTestBase;
 
@@ -33,9 +34,10 @@ import org.testcontainers.containers.MSSQLServerContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -58,21 +60,27 @@ public class SqlServerTestBase extends AbstractTestBase {
 
     private static final String STATEMENTS_PLACEHOLDER = "#";
 
+    private static final long SINK_WAIT_TIMEOUT_SECONDS = 90;
+
     private static final String DISABLE_DB_CDC =
             "IF EXISTS(select 1 from sys.databases where name='#' AND is_cdc_enabled=1)\n"
                     + "EXEC sys.sp_cdc_disable_db";
 
     public static final MSSQLServerContainer<?> MSSQL_SERVER_CONTAINER =
-            new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2019-latest")
+            new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2025-latest")
                     .withPassword("Password!")
                     .withEnv("MSSQL_AGENT_ENABLED", "true")
                     .withEnv("MSSQL_PID", "Standard")
+                    // SQL Server 2025 occasionally crashes during startup on CI; retry with a
+                    // fresh container.
+                    .withStartupAttempts(3)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @BeforeAll
     static void startContainers() throws Exception {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MSSQL_SERVER_CONTAINER)).join();
+        SqlServerTestUtils.waitForSqlServerAgent(MSSQL_SERVER_CONTAINER);
         LOG.info("Containers are started.");
     }
 
@@ -92,7 +100,7 @@ public class SqlServerTestBase extends AbstractTestBase {
                 MSSQL_SERVER_CONTAINER.getPassword());
     }
 
-    private static void dropTestDatabase(Connection connection, String databaseName)
+    protected static void dropTestDatabase(Connection connection, String databaseName)
             throws SQLException {
         try {
             Awaitility.await("Disabling CDC")
@@ -174,15 +182,24 @@ public class SqlServerTestBase extends AbstractTestBase {
      * connection.
      */
     protected void initializeSqlServerTable(String sqlFile) {
+        initializeSqlServerTable(sqlFile, sqlFile);
+    }
+
+    protected void initializeSqlServerTable(String sqlFile, String databaseName) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
-        final URL ddlTestFile = SqlServerTestBase.class.getClassLoader().getResource(ddlFile);
+        final InputStream ddlTestFile =
+                SqlServerTestBase.class.getClassLoader().getResourceAsStream(ddlFile);
         Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
-        try (Connection connection = getJdbcConnection();
+        try (InputStream inputStream = ddlTestFile;
+                BufferedReader reader =
+                        new BufferedReader(
+                                new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+                Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
-            dropTestDatabase(connection, sqlFile);
+            dropTestDatabase(connection, databaseName);
             final List<String> statements =
                     Arrays.stream(
-                                    Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
+                                    reader.lines()
                                             .map(String::trim)
                                             .filter(x -> !x.startsWith("--") && !x.isEmpty())
                                             .map(
@@ -192,6 +209,7 @@ public class SqlServerTestBase extends AbstractTestBase {
                                                         return m.matches() ? m.group(1) : x;
                                                     })
                                             .collect(Collectors.joining("\n"))
+                                            .replace(sqlFile, databaseName)
                                             .split(";"))
                             .collect(Collectors.toList());
             for (String stmt : statements) {
@@ -203,16 +221,21 @@ public class SqlServerTestBase extends AbstractTestBase {
     }
 
     protected static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
-        while (sinkSize(sinkName) == 0) {
-            Thread.sleep(100);
-        }
+        // Bound the wait so that a stalled source (e.g. a record that never converges because a
+        // streaming conversion failed) fails this single test fast instead of hanging the whole
+        // suite until the job-level timeout.
+        Awaitility.await(String.format("Snapshot of %s to start", sinkName))
+                .atMost(SINK_WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(() -> sinkSize(sinkName) > 0);
     }
 
     protected static void waitForSinkSize(String sinkName, int expectedSize)
             throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
+        Awaitility.await(String.format("Sink %s to reach size %d", sinkName, expectedSize))
+                .atMost(SINK_WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(() -> sinkSize(sinkName) >= expectedSize);
     }
 
     protected static int sinkSize(String sinkName) {

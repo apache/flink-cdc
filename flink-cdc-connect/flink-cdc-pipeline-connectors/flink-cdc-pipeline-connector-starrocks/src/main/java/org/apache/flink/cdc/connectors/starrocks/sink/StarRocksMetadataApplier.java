@@ -47,6 +47,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksUtils.toStarRocksDataType;
+import static org.apache.flink.cdc.connectors.starrocks.sink.utils.StarRocksEscapingUtils.escape;
 
 /** A {@code MetadataApplier} that applies metadata changes to StarRocks. */
 public class StarRocksMetadataApplier implements MetadataApplier {
@@ -158,11 +159,13 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                     new StarRocksColumn.Builder()
                             .setColumnName(column.getName())
                             .setOrdinalPosition(-1)
-                            .setColumnComment(column.getComment())
+                            .setColumnComment(escape(column.getComment()))
                             .setDefaultValue(
-                                    StarRocksUtils.convertInvalidTimestampDefaultValue(
-                                            column.getDefaultValueExpression(), column.getType()));
-            toStarRocksDataType(column, false, builder);
+                                    escape(
+                                            StarRocksUtils.convertInvalidTimestampDefaultValue(
+                                                    column.getDefaultValueExpression(),
+                                                    column.getType())));
+            toStarRocksDataType(column, false, builder, tableCreateConfig.getUnicodeCharMaxBytes());
             addColumns.add(builder.build());
         }
 
@@ -321,7 +324,11 @@ public class StarRocksMetadataApplier implements MetadataApplier {
             for (Map.Entry<String, DataType> entry : typeMapping.entrySet()) {
                 StarRocksColumn.Builder builder =
                         new StarRocksColumn.Builder().setColumnName(entry.getKey());
-                toStarRocksDataType(entry.getValue(), false, builder);
+                toStarRocksDataType(
+                        entry.getValue(),
+                        false,
+                        builder,
+                        tableCreateConfig.getUnicodeCharMaxBytes());
                 catalog.alterColumnType(
                         tableId.getSchemaName(), tableId.getTableName(), builder.build());
             }

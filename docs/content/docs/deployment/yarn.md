@@ -1,9 +1,9 @@
 ---
 title: "YARN"
-weight: 2
-type: docs
-aliases:
-  - /deployment/yarn
+slug: "/docs/deployment/yarn"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -43,7 +43,7 @@ This *Getting Started* section assumes a functional YARN environment, starting f
 export HADOOP_CLASSPATH=`hadoop classpath`
 ```
 Flink runs on all UNIX-like environments, i.e. Linux, Mac OS X, and Cygwin (for Windows).  
-You can refer [overview]({{< ref "docs/connectors/pipeline-connectors/overview" >}}) to check supported versions and download [the binary release](https://flink.apache.org/downloads/) of Flink,
+You can refer [overview](../connectors/pipeline-connectors/overview.md) to check supported versions and download [the binary release](https://flink.apache.org/downloads/) of Flink,
 then extract the archive:
 
 ```bash
@@ -128,11 +128,17 @@ sink:
 pipeline:
  name: Sync MySQL Database to Doris
  parallelism: 2
-
+ flink-conf:
+   rest.bind-port: {{REST_PORT}}
+   rest.address: {{NODE_IP}}
+   yarn.application.id: {{YARN_APPLICATION_ID}}
+   execution.checkpointing.interval: 2min
+   # If you need to restore from a savepoint, uncomment the next line:
+   # execution.savepoint.path: hdfs:///flink/savepoint-1537
 ```
 
 You need to modify the configuration file according to your needs.
-Finally, submit job to Flink Yarn Session cluster using Cli.
+Finally, submit job to Flink YARN Session cluster using CLI.
 
 ```bash
 cd /path/flink-cdc-*
@@ -149,10 +155,10 @@ Job Description: Sync MySQL Database to Doris
 
 You can find a job named `Sync MySQL Database to Doris` running through Flink Web UI.
 
-# Yarn Application Mode
-The Yarn Application mode is the recommended approach for running Flink jobs on a Yarn cluster. It offers more flexible resource management and allocation, enabling better utilization of cluster resources.
+# YARN Application Mode
+The YARN Application mode is the recommended approach for running Flink jobs on a YARN cluster. It offers more flexible resource management and allocation, enabling better utilization of cluster resources.
 
-To submit a job to a Flink Yarn Application cluster using the CLI:
+To submit a job to a Flink YARN Application cluster using the CLI:
 ```bash
 cd /path/flink-cdc-*
 ./bin/flink-cdc.sh -t yarn-application -Dexecution.checkpointing.interval=2min mysql-to-doris.yaml
@@ -168,5 +174,4 @@ Pipeline has been submitted to cluster.
 Job ID: application_1728995081590_1254
 Job Description: submit job successful
 ```
-You can find a application_id `application_1728995081590_1254` running through Yarn Web UI.
-
+You can find a application_id `application_1728995081590_1254` running through YARN Web UI.

@@ -20,11 +20,14 @@ package org.apache.flink.cdc.runtime.operators.transform;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.udf.UserDefinedFunction;
+import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 import org.apache.flink.cdc.runtime.model.OpenAIEmbeddingModel;
 import org.apache.flink.table.functions.ScalarFunction;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.junit.jupiter.api.Test;
+
+import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -40,6 +43,16 @@ class UserDefinedFunctionDescriptorTest {
         @Override
         public DataType getReturnType() {
             return DataTypes.TIMESTAMP_LTZ(9);
+        }
+    }
+
+    /** This is a Flink CDC UDF whose type hint depends on per-UDF options. */
+    public static class CdcUdfWithOptionTypeHint implements UserDefinedFunction {
+        @Override
+        public DataType getReturnType(UserDefinedFunctionContext context) {
+            return "string".equals(context.configuration().toMap().get("return-type"))
+                    ? DataTypes.STRING()
+                    : DataTypes.BIGINT();
         }
     }
 
@@ -104,5 +117,16 @@ class UserDefinedFunctionDescriptorTest {
                         "org.apache.flink.cdc.runtime.model.OpenAIEmbeddingModel",
                         DataTypes.ARRAY(DataTypes.FLOAT()),
                         true);
+    }
+
+    @Test
+    void testReturnTypeHintUsesUdfOptions() {
+        UserDefinedFunctionDescriptor descriptor =
+                new UserDefinedFunctionDescriptor(
+                        "option_type_hint",
+                        CdcUdfWithOptionTypeHint.class.getName(),
+                        Collections.singletonMap("return-type", "string"));
+
+        assertThat(descriptor.getReturnTypeHint()).isEqualTo(DataTypes.STRING());
     }
 }

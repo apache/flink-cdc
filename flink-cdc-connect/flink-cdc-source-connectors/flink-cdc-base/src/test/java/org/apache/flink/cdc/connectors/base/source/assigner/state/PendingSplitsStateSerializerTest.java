@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.base.source.assigner.state;
 import org.apache.flink.cdc.connectors.base.source.assigner.AssignerStatus;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
+import org.apache.flink.cdc.connectors.base.source.meta.split.SchemalessSnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitSerializer;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
@@ -35,8 +36,11 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -105,6 +109,122 @@ class PendingSplitsStateSerializerTest {
 
         assertThat(serializer.deserialize(serializer.getVersion(), serializer.serialize(state)))
                 .isEqualTo(state);
+    }
+
+    @Test
+    void testReleaseEnabledRoundTripsV9WithFlag() throws Exception {
+        PendingSplitsStateSerializer serializer =
+                new PendingSplitsStateSerializer(constructSourceSplitSerializer(), true);
+        assertThat(serializer.getVersion()).isEqualTo(9);
+        SnapshotPendingSplitsState released = buildSnapshotState(true);
+        PendingSplitsState restored =
+                serializer.deserialize(serializer.getVersion(), serializer.serialize(released));
+        assertThat(restored).isEqualTo(released);
+        assertThat(((SnapshotPendingSplitsState) restored).isSnapshotMetaReleased()).isTrue();
+    }
+
+    @Test
+    void testReleaseDisabledJobKeepsWritingV8Format() throws Exception {
+        PendingSplitsStateSerializer v8 =
+                new PendingSplitsStateSerializer(constructSourceSplitSerializer(), false);
+        PendingSplitsStateSerializer v9 =
+                new PendingSplitsStateSerializer(constructSourceSplitSerializer(), true);
+        assertThat(v8.getVersion()).isEqualTo(8);
+        assertThat(v9.getVersion()).isEqualTo(9);
+
+        SnapshotPendingSplitsState state = buildSnapshotState(false);
+        byte[] v9Bytes = v9.serialize(state);
+        // clear the lazily cached serialized form so the v8 serializer re-serializes the state
+        state.serializedFormCache = null;
+        byte[] v8Bytes = v8.serialize(state);
+
+        // For a snapshot-only state the released flag is the final byte, so the v8 bytes are the
+        // v9 bytes without that trailing byte, the format an older connector wrote.
+        assertThat(v8Bytes).isEqualTo(Arrays.copyOf(v9Bytes, v9Bytes.length - 1));
+
+        PendingSplitsState restored = v8.deserialize(8, v8Bytes);
+        assertThat(restored).isEqualTo(state);
+        assertThat(((SnapshotPendingSplitsState) restored).isSnapshotMetaReleased()).isFalse();
+    }
+
+    @Test
+    void testHybridStateRoundTripAtV8LeavesFlagFalse() throws Exception {
+        PendingSplitsStateSerializer v8 =
+                new PendingSplitsStateSerializer(constructSourceSplitSerializer(), false);
+        HybridPendingSplitsState hybrid =
+                new HybridPendingSplitsState(buildSnapshotState(false), true);
+        PendingSplitsState restored = v8.deserialize(v8.getVersion(), v8.serialize(hybrid));
+        assertThat(restored).isEqualTo(hybrid);
+        assertThat(
+                        ((HybridPendingSplitsState) restored)
+                                .getSnapshotPendingSplits()
+                                .isSnapshotMetaReleased())
+                .isFalse();
+    }
+
+    private SnapshotPendingSplitsState buildSnapshotState(boolean snapshotMetaReleased) {
+        return new SnapshotPendingSplitsState(
+                Collections.emptyList(),
+                Collections.emptyList(),
+                Collections.emptyMap(),
+                constructTableSchema(),
+                Collections.emptyMap(),
+                AssignerStatus.INITIAL_ASSIGNING,
+                Collections.emptyList(),
+                false,
+                true,
+                Collections.emptyMap(),
+                new ChunkSplitterState(
+                        constructTableId(), ChunkSplitterState.ChunkBound.middleOf(1), 2),
+                snapshotMetaReleased);
+    }
+
+    @Test
+    void testAssignedSplitsKeepAssignmentOrderAfterSerde() throws Exception {
+        TableId tableId = constructTableId();
+        RowType splitKeyType =
+                new RowType(
+                        Collections.singletonList(new RowType.RowField("id", new BigIntType())));
+        // 10+ splits so that the lexicographic order of split ids differs from the assignment
+        // order, which determines the meta group partitioning of finished snapshot splits
+        List<String> assignmentOrder = new ArrayList<>();
+        LinkedHashMap<String, SchemalessSnapshotSplit> assignedSplits = new LinkedHashMap<>();
+        for (int i = 0; i < 12; i++) {
+            String splitId = tableId + ":" + i;
+            assignmentOrder.add(splitId);
+            assignedSplits.put(
+                    splitId,
+                    new SchemalessSnapshotSplit(
+                            tableId,
+                            splitId,
+                            splitKeyType,
+                            new Object[] {i},
+                            new Object[] {i + 1},
+                            null));
+        }
+        PendingSplitsStateSerializer serializer =
+                new PendingSplitsStateSerializer(constructSourceSplitSerializer());
+        SnapshotPendingSplitsState state =
+                new SnapshotPendingSplitsState(
+                        Collections.singletonList(tableId),
+                        Collections.emptyList(),
+                        assignedSplits,
+                        constructTableSchema(),
+                        Collections.emptyMap(),
+                        AssignerStatus.INITIAL_ASSIGNING_FINISHED,
+                        Collections.emptyList(),
+                        false,
+                        true,
+                        Collections.emptyMap(),
+                        ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
+
+        SnapshotPendingSplitsState restoredState =
+                (SnapshotPendingSplitsState)
+                        serializer.deserialize(
+                                serializer.getVersion(), serializer.serialize(state));
+
+        assertThat(new ArrayList<>(restoredState.getAssignedSplits().keySet()))
+                .isEqualTo(assignmentOrder);
     }
 
     private SourceSplitSerializer constructSourceSplitSerializer() {

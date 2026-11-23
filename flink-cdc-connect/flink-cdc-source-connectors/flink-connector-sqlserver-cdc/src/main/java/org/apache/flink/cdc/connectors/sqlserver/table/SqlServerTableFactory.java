@@ -17,11 +17,11 @@
 
 package org.apache.flink.cdc.connectors.sqlserver.table;
 
+import org.apache.flink.cdc.connectors.base.options.StartupMode;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.utils.OptionUtils;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ResolvedSchema;
@@ -38,11 +38,13 @@ import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.CON
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_MAX_RETRIES;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_TIMEOUT;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
@@ -107,7 +109,14 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
                     .defaultValue("initial")
                     .withDescription(
                             "Optional startup mode for SqlServer CDC consumer, valid enumerations are "
-                                    + "\"initial\" and \"latest-offset\"");
+                                    + "\"initial\", \"latest-offset\" and \"timestamp\"");
+
+    public static final ConfigOption<Long> SCAN_STARTUP_TIMESTAMP_MILLIS =
+            ConfigOptions.key("scan.startup.timestamp-millis")
+                    .longType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Optional timestamp used in case of \"timestamp\" startup mode");
 
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
@@ -124,10 +133,11 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
         int port = config.get(PORT);
         StartupOptions startupOptions = getStartupOptions(config);
+        boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
+        validateStartupOptions(startupOptions, enableParallelRead);
         ResolvedSchema physicalSchema =
                 getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
 
-        boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         int splitSize = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
         int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
@@ -142,6 +152,21 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         boolean skipSnapshotBackfill = config.get(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         boolean assignUnboundedChunkFirst =
                 config.get(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
+        boolean releaseSnapshotMetadataEnabled =
+                config.get(SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED);
+        double scanRateLimitRecordsPerSecond = config.get(SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
+
+        if (!enableParallelRead
+                && scanRateLimitRecordsPerSecond
+                        != SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue()) {
+            throw new ValidationException(
+                    String.format(
+                            "Option '%s' requires option '%s' to be enabled. The legacy "
+                                    + "non-incremental source does not support rate limiting, "
+                                    + "please enable incremental snapshot.",
+                            SCAN_RATE_LIMIT_RECORDS_PER_SECOND.key(),
+                            SCAN_INCREMENTAL_SNAPSHOT_ENABLED.key()));
+        }
 
         if (enableParallelRead) {
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
@@ -153,7 +178,7 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
             validateDistributionFactorLower(distributionFactorLower);
         }
 
-        OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
+        OptionUtils.printOptions(IDENTIFIER, config.toMap());
 
         return new SqlServerTableSource(
                 physicalSchema,
@@ -178,7 +203,9 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
                 chunkKeyColumn,
                 closeIdleReaders,
                 skipSnapshotBackfill,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                releaseSnapshotMetadataEnabled,
+                scanRateLimitRecordsPerSecond);
     }
 
     @Override
@@ -203,6 +230,7 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         options.add(PORT);
         options.add(SERVER_TIME_ZONE);
         options.add(SCAN_STARTUP_MODE);
+        options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
         options.add(CHUNK_META_GROUP_SIZE);
@@ -216,11 +244,14 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED);
+        options.add(SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
         return options;
     }
 
     private static final String SCAN_STARTUP_MODE_VALUE_INITIAL = "initial";
     private static final String SCAN_STARTUP_MODE_VALUE_LATEST = "latest-offset";
+    private static final String SCAN_STARTUP_MODE_VALUE_TIMESTAMP = "timestamp";
 
     private static StartupOptions getStartupOptions(ReadableConfig config) {
         String modeString = config.get(SCAN_STARTUP_MODE);
@@ -232,14 +263,39 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
             case SCAN_STARTUP_MODE_VALUE_LATEST:
                 return StartupOptions.latest();
 
+            case SCAN_STARTUP_MODE_VALUE_TIMESTAMP:
+                Long startupTimestampMillis = config.get(SCAN_STARTUP_TIMESTAMP_MILLIS);
+                if (startupTimestampMillis == null) {
+                    throw new ValidationException(
+                            String.format(
+                                    "To use timestamp startup mode, the startup timestamp millis '%s' must be set.",
+                                    SCAN_STARTUP_TIMESTAMP_MILLIS.key()));
+                }
+                return StartupOptions.timestamp(startupTimestampMillis);
+
             default:
                 throw new ValidationException(
                         String.format(
-                                "Invalid value for option '%s'. Supported values are [%s, %s], but was: %s",
+                                "Invalid value for option '%s'. Supported values are [%s, %s, %s], but was: %s",
                                 SCAN_STARTUP_MODE.key(),
                                 SCAN_STARTUP_MODE_VALUE_INITIAL,
                                 SCAN_STARTUP_MODE_VALUE_LATEST,
+                                SCAN_STARTUP_MODE_VALUE_TIMESTAMP,
                                 modeString));
+        }
+    }
+
+    private static void validateStartupOptions(
+            StartupOptions startupOptions, boolean enableParallelRead) {
+        if (startupOptions.startupMode == StartupMode.TIMESTAMP && !enableParallelRead) {
+            throw new ValidationException(
+                    String.format(
+                            "Option '%s'='%s' requires '%s'='true' because timestamp startup "
+                                    + "is only supported by the incremental SQL Server source; "
+                                    + "the legacy non-parallel source does not support it.",
+                            SCAN_STARTUP_MODE.key(),
+                            SCAN_STARTUP_MODE_VALUE_TIMESTAMP,
+                            SCAN_INCREMENTAL_SNAPSHOT_ENABLED.key()));
         }
     }
 

@@ -1,9 +1,9 @@
 ---
 title: "Type Mappings"
-weight: 8
-type: docs
-aliases:
-  - /core-concept/type-mappings/
+slug: "/docs/core-concept/type-mappings"
+sidebar_position: 8
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

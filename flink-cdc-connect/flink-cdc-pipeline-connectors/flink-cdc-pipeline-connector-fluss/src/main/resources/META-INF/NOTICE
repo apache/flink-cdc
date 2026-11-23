@@ -1,0 +1,18 @@
+flink-cdc-pipeline-connector-fluss
+Copyright 2024-2026 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+Apache Fluss includes software developed for Orekit by
+CS Systèmes d'Information (http://www.c-s.fr/)
+Copyright 2010-2012 CS Systèmes d'Information
+
+Apache Fluss includes Jackson, originally written by Tatu Saloranta.
+Copyright 2007-, Tatu Saloranta
+
+Jackson Core bundles a shaded copy of FastDoubleParser.
+Copyright © 2023 Werner Randelshofer, Switzerland. MIT License.
+
+The Netty Project
+Copyright 2016 The Netty Project

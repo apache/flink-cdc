@@ -66,13 +66,9 @@ public class FlussEventSerializationSchema implements FlussEventSerializer<Event
     public FlussEvent serialize(Event event) throws IOException {
         if (event instanceof SchemaChangeEvent) {
             applySchemaChangeEvent((SchemaChangeEvent) event);
-            return new FlussEvent(getTablePath(((SchemaChangeEvent) event).tableId()), null, true);
+            return null;
         } else if (event instanceof DataChangeEvent) {
-            FlussRowWithOp rowWithOp = applyDataChangeEvent((DataChangeEvent) event);
-            return new FlussEvent(
-                    getTablePath(((DataChangeEvent) event).tableId()),
-                    Collections.singletonList(rowWithOp),
-                    false);
+            return applyDataChangeEvent((DataChangeEvent) event);
 
         } else {
             throw new UnsupportedOperationException("Don't support event " + event);
@@ -90,7 +86,10 @@ public class FlussEventSerializationSchema implements FlussEventSerializer<Event
                             schemaMaps.get(tableId).upstreamCdcSchema, newSchema)) {
                 Table table = connection.getTable(getTablePath(tableId));
                 TableSchemaInfo newSchemaInfo =
-                        new TableSchemaInfo(newSchema, table.getTableInfo().getSchema());
+                        new TableSchemaInfo(
+                                table.getTableInfo().getSchemaId(),
+                                newSchema,
+                                table.getTableInfo().getSchema());
                 schemaMaps.put(tableId, newSchemaInfo);
             }
         } else if (event instanceof AddColumnEvent) {
@@ -106,6 +105,7 @@ public class FlussEventSerializationSchema implements FlussEventSerializer<Event
                 Table table = connection.getTable(getTablePath(tableId));
                 TableSchemaInfo newSchemaInfo =
                         new TableSchemaInfo(
+                                table.getTableInfo().getSchemaId(),
                                 SchemaUtils.applySchemaChangeEvent(schema, event),
                                 table.getTableInfo().getSchema());
                 schemaMaps.put(tableId, newSchemaInfo);
@@ -118,29 +118,44 @@ public class FlussEventSerializationSchema implements FlussEventSerializer<Event
         }
     }
 
-    private FlussRowWithOp applyDataChangeEvent(DataChangeEvent record) {
+    private FlussEvent applyDataChangeEvent(DataChangeEvent record) {
         OperationType op = record.op();
         TableSchemaInfo tableSchemaInfo = schemaMaps.get(record.tableId());
         Preconditions.checkNotNull(
                 tableSchemaInfo, "Table schema not found for table " + record.tableId());
         int flussFieldCount = tableSchemaInfo.downstreamFlussSchema.getRowType().getFieldCount();
         boolean hasPrimaryKey = !tableSchemaInfo.upstreamCdcSchema.primaryKeys().isEmpty();
+        int schemaId = tableSchemaInfo.schemaId;
+        FlussRowWithOp flussRowWithOp;
         switch (op) {
             case INSERT:
             case UPDATE:
             case REPLACE:
-                return new FlussRowWithOp(
-                        CdcAsFlussRow.replace(
-                                record.after(), flussFieldCount, tableSchemaInfo.indexMapping),
-                        hasPrimaryKey ? UPSERT : APPEND);
+                flussRowWithOp =
+                        new FlussRowWithOp(
+                                CdcAsFlussRow.replace(
+                                        record.after(),
+                                        flussFieldCount,
+                                        tableSchemaInfo.indexMapping),
+                                hasPrimaryKey ? UPSERT : APPEND);
+                break;
             case DELETE:
-                return new FlussRowWithOp(
-                        CdcAsFlussRow.replace(
-                                record.before(), flussFieldCount, tableSchemaInfo.indexMapping),
-                        DELETE);
+                flussRowWithOp =
+                        new FlussRowWithOp(
+                                CdcAsFlussRow.replace(
+                                        record.before(),
+                                        flussFieldCount,
+                                        tableSchemaInfo.indexMapping),
+                                DELETE);
+                break;
             default:
                 throw new IllegalArgumentException("Unsupported row kind: " + op);
         }
+
+        return new FlussEvent(
+                getTablePath(record.tableId()),
+                Collections.singletonList(flussRowWithOp),
+                schemaId);
     }
 
     private TablePath getTablePath(TableId tableId) {
@@ -148,13 +163,16 @@ public class FlussEventSerializationSchema implements FlussEventSerializer<Event
     }
 
     private static class TableSchemaInfo {
+        int schemaId;
         org.apache.flink.cdc.common.schema.Schema upstreamCdcSchema;
         org.apache.fluss.metadata.Schema downstreamFlussSchema;
         Map<Integer, Integer> indexMapping;
 
         private TableSchemaInfo(
+                int schemaId,
                 org.apache.flink.cdc.common.schema.Schema upstreamCdcSchema,
                 org.apache.fluss.metadata.Schema downstreamFlussSchema) {
+            this.schemaId = schemaId;
             this.upstreamCdcSchema = upstreamCdcSchema;
             this.downstreamFlussSchema = downstreamFlussSchema;
             this.indexMapping =

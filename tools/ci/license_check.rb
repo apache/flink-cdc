@@ -81,6 +81,28 @@ EXCEPTION_PACKAGES = [
   'org/eclipse/parsson/'   # EPL 2.0
 ].freeze
 
+# Required attributions in final shaded JARs, not only in source NOTICE files.
+NOTICE_EXPECTATIONS = {
+  'flink-cdc-pipeline-connector-doris' => ['The Netty Project', 'BoringSSL'],
+  'flink-cdc-pipeline-connector-fluss' => [
+    'Apache Fluss includes software developed for Orekit',
+    'Apache Fluss includes Jackson, originally written by Tatu Saloranta.',
+    'Jackson Core bundles a shaded copy of FastDoubleParser.',
+    'The Netty Project'
+  ],
+  'flink-cdc-pipeline-connector-iceberg' => [
+    'Apache Iceberg includes code from Kite',
+    'FastDoubleParser',
+    'Nessie includes code from Apache Polaris'
+  ],
+  'flink-cdc-pipeline-connector-maxcompute' => ['The Netty Project'],
+  'flink-cdc-pipeline-connector-paimon' => ['FastDoubleParser', 'The Netty Project'],
+  'flink-cdc-pipeline-connector-starrocks' => ['The Netty Project'],
+  'flink-sql-connector-tidb-cdc' => ['The Netty Project', 'BoringSSL'],
+  'flink-sql-connector-vitess-cdc' => ['The Netty Project', 'BoringSSL'],
+  'flink-cdc-pipeline-model-openai-compatible' => ['Public Suffix List']
+}.freeze
+
 puts 'Start license check...'
 
 # Extract Flink CDC revision number from global pom.xml
@@ -98,7 +120,11 @@ def traverse_module(path)
   return if EXCLUDED_MODULES.include?(module_name)
 
   jar_file = File.join path, 'target', "#{module_name}-#{REVISION_NUMBER}.jar"
-  check_jar_license jar_file if File.exist? jar_file
+  if File.exist? jar_file
+    check_jar_license jar_file, module_name
+  elsif NOTICE_EXPECTATIONS.key?(module_name)
+    @notice_issues << "#{jar_file}: packaged JAR is missing"
+  end
 
   File.read(File.join(path, 'pom.xml')).scan(%r{<module>(.*)</module>}).map(&:first).each do |submodule|
     traverse_module File.join(path, submodule.to_s) unless submodule.nil?
@@ -106,11 +132,22 @@ def traverse_module(path)
 end
 
 @tainted_records = []
+@notice_issues = []
 
 # Check license issues in given jar file
-def check_jar_license(jar_file)
+def check_jar_license(jar_file, module_name)
   puts "Checking jar file #{jar_file}"
   Zip::File.open(jar_file) do |jar|
+    notice_entry = jar.find_entry('META-INF/NOTICE')
+    if notice_entry.nil?
+      @notice_issues << "#{jar_file}: META-INF/NOTICE is missing"
+    else
+      notice = notice_entry.get_input_stream.read.force_encoding('UTF-8').gsub(/\s+/, ' ')
+      NOTICE_EXPECTATIONS.fetch(module_name, []).each do |attribution|
+        @notice_issues << "#{jar_file}: missing #{attribution}" unless notice.include?(attribution)
+      end
+    end
+
     jar.filter { |e| e.ftype == :file }
        .filter { |e| !File.basename(e.name).downcase.end_with?(*BINARY_FILE_EXTENSIONS) }
        .filter { |e| !File.basename(e.name).downcase.start_with? 'license', 'dependencies', 'notice', 'third-party' }
@@ -133,6 +170,12 @@ unless @tainted_records.empty?
   puts "\nError: packaged jar contains files with incompatible licenses:"
   puts @tainted_records.map { |e| "  -> In #{e[:jar_file]}: #{e[:suspicious_file]}" }.join("\n")
   abort 'See https://www.apache.org/legal/resolved.html for more details.'
+end
+
+unless @notice_issues.empty?
+  puts "\nError: packaged JAR NOTICE is incomplete:"
+  puts @notice_issues.map { |issue| "  -> #{issue}" }.join("\n")
+  abort 'Inspect META-INF/NOTICE in the final shaded JAR.'
 end
 
 puts 'License check passed.'

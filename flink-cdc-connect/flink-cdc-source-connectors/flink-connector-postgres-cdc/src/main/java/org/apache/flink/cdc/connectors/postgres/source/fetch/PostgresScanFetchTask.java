@@ -39,6 +39,7 @@ import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
 import io.debezium.pipeline.source.spi.SnapshotProgressListener;
 import io.debezium.pipeline.spi.SnapshotResult;
+import io.debezium.relational.Column;
 import io.debezium.relational.RelationalSnapshotChangeEventSource;
 import io.debezium.relational.SnapshotChangeRecordEmitter;
 import io.debezium.relational.Table;
@@ -98,6 +99,7 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
 
         PostgresSnapshotSplitReadTask snapshotSplitReadTask =
                 new PostgresSnapshotSplitReadTask(
+                        (PostgresSourceConfig) ctx.getSourceConfig(),
                         ctx.getConnection(),
                         ctx.getDbzConnectorConfig(),
                         ctx.getDatabaseSchema(),
@@ -214,7 +216,7 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                 LoggerFactory.getLogger(PostgresSnapshotSplitReadTask.class);
 
         private final PostgresConnection jdbcConnection;
-        private final PostgresConnectorConfig connectorConfig;
+        private final PostgresSourceConfig sourceConfig;
         private final PostgresEventDispatcher<TableId> eventDispatcher;
         private final SnapshotSplit snapshotSplit;
         private final PostgresOffsetContext offsetContext;
@@ -223,6 +225,7 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
         private final Clock clock;
 
         public PostgresSnapshotSplitReadTask(
+                PostgresSourceConfig sourceConfig,
                 PostgresConnection jdbcConnection,
                 PostgresConnectorConfig connectorConfig,
                 PostgresSchema databaseSchema,
@@ -232,7 +235,7 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                 SnapshotSplit snapshotSplit) {
             super(connectorConfig, snapshotProgressListener);
             this.jdbcConnection = jdbcConnection;
-            this.connectorConfig = connectorConfig;
+            this.sourceConfig = sourceConfig;
             this.snapshotProgressListener = snapshotProgressListener;
             this.databaseSchema = databaseSchema;
             this.eventDispatcher = eventDispatcher;
@@ -314,7 +317,7 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                                     snapshotSplit.getSplitStart(),
                                     snapshotSplit.getSplitEnd(),
                                     snapshotSplit.getSplitKeyType().getFieldCount(),
-                                    connectorConfig.getSnapshotFetchSize());
+                                    sourceConfig.getFetchSize());
                     ResultSet rs = selectStatement.executeQuery()) {
 
                 ColumnUtils.ColumnArray columnArray = ColumnUtils.toArray(rs, table);
@@ -325,7 +328,10 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                     rows++;
                     final Object[] row = new Object[columnArray.getGreatestColumnPosition()];
                     for (int i = 0; i < columnArray.getColumns().length; i++) {
-                        row[columnArray.getColumns()[i].position() - 1] = rs.getObject(i + 1);
+                        Column col = columnArray.getColumns()[i];
+                        row[col.position() - 1] =
+                                jdbcConnection.getColumnValue(
+                                        rs, i + 1, col, table, databaseSchema);
                     }
                     if (logTimer.expired()) {
                         long stop = clock.currentTimeInMillis();

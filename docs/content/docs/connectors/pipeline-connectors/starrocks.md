@@ -1,9 +1,9 @@
 ---
 title: "StarRocks"
-weight: 6
-type: docs
-aliases:
-- /connectors/pipeline-connectors/starrocks
+slug: "/docs/connectors/pipeline-connectors/starrocks"
+sidebar_position: 6
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -201,7 +201,7 @@ pipeline:
       <td>Integer</td>
       <td>Number of buckets when creating a StarRocks table automatically. For StarRocks 2.5 or later, it's not required
             to set the option because StarRocks can 
-            <a href="https://docs.starrocks.io/docs/table_design/Data_distribution/#set-the-number-of-buckets">
+            <a href="https://docs.starrocks.io/docs/table_design/data_distribution/#set-the-number-of-buckets">
             determine the number of buckets automatically</a>. For StarRocks prior to 2.5, you must set this option. </td>
     </tr>
     <tr>
@@ -221,6 +221,13 @@ pipeline:
       <td>Timeout for a schema change on StarRocks side, and must be an integral multiple of 
           seconds. StarRocks will cancel the schema change after timeout which will
           cause the sink failure. </td>
+    </tr>
+    <tr>
+      <td>unicode-char.max-bytes</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">3</td>
+      <td>Integer</td>
+      <td>The maximum number of bytes allocated for each upstream character when mapping CHAR and VARCHAR types to StarRocks, whose length is measured in bytes. If the upstream source uses utf8mb4, set this option to 4 to avoid underestimating column lengths. The default value of 3 is retained for backward compatibility.</td>
     </tr>
     <tr>
       <td>sink.socket.timeout-ms</td>
@@ -244,7 +251,7 @@ pipeline:
   * the distribution keys are the same as the primary keys
   * there is no partition key
   * the number of buckets is controlled by `table.create.num-buckets`. If you are using StarRocks 2.5 or later,
-    it's not required to set the option because StarRocks can [determine the number of buckets automatically](https://docs.starrocks.io/docs/table_design/Data_distribution/#set-the-number-of-buckets),
+    it's not required to set the option because StarRocks can [determine the number of buckets automatically](https://docs.starrocks.io/docs/table_design/data_distribution/#set-the-number-of-buckets),
     otherwise you must set the option.
 
 * For schema change synchronization
@@ -329,24 +336,19 @@ pipeline:
       <td></td>
     </tr>
     <tr>
-      <td>CHAR(n) where n <= 85</td>
-      <td>CHAR(n * 3)</td>
-      <td>CDC defines the length by characters, and StarRocks defines it by bytes. According to UTF-8, one Chinese 
-        character is equal to three bytes, so the length for StarRocks is n * 3. Because the max length of StarRocks
-        CHAR is 255, map CDC CHAR to StarRocks CHAR only when the CDC length is no larger than 85.</td>
+      <td>CHAR(n) where n * unicode-char.max-bytes <= 255 and not primary key</td>
+      <td>CHAR(n * unicode-char.max-bytes)</td>
+      <td>CDC defines the length by characters, and StarRocks defines it by bytes. The StarRocks length is calculated as n * unicode-char.max-bytes. Because the max length of StarRocks CHAR is 255, map CDC CHAR to StarRocks CHAR only when the calculated length is no larger than 255. If the column is part of the primary key, it is mapped to VARCHAR instead.</td>
     </tr>
     <tr>
-      <td>CHAR(n) where n > 85</td>
-      <td>VARCHAR(n * 3)</td>
-      <td>CDC defines the length by characters, and StarRocks defines it by bytes. According to UTF-8, one Chinese 
-        character is equal to three bytes, so the length for StarRocks is n * 3. Because the max length of StarRocks
-        CHAR is 255, map CDC CHAR to StarRocks VARCHAR if the CDC length is larger than 85.</td>
+      <td>CHAR(n) where n * unicode-char.max-bytes > 255, or primary key</td>
+      <td>VARCHAR(min(n * unicode-char.max-bytes, 1048576))</td>
+      <td>CDC defines the length by characters, and StarRocks defines it by bytes. The StarRocks length is calculated as n * unicode-char.max-bytes. Because the max length of StarRocks CHAR is 255, map CDC CHAR to StarRocks VARCHAR when the calculated length exceeds 255. Primary key CHAR columns are also mapped to VARCHAR.</td>
     </tr>
     <tr>
       <td>VARCHAR(n)</td>
-      <td>VARCHAR(n * 3)</td>
-      <td>CDC defines the length by characters, and StarRocks defines it by bytes. According to UTF-8, one Chinese 
-        character is equal to three bytes, so the length for StarRocks is n * 3.</td>
+      <td>VARCHAR(min(n * unicode-char.max-bytes, 1048576))</td>
+      <td>CDC defines the length by characters, and StarRocks defines it by bytes. The StarRocks length is calculated as n * unicode-char.max-bytes and capped at 1048576.</td>
     </tr>
     <tr>
       <td>BINARY(n)</td>
@@ -366,5 +368,3 @@ pipeline:
     </tbody>
 </table>
 </div>
-
-{{< top >}}

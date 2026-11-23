@@ -1,9 +1,9 @@
 ---
 title: "Postgres"
-weight: 5
-type: docs
-aliases:
-- /connectors/flink-sources/postgres-cdc
+slug: "/docs/connectors/flink-sources/postgres-cdc"
+sidebar_position: 5
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -26,15 +26,21 @@ under the License.
 
 # Postgres CDC Connector
 
-The Postgres CDC connector allows for reading snapshot data and incremental data from PostgreSQL database. This document describes how to setup the Postgres CDC connector to run SQL queries against PostgreSQL databases.
+The Postgres CDC connector allows for reading snapshot data and incremental data from PostgreSQL database. This document describes how to set up the Postgres CDC connector to run SQL queries against PostgreSQL databases.
 
 ## Dependencies
 
-In order to setup the Postgres CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
+To set up the Postgres CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
 ### Maven dependency
 
-{{< artifact flink-connector-postgres-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-postgres-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -216,10 +222,10 @@ SELECT * FROM shipments;
           <td>Boolean</td>
           <td>Incremental snapshot is a new mechanism to read snapshot of a table. Compared to the old snapshot mechanism,
               the incremental snapshot has many advantages, including:
-                (1) source can be parallel during snapshot reading,
-                (2) source can perform checkpoints in the chunk granularity during snapshot reading,
-                (3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.
-              Please see <a href="#incremental-snapshot-reading ">Incremental Snapshot Reading</a>section for more detailed information.
+                <br/>(1) source can be parallel during snapshot reading,
+                <br/>(2) source can perform checkpoints in the chunk granularity during snapshot reading,
+                <br/>(3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.
+              <br/>Please see <a href="#incremental-snapshot-reading-experimental">Incremental Snapshot Reading</a> section for more detailed information.
           </td>
     </tr>
     <tr>
@@ -232,6 +238,13 @@ SELECT * FROM shipments;
           If the flink version is greater than or equal to 1.15, the default value of 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' has been changed to true,
           so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
       </td>
+    </tr>
+    <tr>
+      <td>scan.incremental.snapshot.metadata.release.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to release the snapshot split metadata (assigned splits, finished offsets and table schemas) held by the source coordinator once the source has entered the stream phase, to reduce JobManager memory on jobs with a very large number of snapshot splits. Disabled by default. Incompatible with scan.newly-added-table.enabled: enabling both fails at startup, and a job that has released the metadata cannot later enable newly-added-table scanning. Release happens only after a successful checkpoint; if checkpointing is disabled or no checkpoint completes, the metadata is retained, so this option has no effect without checkpointing. A checkpoint or savepoint taken with this option enabled cannot be used to restore the job after downgrading to Flink CDC 3.6.0 or an earlier version.</td>
     </tr>
     <tr>
       <td>scan.lsn-commit.checkpoints-num-delay</td>
@@ -287,6 +300,17 @@ SELECT * FROM shipments;
         If enabled:
           (1) PUBLICATION must be created beforehand with parameter publish_via_partition_root=true
           (2) Table list (regex or predefined list) should only match the parent table name, if table list matches both parent and child tables, snapshot data will be read twice.
+      </td>
+    </tr>
+    <tr>
+      <td>scan.rate-limit.records-per-second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">-1</td>
+      <td>Double</td>
+      <td>
+        The maximum number of records emitted per second, the default value: -1, means no rate limiting.(only for flink2.x)<br>
+        This option only takes effect when `scan.incremental.snapshot.enabled` is `true`. The legacy non-incremental source does not support rate limiting, and configuring this option with incremental snapshot disabled fails validation.<br>
+        WARNING: Incremental/binlog phase: Rate limiting can cause the connector to fall behind the upstream change stream, risking binlog/WAL purging before the connector catches up (data loss for MySQL, replication slot issues for PostgreSQL).
       </td>
     </tr>
     </tbody>
@@ -350,9 +374,9 @@ The following options is available only when `scan.incremental.snapshot.enabled=
           <td>The maximum time that the connector should wait after trying to connect to the PostgreSQL database server before timing out.</td>
     </tr>
     <tr>
-          <td>connect.pool.size</td>
+          <td>connection.pool.size</td>
           <td>optional</td>
-          <td style="word-wrap: break-word;">30</td>
+          <td style="word-wrap: break-word;">20</td>
           <td>Integer</td>
           <td>The connection pool size.</td>
     </tr>
@@ -574,7 +598,7 @@ $ ./bin/flink run \
       --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**Note:** Please refer to the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) for more details.
+**Note:** Please refer to the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/cli/#command-line-interface) for more details.
 
 ### DataStream Source
 
@@ -725,7 +749,7 @@ Since the order of processing these records cannot be guaranteed, the final valu
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">Flink SQL type</th>
       </tr>
     </thead>
     <tbody>
@@ -816,5 +840,3 @@ Since the order of processing these records cannot be guaranteed, the final valu
     </tbody>
 </table>
 </div>
-
-{{< top >}}

@@ -258,6 +258,14 @@ public class MySqlDataSourceOptions {
                             "Whether to scan the newly added tables or not, by default is false. This option is only useful when we start the job from a savepoint/checkpoint.");
 
     @Experimental
+    public static final ConfigOption<Boolean> SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED =
+            ConfigOptions.key("scan.incremental.snapshot.metadata.release.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to release the snapshot split metadata held by the source coordinator after entering the binlog phase to reduce JobManager memory. Disabled by default. The release happens only after a checkpoint completes, so it has no effect without checkpointing. Cannot be enabled together with scan.newly-added-table.enabled (the job fails to start).");
+
+    @Experimental
     public static final ConfigOption<Boolean> SCHEMA_CHANGE_ENABLED =
             ConfigOptions.key("schema-change.enabled")
                     .booleanType()
@@ -345,4 +353,11 @@ public class MySqlDataSourceOptions {
                     .defaultValue(false)
                     .withDescription(
                             "Whether to skip backfill in snapshot reading phase. If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in change log reading phase instead of being merged into the snapshot.WARNING: Skipping backfill might lead to data inconsistency because some change log events happened within the snapshot phase might be replayed (only at-least-once semantic is promised). For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.");
+
+    public static final ConfigOption<Double> SCAN_RATE_LIMIT_RECORDS_PER_SECOND =
+            ConfigOptions.key("scan.rate-limit.records-per-second")
+                    .doubleType()
+                    .defaultValue(-1d)
+                    .withDescription(
+                            "The maximum number of records emitted per second, the default value: -1, means no rate limiting.");
 }

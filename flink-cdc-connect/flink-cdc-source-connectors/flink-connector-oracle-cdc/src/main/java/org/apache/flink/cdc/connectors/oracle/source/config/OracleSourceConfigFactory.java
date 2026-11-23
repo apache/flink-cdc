@@ -135,6 +135,8 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
                 chunkKeyColumn,
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                releaseSnapshotMetadataEnabled,
+                scanRateLimitRecordsPerSecond);
     }
 }

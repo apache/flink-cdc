@@ -156,6 +156,23 @@ class FlussConversionsTest {
                 .hasMessageContaining("Unsupported data type in fluss");
     }
 
+    @Test
+    void testToCdcSchemaWithPartitionKeys() {
+        org.apache.fluss.metadata.Schema flussSchema =
+                FlussConversions.toFlussSchema(
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT().notNull())
+                                .physicalColumn("dt", DataTypes.STRING().notNull())
+                                .primaryKey("id", "dt")
+                                .build());
+
+        Schema cdcSchema =
+                FlussConversions.toCdcSchema(flussSchema, Collections.singletonList("dt"));
+
+        assertThat(cdcSchema.primaryKeys()).containsExactly("id", "dt");
+        assertThat(cdcSchema.partitionKeys()).containsExactly("dt");
+    }
+
     // --------------------------------------------------------------------------------------------
     // Tests for toFlussTable
     // --------------------------------------------------------------------------------------------
@@ -202,11 +219,19 @@ class FlussConversionsTest {
 
         Map<String, String> properties = new HashMap<>();
         properties.put("table.replication.factor", "3");
+        properties.put("paimon.file.format", "orc");
+        properties.put("iceberg.write.format.default", "parquet");
 
         TableDescriptor descriptor =
                 FlussConversions.toFlussTable(cdcSchema, null, null, properties);
 
-        assertThat(descriptor.getProperties()).containsEntry("table.replication.factor", "3");
+        assertThat(descriptor.getProperties())
+                .containsExactlyEntriesOf(
+                        Collections.singletonMap("table.replication.factor", "3"));
+        assertThat(descriptor.getCustomProperties())
+                .hasSize(2)
+                .containsEntry("paimon.file.format", "orc")
+                .containsEntry("iceberg.write.format.default", "parquet");
     }
 
     @Test

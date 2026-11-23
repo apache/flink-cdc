@@ -18,12 +18,14 @@
 package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.common.io.ParseException;
+import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
+import org.apache.flink.cdc.runtime.parser.metadata.AiFunctionSqlOperatorTable;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSchemaFactory;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSqlOperatorTable;
 import org.apache.flink.cdc.runtime.typeutils.CalciteDataTypeConverter;
@@ -40,7 +42,6 @@ import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
-import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.schema.ScalarFunction;
 import org.apache.calcite.schema.SchemaPlus;
@@ -53,8 +54,10 @@ import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.SqlSyntax;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.SqlParserPos;
@@ -62,8 +65,13 @@ import org.apache.calcite.sql.type.InferTypes;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.util.SqlOperatorTables;
+import org.apache.calcite.sql.util.SqlShuttle;
+import org.apache.calcite.sql.validate.SqlConformance;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
+import org.apache.calcite.sql.validate.SqlDelegatingConformance;
+import org.apache.calcite.sql.validate.SqlNameMatcher;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
@@ -96,12 +104,55 @@ public class TransformParser {
     private static final String DEFAULT_TABLE = "TB";
     private static final String MAPPED_COLUMN_NAME_PREFIX = "$";
     private static final String MAPPED_SINGLE_COLUMN_NAME = MAPPED_COLUMN_NAME_PREFIX + "0";
+    private static final SqlConformance TRANSFORM_SQL_CONFORMANCE = new TransformSqlConformance();
+
+    private static class TransformSqlConformance extends SqlDelegatingConformance {
+
+        private TransformSqlConformance() {
+            super(SqlConformanceEnum.MYSQL_5);
+        }
+
+        @Override
+        public boolean allowCharLiteralAlias() {
+            return SqlConformanceEnum.MYSQL_5.allowCharLiteralAlias();
+        }
+
+        @Override
+        public boolean allowExplicitRowValueConstructor() {
+            return true;
+        }
+
+        @Override
+        public boolean isLimitStartCountAllowed() {
+            return SqlConformanceEnum.MYSQL_5.isLimitStartCountAllowed();
+        }
+
+        @Override
+        public boolean isPercentRemainderAllowed() {
+            return SqlConformanceEnum.MYSQL_5.isPercentRemainderAllowed();
+        }
+
+        @Override
+        public boolean allowGeometry() {
+            return SqlConformanceEnum.MYSQL_5.allowGeometry();
+        }
+
+        @Override
+        public boolean shouldConvertRaggedUnionTypesToVarying() {
+            return SqlConformanceEnum.MYSQL_5.shouldConvertRaggedUnionTypesToVarying();
+        }
+
+        @Override
+        public boolean allowExtendedTrim() {
+            return SqlConformanceEnum.MYSQL_5.allowExtendedTrim();
+        }
+    }
 
     private static SqlParser getCalciteParser(String sql) {
         return SqlParser.create(
-                sql,
+                TransformSqlSyntaxRewriter.rewriteTryCast(sql),
                 SqlParser.Config.DEFAULT
-                        .withConformance(SqlConformanceEnum.MYSQL_5)
+                        .withConformance(TRANSFORM_SQL_CONFORMANCE)
                         .withCaseSensitive(true)
                         .withLex(Lex.JAVA));
     }
@@ -110,7 +161,8 @@ public class TransformParser {
             List<Column> columns,
             SqlNode sqlNode,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
-            SupportedMetadataColumn[] supportedMetadataColumns) {
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            DecimalPrecisionMode decimalPrecisionMode) {
         List<Column> columnsWithMetadata =
                 copyFillMetadataColumn(columns, supportedMetadataColumns);
         CalciteSchema rootSchema = CalciteSchema.createRootSchema(true);
@@ -154,7 +206,8 @@ public class TransformParser {
                 throw new RuntimeException("Failed to resolve UDF: " + udf, e);
             }
         }
-        SqlTypeFactoryImpl factory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
+        SqlTypeFactoryImpl factory =
+                new SqlTypeFactoryImpl(FlinkCdcTypeSystem.of(decimalPrecisionMode));
         CalciteCatalogReader calciteCatalogReader =
                 new CalciteCatalogReader(
                         rootSchema,
@@ -163,15 +216,23 @@ public class TransformParser {
                         new CalciteConnectionConfigImpl(new Properties()));
         TransformSqlOperatorTable transformSqlOperatorTable = TransformSqlOperatorTable.instance();
         SqlOperatorTable udfOperatorTable = SqlOperatorTables.of(udfFunctions);
+        SqlOperatorTable aiFunctionOperatorTable = AiFunctionSqlOperatorTable.create();
+        // Calcite looks up function candidates again when deriving a call's type. Rebind
+        // same-name calls and expose only UDF candidates to keep validation consistent with
+        // UDF-first code generation.
         SqlValidator validator =
                 SqlValidatorUtil.newValidator(
-                        SqlOperatorTables.chain(transformSqlOperatorTable, udfOperatorTable),
+                        new UdfFirstSqlOperatorTable(
+                                udfOperatorTable,
+                                SqlOperatorTables.chain(
+                                        transformSqlOperatorTable, aiFunctionOperatorTable)),
                         calciteCatalogReader,
                         factory,
                         SqlValidator.Config.DEFAULT
                                 .withIdentifierExpansion(true)
                                 .withConformance(SqlConformanceEnum.MYSQL_5));
-        SqlNode validateSqlNode = validator.validate(sqlNode);
+        SqlNode validateSqlNode =
+                validator.validate(resolveUserDefinedFunctions(sqlNode, udfFunctions));
         SqlToRelConverter sqlToRelConverter =
                 new SqlToRelConverter(
                         null,
@@ -184,6 +245,70 @@ public class TransformParser {
                         SqlToRelConverter.config().withTrimUnusedFields(true));
         RelRoot relRoot = sqlToRelConverter.convertQuery(validateSqlNode, false, false);
         return relRoot.rel;
+    }
+
+    private static SqlNode resolveUserDefinedFunctions(
+            SqlNode sqlNode, List<SqlFunction> udfFunctions) {
+        return sqlNode.accept(
+                new SqlShuttle() {
+                    @Override
+                    public SqlNode visit(SqlCall call) {
+                        SqlNode visited = super.visit(call);
+                        if (visited instanceof SqlBasicCall) {
+                            SqlBasicCall basicCall = (SqlBasicCall) visited;
+                            if (basicCall.getOperator().getSyntax().family != SqlSyntax.FUNCTION) {
+                                return visited;
+                            }
+                            udfFunctions.stream()
+                                    .filter(
+                                            udf ->
+                                                    udf.getName()
+                                                            .equalsIgnoreCase(
+                                                                    basicCall
+                                                                            .getOperator()
+                                                                            .getName()))
+                                    .findFirst()
+                                    .ifPresent(basicCall::setOperator);
+                        }
+                        return visited;
+                    }
+                });
+    }
+
+    private static final class UdfFirstSqlOperatorTable implements SqlOperatorTable {
+        private final SqlOperatorTable udfOperatorTable;
+        private final SqlOperatorTable fallbackOperatorTable;
+
+        private UdfFirstSqlOperatorTable(
+                SqlOperatorTable udfOperatorTable, SqlOperatorTable fallbackOperatorTable) {
+            this.udfOperatorTable = udfOperatorTable;
+            this.fallbackOperatorTable = fallbackOperatorTable;
+        }
+
+        @Override
+        public void lookupOperatorOverloads(
+                SqlIdentifier opName,
+                @Nullable SqlFunctionCategory category,
+                SqlSyntax syntax,
+                List<SqlOperator> operatorList,
+                SqlNameMatcher nameMatcher) {
+            List<SqlOperator> udfOperators = new ArrayList<>();
+            udfOperatorTable.lookupOperatorOverloads(
+                    opName, category, syntax, udfOperators, nameMatcher);
+            if (udfOperators.isEmpty()) {
+                fallbackOperatorTable.lookupOperatorOverloads(
+                        opName, category, syntax, operatorList, nameMatcher);
+            } else {
+                operatorList.addAll(udfOperators);
+            }
+        }
+
+        @Override
+        public List<SqlOperator> getOperatorList() {
+            List<SqlOperator> operators = new ArrayList<>(udfOperatorTable.getOperatorList());
+            operators.addAll(fallbackOperatorTable.getOperatorList());
+            return operators;
+        }
     }
 
     public static SqlSelect parseSelect(String statement) {
@@ -276,6 +401,20 @@ public class TransformParser {
             List<Column> columns,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             SupportedMetadataColumn[] supportedMetadataColumns) {
+        return generateProjectionColumns(
+                projectionExpression,
+                columns,
+                udfDescriptors,
+                supportedMetadataColumns,
+                DecimalPrecisionMode.UP_TO_19);
+    }
+
+    public static List<ProjectionColumn> generateProjectionColumns(
+            String projectionExpression,
+            List<Column> columns,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            DecimalPrecisionMode decimalPrecisionMode) {
         if (isNullOrWhitespaceOnly(projectionExpression)) {
             return new ArrayList<>();
         }
@@ -285,13 +424,16 @@ public class TransformParser {
         }
 
         expandWildcard(sqlSelect, columns);
-        RelNode relNode = sqlToRel(columns, sqlSelect, udfDescriptors, supportedMetadataColumns);
-        RelDataType[] relDataTypes =
-                relNode.getRowType().getFieldList().stream()
-                        .map(RelDataTypeField::getType)
-                        .toArray(RelDataType[]::new);
         Map<String, Column> originalColumnMap =
                 columns.stream().collect(Collectors.toMap(Column::getName, column -> column));
+        RelDataType[] relDataTypes =
+                deduceProjectionRelDataTypes(
+                        columns,
+                        originalColumnMap,
+                        sqlSelect,
+                        udfDescriptors,
+                        supportedMetadataColumns,
+                        decimalPrecisionMode);
         List<ProjectionColumn> projectionColumns = new ArrayList<>();
         Map<String, Integer> addedProjectionColumnNames = new HashMap<>();
 
@@ -341,18 +483,28 @@ public class TransformParser {
                 } else {
                     List<String> originalColumnNames = parseColumnNameList(exprNode);
                     Map<String, String> columnNameMap = generateColumnNameMap(originalColumnNames);
+                    DataType dataType =
+                            CalciteDataTypeConverter.convertCalciteRelDataTypeToDataType(
+                                    relDataType);
+                    if (exprNode instanceof SqlBasicCall
+                            && ((SqlBasicCall) exprNode)
+                                    .getOperator()
+                                    .getName()
+                                    .equalsIgnoreCase("IFNULL")) {
+                        dataType = dataType.copy(relDataType.isNullable());
+                    }
                     projectionColumn =
                             ProjectionColumn.ofCalculated(
                                     columnName,
-                                    CalciteDataTypeConverter.convertCalciteRelDataTypeToDataType(
-                                            relDataType),
+                                    dataType,
                                     exprNode.toString(),
                                     JaninoCompiler.translateSqlNodeToJaninoExpression(
                                             JaninoCompiler.Context.of(
                                                     columns,
                                                     columnNameMap,
                                                     udfDescriptors,
-                                                    supportedMetadataColumns),
+                                                    supportedMetadataColumns,
+                                                    decimalPrecisionMode),
                                             exprNode),
                                     originalColumnNames,
                                     columnNameMap);
@@ -385,6 +537,159 @@ public class TransformParser {
             }
         }
         return projectionColumns;
+    }
+
+    private static RelDataType[] deduceProjectionRelDataTypes(
+            List<Column> columns,
+            Map<String, Column> originalColumnMap,
+            SqlSelect sqlSelect,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            DecimalPrecisionMode decimalPrecisionMode) {
+        try {
+            RelNode relNode =
+                    sqlToRel(
+                            columns,
+                            sqlSelect,
+                            udfDescriptors,
+                            supportedMetadataColumns,
+                            decimalPrecisionMode);
+            return relNode.getRowType().getFieldList().stream()
+                    .map(RelDataTypeField::getType)
+                    .toArray(RelDataType[]::new);
+        } catch (RuntimeException e) {
+            try {
+                // Keep Calcite as the primary type inference path. This fallback only covers
+                // transform predicates that Janino can evaluate but Calcite may fail to convert
+                // while building projection columns.
+                SqlTypeFactoryImpl typeFactory =
+                        new SqlTypeFactoryImpl(FlinkCdcTypeSystem.of(decimalPrecisionMode));
+                List<RelDataType> relDataTypes = new ArrayList<>();
+                for (SqlNode sqlNode : sqlSelect.getSelectList()) {
+                    relDataTypes.add(
+                            deduceProjectionRelDataType(
+                                    typeFactory,
+                                    columns,
+                                    originalColumnMap,
+                                    unwrapAsExpression(sqlNode),
+                                    udfDescriptors,
+                                    supportedMetadataColumns,
+                                    decimalPrecisionMode));
+                }
+                return relDataTypes.toArray(new RelDataType[0]);
+            } catch (RuntimeException fallbackException) {
+                e.addSuppressed(fallbackException);
+                throw e;
+            }
+        }
+    }
+
+    private static SqlNode unwrapAsExpression(SqlNode sqlNode) {
+        if (sqlNode instanceof SqlBasicCall) {
+            SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
+            if (SqlKind.AS.equals(sqlBasicCall.getOperator().kind)
+                    && !sqlBasicCall.getOperandList().isEmpty()) {
+                return sqlBasicCall.getOperandList().get(0);
+            }
+        }
+        return sqlNode;
+    }
+
+    private static RelDataType deduceProjectionRelDataType(
+            RelDataTypeFactory typeFactory,
+            List<Column> columns,
+            Map<String, Column> originalColumnMap,
+            SqlNode exprNode,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            DecimalPrecisionMode decimalPrecisionMode) {
+        if (exprNode instanceof SqlIdentifier) {
+            String columnName =
+                    ((SqlIdentifier) exprNode)
+                            .names.get(((SqlIdentifier) exprNode).names.size() - 1);
+            return toRelDataType(
+                    typeFactory,
+                    findIdentifierDataType(
+                            originalColumnMap, columnName, supportedMetadataColumns));
+        }
+        if (requiresBooleanTypeFallback(exprNode)) {
+            validateReferencedColumns(originalColumnMap, exprNode, supportedMetadataColumns);
+            return typeFactory.createTypeWithNullability(
+                    typeFactory.createSqlType(SqlTypeName.BOOLEAN), true);
+        }
+        return toRelDataType(
+                typeFactory,
+                deduceSubExpressionType(
+                        columns,
+                        exprNode,
+                        udfDescriptors,
+                        supportedMetadataColumns,
+                        decimalPrecisionMode));
+    }
+
+    private static DataType findIdentifierDataType(
+            Map<String, Column> originalColumnMap,
+            String columnName,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
+        if (originalColumnMap.containsKey(columnName)) {
+            return originalColumnMap.get(columnName).getType();
+        }
+        for (SupportedMetadataColumn metadataColumn : supportedMetadataColumns) {
+            if (metadataColumn.getName().equals(columnName)) {
+                return metadataColumn.getType();
+            }
+        }
+        return METADATA_COLUMNS.stream()
+                .filter(column -> column.f0.equals(columnName))
+                .findFirst()
+                .map(column -> column.f1)
+                .orElseThrow(
+                        () ->
+                                new IllegalArgumentException(
+                                        "Referenced column "
+                                                + columnName
+                                                + " is not present in original table."));
+    }
+
+    private static RelDataType toRelDataType(RelDataTypeFactory typeFactory, DataType dataType) {
+        return CalciteDataTypeConverter.convertCalciteRelDataType(
+                        typeFactory,
+                        Collections.singletonList(Column.physicalColumn("__tmp", dataType)))
+                .getFieldList()
+                .get(0)
+                .getType();
+    }
+
+    private static void validateReferencedColumns(
+            Map<String, Column> originalColumnMap,
+            SqlNode exprNode,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
+        for (String columnName : parseColumnNameList(exprNode)) {
+            findIdentifierDataType(originalColumnMap, columnName, supportedMetadataColumns);
+        }
+    }
+
+    private static boolean requiresBooleanTypeFallback(SqlNode sqlNode) {
+        if (!(sqlNode instanceof SqlBasicCall)) {
+            return false;
+        }
+        SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
+        switch (sqlBasicCall.getKind()) {
+            case AND:
+            case OR:
+            case NOT:
+                return sqlBasicCall.getOperandList().stream()
+                        .anyMatch(TransformParser::requiresBooleanTypeFallback);
+            case IS_DISTINCT_FROM:
+            case IS_NOT_DISTINCT_FROM:
+            case IS_UNKNOWN:
+            case SIMILAR:
+                return true;
+            case LIKE:
+                return sqlBasicCall.getOperandList().size() == 3;
+            default:
+                return false;
+        }
     }
 
     /**
@@ -432,6 +737,22 @@ public class TransformParser {
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             SupportedMetadataColumn[] supportedMetadataColumns,
             Map<String, String> columnNameMap) {
+        return translateFilterExpressionToJaninoExpression(
+                filterExpression,
+                columns,
+                udfDescriptors,
+                supportedMetadataColumns,
+                columnNameMap,
+                DecimalPrecisionMode.UP_TO_19);
+    }
+
+    public static String translateFilterExpressionToJaninoExpression(
+            String filterExpression,
+            List<Column> columns,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            Map<String, String> columnNameMap,
+            DecimalPrecisionMode decimalPrecisionMode) {
         if (isNullOrWhitespaceOnly(filterExpression)) {
             return "";
         }
@@ -442,7 +763,11 @@ public class TransformParser {
         SqlNode where = sqlSelect.getWhere();
         return JaninoCompiler.translateSqlNodeToJaninoExpression(
                 JaninoCompiler.Context.of(
-                        columns, columnNameMap, udfDescriptors, supportedMetadataColumns),
+                        columns,
+                        columnNameMap,
+                        udfDescriptors,
+                        supportedMetadataColumns,
+                        decimalPrecisionMode),
                 where);
     }
 
@@ -612,6 +937,20 @@ public class TransformParser {
             SqlNode subExpression,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             SupportedMetadataColumn[] supportedMetadataColumns) {
+        return deduceSubExpressionType(
+                columns,
+                subExpression,
+                udfDescriptors,
+                supportedMetadataColumns,
+                DecimalPrecisionMode.UP_TO_19);
+    }
+
+    public static DataType deduceSubExpressionType(
+            List<Column> columns,
+            SqlNode subExpression,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            DecimalPrecisionMode decimalPrecisionMode) {
         SqlSelect sqlSelect =
                 new SqlSelect(
                         SqlParserPos.QUOTED_ZERO,
@@ -626,7 +965,13 @@ public class TransformParser {
                         null,
                         null,
                         null);
-        RelNode relNode = sqlToRel(columns, sqlSelect, udfDescriptors, supportedMetadataColumns);
+        RelNode relNode =
+                sqlToRel(
+                        columns,
+                        sqlSelect,
+                        udfDescriptors,
+                        supportedMetadataColumns,
+                        decimalPrecisionMode);
         RelDataType[] relDataTypes =
                 relNode.getRowType().getFieldList().stream()
                         .map(RelDataTypeField::getType)

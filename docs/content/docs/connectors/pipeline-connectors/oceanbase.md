@@ -1,9 +1,9 @@
 ---
 title: "OceanBase"
-weight: 7
-type: docs
-aliases:
-- /connectors/pipeline-connectors/oceanbase
+slug: "/docs/connectors/pipeline-connectors/oceanbase"
+sidebar_position: 7
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -376,5 +376,3 @@ pipeline:
     </tbody>
 </table>
 </div>
-
-{{< top >}}

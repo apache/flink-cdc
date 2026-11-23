@@ -31,6 +31,9 @@ public class IcebergDataSinkOptions {
     // prefix for passing properties for catalog creation.
     public static final String PREFIX_CATALOG_PROPERTIES = "catalog.properties.";
 
+    // prefix for passing properties for Hadoop configuration.
+    public static final String PREFIX_HADOOP_CONF = "hadoop.conf.";
+
     public static final ConfigOption<String> TYPE =
             key("catalog.properties.type")
                     .stringType()

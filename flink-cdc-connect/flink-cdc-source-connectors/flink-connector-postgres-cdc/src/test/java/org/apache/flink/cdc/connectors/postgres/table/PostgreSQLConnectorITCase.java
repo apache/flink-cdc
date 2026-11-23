@@ -49,7 +49,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.TimeZone;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
@@ -711,6 +713,120 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         Assertions.assertThat(actual).isEqualTo(expected);
 
         result.getJobClient().get().cancel().get();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testPreEpochTimestampWallClockConversion(boolean parallelismSnapshot) throws Throwable {
+        TimeZone originalTimeZone = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Shanghai"));
+            setup(parallelismSnapshot);
+            initializePostgresTable(POSTGIS_CONTAINER, "column_type_test");
+            insertPreEpochTimestampRow();
+
+            String sourceDDL = preEpochTimestampSourceDdl(parallelismSnapshot);
+            String sinkDDL =
+                    "CREATE TABLE sink ("
+                            + "    id INTEGER NOT NULL,"
+                            + "    small_c SMALLINT,"
+                            + "    timestamp3_c TIMESTAMP(3),"
+                            + "    timestamp6_c TIMESTAMP(6),"
+                            + "    array_ts TIMESTAMP(6), bc_year INT,"
+                            + "    PRIMARY KEY (id) NOT ENFORCED"
+                            + ") WITH ("
+                            + " 'connector' = 'values',"
+                            + " 'sink-insert-only' = 'false'"
+                            + ")";
+            tEnv.executeSql(sourceDDL);
+            tEnv.executeSql(sinkDDL);
+
+            TableResult result =
+                    tEnv.executeSql(
+                            "INSERT INTO sink SELECT id, small_c, timestamp3_c, timestamp6_c, historical_ts[1], CAST(EXTRACT(YEAR FROM historical_ts[2]) AS INT) FROM full_types");
+
+            waitForSinkSize("sink", 2);
+            // the stored value is read as it is during the snapshot phase
+            Assertions.assertThat(preEpochSnapshotRecords())
+                    .containsExactly(
+                            "+I(2,32767,1900-01-01T00:00:00.123,1900-01-01T00:00:00.123456,1900-01-01T00:00:00.123456,0)");
+
+            // wait a bit to make sure the replication slot is ready
+            Thread.sleep(5000);
+            try (Connection connection = getJdbcConnection(POSTGIS_CONTAINER);
+                    Statement statement = connection.createStatement()) {
+                statement.execute("UPDATE inventory.full_types SET small_c=0 WHERE id=2;");
+            }
+
+            waitForSinkSize("sink", 4);
+            // the stored value is also kept during the change log phase
+            List<String> expected =
+                    Arrays.asList(
+                            "+I(2,32767,1900-01-01T00:00:00.123,1900-01-01T00:00:00.123456,1900-01-01T00:00:00.123456,0)",
+                            "-D(2,32767,1900-01-01T00:00:00.123,1900-01-01T00:00:00.123456,1900-01-01T00:00:00.123456,0)",
+                            "+I(2,0,1900-01-01T00:00:00.123,1900-01-01T00:00:00.123456,1900-01-01T00:00:00.123456,0)");
+            Assertions.assertThat(preEpochChangeLogRecords()).containsExactlyElementsOf(expected);
+
+            result.getJobClient().get().cancel().get();
+        } finally {
+            TimeZone.setDefault(originalTimeZone);
+        }
+    }
+
+    private void insertPreEpochTimestampRow() throws SQLException {
+        try (Connection connection = getJdbcConnection(POSTGIS_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "ALTER TABLE inventory.full_types ADD COLUMN historical_ts TIMESTAMP(6)[]");
+            statement.execute(
+                    "INSERT INTO inventory.full_types "
+                            + "(id, small_c, timestamp3_c, timestamp6_c, historical_ts) VALUES "
+                            + "(2, 32767, '1900-01-01 00:00:00.123', "
+                            + "'1900-01-01 00:00:00.123456', ARRAY['1900-01-01 00:00:00.123456','0001-02-29 00:00:00 BC']::TIMESTAMP(6)[]);");
+        }
+    }
+
+    private String preEpochTimestampSourceDdl(boolean parallelismSnapshot) {
+        return String.format(
+                "CREATE TABLE full_types ("
+                        + "    id INTEGER NOT NULL,"
+                        + "    small_c SMALLINT,"
+                        + "    timestamp3_c TIMESTAMP(3),"
+                        + "    timestamp6_c TIMESTAMP(6), historical_ts ARRAY<TIMESTAMP(6)>"
+                        + ") WITH ("
+                        + " 'connector' = 'postgres-cdc',"
+                        + " 'hostname' = '%s',"
+                        + " 'port' = '%s',"
+                        + " 'username' = '%s',"
+                        + " 'password' = '%s',"
+                        + " 'database-name' = '%s',"
+                        + " 'schema-name' = '%s',"
+                        + " 'table-name' = '%s',"
+                        + " 'scan.incremental.snapshot.enabled' = '%s',"
+                        + " 'decoding.plugin.name' = 'pgoutput', "
+                        + " 'slot.name' = '%s'"
+                        + ")",
+                POSTGIS_CONTAINER.getHost(),
+                POSTGIS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                POSTGIS_CONTAINER.getUsername(),
+                POSTGIS_CONTAINER.getPassword(),
+                POSTGIS_CONTAINER.getDatabaseName(),
+                "inventory",
+                "full_types",
+                parallelismSnapshot,
+                getSlotName());
+    }
+
+    private List<String> preEpochSnapshotRecords() {
+        return TestValuesTableFactory.getRawResultsAsStrings("sink").stream()
+                .filter(record -> record.startsWith("+I(2,"))
+                .collect(Collectors.toList());
+    }
+
+    private List<String> preEpochChangeLogRecords() {
+        return TestValuesTableFactory.getRawResultsAsStrings("sink").stream()
+                .filter(record -> record.startsWith("+I(2,") || record.startsWith("-D(2,"))
+                .collect(Collectors.toList());
     }
 
     @ParameterizedTest

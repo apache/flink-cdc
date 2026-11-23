@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.fluss.sink.v2.metrics;
 
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.metrics.MetricGroup;
 
 import org.apache.fluss.metrics.CharacterFilter;
@@ -25,8 +26,11 @@ import org.apache.fluss.metrics.Gauge;
 import org.apache.fluss.metrics.Histogram;
 import org.apache.fluss.metrics.Meter;
 import org.apache.fluss.metrics.Metric;
+import org.apache.fluss.metrics.MetricView;
+import org.apache.fluss.metrics.MetricViewUpdater;
 import org.apache.fluss.metrics.groups.AbstractMetricGroup;
 import org.apache.fluss.metrics.registry.MetricRegistry;
+import org.apache.fluss.utils.concurrent.ExecutorThreadFactory;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -34,6 +38,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 /* This file is based on source code of Apache Fluss Project (https://fluss.apache.org/), licensed by the Apache
  * Software Foundation (ASF) under the Apache License, Version 2.0. See the NOTICE file distributed with this work for
@@ -54,15 +60,29 @@ public class WrapperFlussMetricRegistry implements MetricRegistry {
     public static final String FLUSS_GROUP_NAME = "fluss";
     private static final Character FIELD_DELIMITER = '_';
 
+    private final Object lock = new Object();
     private final MetricGroup metricGroupForFluss;
     private final Map<String, Metric> metrics;
     private final Set<String> exposedMetricNames;
 
+    private ScheduledExecutorService viewUpdaterScheduledExecutor;
+    private MetricViewUpdater metricViewUpdater;
+    private boolean closed;
+
     public WrapperFlussMetricRegistry(
             MetricGroup flinkOperatorMetricGroup, Set<String> exposedMetricNames) {
+        this(flinkOperatorMetricGroup, exposedMetricNames, null);
+    }
+
+    @VisibleForTesting
+    WrapperFlussMetricRegistry(
+            MetricGroup flinkOperatorMetricGroup,
+            Set<String> exposedMetricNames,
+            ScheduledExecutorService viewUpdaterScheduledExecutor) {
         this.metricGroupForFluss = flinkOperatorMetricGroup.addGroup(FLUSS_GROUP_NAME);
         this.metrics = new HashMap<>();
         this.exposedMetricNames = exposedMetricNames;
+        this.viewUpdaterScheduledExecutor = viewUpdaterScheduledExecutor;
     }
 
     @Override
@@ -86,6 +106,7 @@ public class WrapperFlussMetricRegistry implements MetricRegistry {
 
         // now, register to the Flink's metrics group
         registerMetric(currentMetricGroup, metric, metricName);
+        registerMetricView(metric);
     }
 
     /** Exposes the metrics of Fluss metics group for flink. */
@@ -134,8 +155,42 @@ public class WrapperFlussMetricRegistry implements MetricRegistry {
         }
     }
 
+    private void registerMetricView(Metric metric) {
+        if (!(metric instanceof MetricView)) {
+            return;
+        }
+
+        synchronized (lock) {
+            if (closed) {
+                return;
+            }
+            if (metricViewUpdater == null) {
+                if (viewUpdaterScheduledExecutor == null) {
+                    viewUpdaterScheduledExecutor =
+                            Executors.newSingleThreadScheduledExecutor(
+                                    new ExecutorThreadFactory("fluss-metric-view-updater"));
+                }
+                metricViewUpdater = new MetricViewUpdater(viewUpdaterScheduledExecutor);
+            }
+            metricViewUpdater.notifyOfAddedView((MetricView) metric);
+        }
+    }
+
+    private void unregisterMetricView(Metric metric) {
+        if (!(metric instanceof MetricView)) {
+            return;
+        }
+
+        synchronized (lock) {
+            if (metricViewUpdater != null) {
+                metricViewUpdater.notifyOfRemovedView((MetricView) metric);
+            }
+        }
+    }
+
     @Override
     public void unregister(Metric metric, String metricName, AbstractMetricGroup group) {
+        unregisterMetricView(metric);
         // do nothing since the metric is actually registered into Flink's metric system,
         // it's fine to not unregister in here now since when Fluss's writer/scanner needs to
         // unregister metrics, it means the writer/scanner needs to be closed along with closing
@@ -144,6 +199,14 @@ public class WrapperFlussMetricRegistry implements MetricRegistry {
 
     @Override
     public CompletableFuture<Void> closeAsync() {
+        synchronized (lock) {
+            closed = true;
+            if (viewUpdaterScheduledExecutor != null) {
+                viewUpdaterScheduledExecutor.shutdownNow();
+                viewUpdaterScheduledExecutor = null;
+                metricViewUpdater = null;
+            }
+        }
         ((org.apache.flink.runtime.metrics.groups.AbstractMetricGroup<?>) metricGroupForFluss)
                 .close();
         return CompletableFuture.completedFuture(null);

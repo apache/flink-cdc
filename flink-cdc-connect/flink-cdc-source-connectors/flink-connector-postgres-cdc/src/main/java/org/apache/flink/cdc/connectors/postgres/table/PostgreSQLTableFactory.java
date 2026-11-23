@@ -38,11 +38,13 @@ import java.util.Set;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.DATABASE_NAME;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.HOSTNAME;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.PASSWORD;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.SCHEMA_NAME;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.TABLE_NAME;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.USERNAME;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED;
@@ -122,6 +124,21 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         boolean assignUnboundedChunkFirst =
                 config.get(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
         boolean appendOnly = config.get(SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
+        boolean releaseSnapshotMetadataEnabled =
+                config.get(SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED);
+        double scanRateLimitRecordsPerSecond = config.get(SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
+
+        if (!enableParallelRead
+                && scanRateLimitRecordsPerSecond
+                        != SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue()) {
+            throw new ValidationException(
+                    String.format(
+                            "Option '%s' requires option '%s' to be enabled. The legacy "
+                                    + "non-incremental source does not support rate limiting, "
+                                    + "please enable incremental snapshot.",
+                            SCAN_RATE_LIMIT_RECORDS_PER_SECOND.key(),
+                            SCAN_INCREMENTAL_SNAPSHOT_ENABLED.key()));
+        }
 
         if (enableParallelRead) {
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
@@ -170,7 +187,9 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
                 lsnCommitCheckpointsDelay,
                 assignUnboundedChunkFirst,
                 appendOnly,
-                includePartitionedTables);
+                includePartitionedTables,
+                releaseSnapshotMetadataEnabled,
+                scanRateLimitRecordsPerSecond);
     }
 
     @Override
@@ -216,6 +235,8 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
         options.add(SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
         options.add(SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED);
+        options.add(SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
         return options;
     }
 

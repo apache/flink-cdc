@@ -244,6 +244,21 @@ public class MySqlSourceOptions {
                             "Whether capture the scan the newly added tables or not, by default is false. This option is only useful when we start the job from a savepoint/checkpoint.");
 
     @Experimental
+    public static final ConfigOption<Boolean> SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED =
+            ConfigOptions.key("scan.incremental.snapshot.metadata.release.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to release the snapshot split metadata (assigned splits, finished"
+                                    + " offsets and table schemas) held by the source coordinator once the"
+                                    + " source has entered the binlog phase, to reduce JobManager memory"
+                                    + " pressure on jobs with a very large number of snapshot splits. Disabled"
+                                    + " by default. The release happens only after a checkpoint completes, so it has no"
+                                    + " effect without checkpointing. Cannot be enabled together with"
+                                    + " scan.newly-added-table.enabled (the job fails to start), since that"
+                                    + " flow needs the metadata that would be released.");
+
+    @Experimental
     public static final ConfigOption<String> SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN =
             ConfigOptions.key("scan.incremental.snapshot.chunk.key-column")
                     .stringType()
@@ -292,4 +307,12 @@ public class MySqlSourceOptions {
                     .defaultValue(true)
                     .withDescription(
                             "Whether to assign the unbounded chunks first during snapshot reading phase. This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.");
+
+    public static final ConfigOption<Double> SCAN_RATE_LIMIT_RECORDS_PER_SECOND =
+            ConfigOptions.key("scan.rate-limit.records-per-second")
+                    .doubleType()
+                    .defaultValue(-1d)
+                    .withDescription(
+                            "The maximum number of records emitted per second, the default value: -1, means no rate limiting. "
+                                    + "This option only takes effect when 'scan.incremental.snapshot.enabled' is true.");
 }

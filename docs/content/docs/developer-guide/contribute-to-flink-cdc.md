@@ -1,9 +1,9 @@
 ---
 title: "Contribute to Flink CDC"
-weight: 2
-type: docs
-aliases:
-  - /developer-guide/contribute-to-flink-cdc
+slug: "/docs/developer-guide/contribute-to-flink-cdc"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -45,7 +45,7 @@ project as follows.
 
 Any other question? Reach out to the Dev mail list to get help!
 
-<h2 id="code-contribution-guide">Code Contribution Guide</h2>
+## Code Contribution Guide
 
 Flink CDC is maintained, improved, and extended by code contributions of volunteers. We welcome contributions.
 
@@ -63,7 +63,7 @@ If you would like to contribute to Flink CDC, you could raise it as follows.
 4. Find a reviewer to review your PR and make sure the CI passed
 5. A committer of Flink CDC checks if the contribution fulfills the requirements and merges the code to the codebase.
 
-<h2 id="code-review-guide">Code Review Guide</h2>
+## Code Review Guide
 
 Every review needs to check the following aspects. 
 

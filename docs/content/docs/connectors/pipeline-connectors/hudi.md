@@ -1,9 +1,9 @@
 ---
 title: "Hudi"
-weight: 10
-type: docs
-aliases:
-- /connectors/pipeline-connectors/hudi
+slug: "/docs/connectors/pipeline-connectors/hudi"
+sidebar_position: 10
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -120,7 +120,7 @@ Pipeline Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Pass Hudi table options to the pipeline，See <a href="https://hudi.apache.org/docs/configurations/#FLINK_SQL">Hudi table options</a></td>
+      <td>Pass Hudi table options to the pipeline. See <a href="https://hudi.apache.org/docs/configurations/#FLINK_SQL">Hudi table options</a></td>
     </tr>
     </tbody>
 </table>    
@@ -218,5 +218,3 @@ Data Type Mapping
     </tbody>
 </table>
 </div>
-
-{{< top >}}

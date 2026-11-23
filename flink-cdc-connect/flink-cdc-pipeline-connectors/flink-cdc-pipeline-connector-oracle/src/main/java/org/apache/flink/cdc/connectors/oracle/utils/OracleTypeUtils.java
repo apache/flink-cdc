@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.oracle.utils;
 
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.common.types.DecimalType;
 
 import io.debezium.relational.Column;
 import oracle.jdbc.OracleTypes;
@@ -72,11 +73,56 @@ public class OracleTypeUtils {
                 return DataTypes.DOUBLE();
             case Types.NUMERIC:
             case Types.DECIMAL:
-                return column.length() == 0
-                                || !column.scale().isPresent()
-                                || column.scale().get() <= 0
-                        ? DataTypes.BIGINT()
-                        : DataTypes.DECIMAL(column.length(), column.scale().orElse(0));
+                {
+                    // Bare NUMBER (scale unspecified): floating-point semantic,
+                    // can store both integers and decimals up to 38 significant
+                    // digits. Use DECIMAL(38, 19) as a balanced universal
+                    // numeric type, matching Debezium's VariableScaleDecimal
+                    // encoding and OracleSchemaDataTypeInference.inferStruct.
+                    if (!column.scale().isPresent()) {
+                        return DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 19);
+                    }
+                    int precision = column.length();
+                    // precision == 0 (e.g. NUMBER(*, s)) means unspecified.
+                    int p = precision > 0 ? precision : DecimalType.MAX_PRECISION;
+                    int scale = column.scale().get();
+
+                    // scale < 0: value = unscaled * 10^|scale|. Debezium
+                    // encodes these as INT8 / INT16 / INT32 / INT64 based on
+                    // (precision - scale), which is the number of integer
+                    // digits. The default Debezium runtime
+                    // (DebeziumSchemaDataTypeInference) maps those to
+                    // TINYINT / SMALLINT / INT / BIGINT — all of which live
+                    // in the same 8-byte compact slot of BinaryRecordData's
+                    // fixed area. So we mirror that family here to keep the
+                    // schema and runtime layers in sync. When (precision -
+                    // scale) exceeds 18 the value can no longer fit in a
+                    // BIGINT and Debezium falls back to VariableScaleDecimal;
+                    // we map that case to STRING because the integer range
+                    // is genuinely beyond any native Flink CDC type.
+                    if (scale < 0) {
+                        int intDigits = p - scale; // p + |scale|
+                        if (intDigits <= 18) {
+                            return DataTypes.BIGINT();
+                        }
+                        return DataTypes.STRING();
+                    }
+                    // scale > 36: not safely representable as DECIMAL.
+                    if (scale > 36) {
+                        return DataTypes.STRING();
+                    }
+                    if (scale == 0) {
+                        // Explicit integer: BIGINT for p <= 18 (Debezium encodes
+                        // as INT8/16/32/64, parent class runtime returns
+                        // TINYINT/SMALLINT/INT/BIGINT — same 8-byte-or-less
+                        // family), DECIMAL(p, 0) for p > 18 (Debezium encodes
+                        // as VariableScaleDecimal, runtime returns DECIMAL,
+                        // BinaryRecordData layout matches 16-byte DECIMAL).
+                        return p <= 18 ? DataTypes.BIGINT() : DataTypes.DECIMAL(p, 0);
+                    }
+                    // 1 <= scale <= 36: standard decimal with fractional part.
+                    return DataTypes.DECIMAL(p, scale);
+                }
             case Types.DATE:
                 return DataTypes.DATE();
             case Types.TIMESTAMP:

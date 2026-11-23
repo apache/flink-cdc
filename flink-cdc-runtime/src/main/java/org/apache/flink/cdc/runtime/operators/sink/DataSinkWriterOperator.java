@@ -30,6 +30,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.sink.exception.SinkWrapperException;
+import org.apache.flink.cdc.source.RuntimeContextAdapter;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
@@ -127,7 +128,7 @@ public class DataSinkWriterOperator<CommT>
     @Override
     public void initializeState(StateInitializationContext context) throws Exception {
         schemaEvolutionClient.registerSubtask(
-                getRuntimeContext().getTaskInfo().getIndexOfThisSubtask());
+                RuntimeContextAdapter.getIndexOfThisSubtask(getRuntimeContext()));
         this.<AbstractStreamOperator<CommittableMessage<CommT>>>getFlinkWriterOperator()
                 .initializeState(context);
     }
@@ -227,7 +228,7 @@ public class DataSinkWriterOperator<CommT>
                             });
         }
         schemaEvolutionClient.notifyFlushSuccess(
-                getRuntimeContext().getTaskInfo().getIndexOfThisSubtask(),
+                RuntimeContextAdapter.getIndexOfThisSubtask(getRuntimeContext()),
                 event.getSourceSubTaskId());
     }
 

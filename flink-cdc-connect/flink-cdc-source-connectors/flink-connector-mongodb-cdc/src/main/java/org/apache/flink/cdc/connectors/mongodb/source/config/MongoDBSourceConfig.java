@@ -28,6 +28,7 @@ import java.util.Objects;
 
 import static org.apache.flink.cdc.connectors.mongodb.source.utils.MongoUtils.buildConnectionString;
 import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.flink.util.Preconditions.checkState;
 
 /** A MongoDB Source configuration which is used by {@link MongoDBSource}. */
 public class MongoDBSourceConfig implements SourceConfig {
@@ -56,6 +57,17 @@ public class MongoDBSourceConfig implements SourceConfig {
     private final boolean skipSnapshotBackfill;
     private final boolean isScanNewlyAddedTableEnabled;
     private final boolean assignUnboundedChunkFirst;
+    private final boolean releaseSnapshotMetadataEnabled;
+
+    private final boolean sslEnabled;
+    private final boolean sslInvalidHostnameAllowed;
+    @Nullable private final String sslKeyStore;
+    @Nullable private final String sslKeyStorePassword;
+    private final String sslKeyStoreType;
+    @Nullable private final String sslTrustStore;
+    @Nullable private final String sslTrustStorePassword;
+    private final String sslTrustStoreType;
+    private final double scanRateLimitRecordsPerSecond;
 
     MongoDBSourceConfig(
             String scheme,
@@ -79,7 +91,17 @@ public class MongoDBSourceConfig implements SourceConfig {
             boolean disableCursorTimeout,
             boolean skipSnapshotBackfill,
             boolean isScanNewlyAddedTableEnabled,
-            boolean assignUnboundedChunkFirst) {
+            boolean assignUnboundedChunkFirst,
+            boolean releaseSnapshotMetadataEnabled,
+            boolean sslEnabled,
+            boolean sslInvalidHostnameAllowed,
+            @Nullable String sslKeyStore,
+            @Nullable String sslKeyStorePassword,
+            String sslKeyStoreType,
+            @Nullable String sslTrustStore,
+            @Nullable String sslTrustStorePassword,
+            String sslTrustStoreType,
+            double scanRateLimitRecordsPerSecond) {
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
         this.username = username;
@@ -103,6 +125,22 @@ public class MongoDBSourceConfig implements SourceConfig {
         this.skipSnapshotBackfill = skipSnapshotBackfill;
         this.isScanNewlyAddedTableEnabled = isScanNewlyAddedTableEnabled;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
+        this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
+        checkState(
+                !(isScanNewlyAddedTableEnabled && releaseSnapshotMetadataEnabled),
+                "scan.incremental.snapshot.metadata.release.enabled and "
+                        + "scan.newly-added-table.enabled cannot both be enabled: releasing the "
+                        + "snapshot split metadata would drop the assigned splits, finished offsets "
+                        + "and table schemas that newly-added-table scanning needs.");
+        this.sslEnabled = sslEnabled;
+        this.sslInvalidHostnameAllowed = sslInvalidHostnameAllowed;
+        this.sslKeyStore = sslKeyStore;
+        this.sslKeyStorePassword = sslKeyStorePassword;
+        this.sslKeyStoreType = sslKeyStoreType;
+        this.sslTrustStore = sslTrustStore;
+        this.sslTrustStorePassword = sslTrustStorePassword;
+        this.sslTrustStoreType = sslTrustStoreType;
+        this.scanRateLimitRecordsPerSecond = scanRateLimitRecordsPerSecond;
     }
 
     public String getScheme() {
@@ -207,6 +245,52 @@ public class MongoDBSourceConfig implements SourceConfig {
         return assignUnboundedChunkFirst;
     }
 
+    public boolean isSslEnabled() {
+        return sslEnabled;
+    }
+
+    public boolean isSslInvalidHostnameAllowed() {
+        return sslInvalidHostnameAllowed;
+    }
+
+    @Nullable
+    public String getSslKeyStore() {
+        return sslKeyStore;
+    }
+
+    @Nullable
+    public String getSslKeyStorePassword() {
+        return sslKeyStorePassword;
+    }
+
+    public String getSslKeyStoreType() {
+        return sslKeyStoreType;
+    }
+
+    @Nullable
+    public String getSslTrustStore() {
+        return sslTrustStore;
+    }
+
+    @Nullable
+    public String getSslTrustStorePassword() {
+        return sslTrustStorePassword;
+    }
+
+    public String getSslTrustStoreType() {
+        return sslTrustStoreType;
+    }
+
+    @Override
+    public boolean isReleaseSnapshotMetadataEnabled() {
+        return releaseSnapshotMetadataEnabled;
+    }
+
+    @Override
+    public double getScanRateLimitRecordsPerSecond() {
+        return scanRateLimitRecordsPerSecond;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -234,7 +318,17 @@ public class MongoDBSourceConfig implements SourceConfig {
                 && Objects.equals(collectionList, that.collectionList)
                 && Objects.equals(connectionString, that.connectionString)
                 && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill)
-                && Objects.equals(isScanNewlyAddedTableEnabled, that.isScanNewlyAddedTableEnabled);
+                && Objects.equals(isScanNewlyAddedTableEnabled, that.isScanNewlyAddedTableEnabled)
+                && releaseSnapshotMetadataEnabled == that.releaseSnapshotMetadataEnabled
+                && sslEnabled == that.sslEnabled
+                && sslInvalidHostnameAllowed == that.sslInvalidHostnameAllowed
+                && Objects.equals(sslKeyStore, that.sslKeyStore)
+                && Objects.equals(sslKeyStorePassword, that.sslKeyStorePassword)
+                && Objects.equals(sslKeyStoreType, that.sslKeyStoreType)
+                && Objects.equals(sslTrustStore, that.sslTrustStore)
+                && Objects.equals(sslTrustStorePassword, that.sslTrustStorePassword)
+                && Objects.equals(sslTrustStoreType, that.sslTrustStoreType)
+                && scanRateLimitRecordsPerSecond == that.scanRateLimitRecordsPerSecond;
     }
 
     @Override
@@ -258,6 +352,16 @@ public class MongoDBSourceConfig implements SourceConfig {
                 samplesPerChunk,
                 closeIdleReaders,
                 skipSnapshotBackfill,
-                isScanNewlyAddedTableEnabled);
+                isScanNewlyAddedTableEnabled,
+                releaseSnapshotMetadataEnabled,
+                sslEnabled,
+                sslInvalidHostnameAllowed,
+                sslKeyStore,
+                sslKeyStorePassword,
+                sslKeyStoreType,
+                sslTrustStore,
+                sslTrustStorePassword,
+                sslTrustStoreType,
+                scanRateLimitRecordsPerSecond);
     }
 }

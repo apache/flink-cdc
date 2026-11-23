@@ -47,8 +47,10 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -396,6 +398,66 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
         return records;
     }
 
+    @Test
+    void testCoordinatorReleasesSnapshotMetadataInGroupFetchPath() throws Exception {
+        // Small chunks yield many snapshot splits and a small meta-group size forces group-fetch,
+        // the path where the coordinator holds (and, with the option on, releases) the bulk
+        // snapshot-split metadata. No failover: asserts the release drops no snapshot or stream
+        // data.
+        testSqlServerParallelSource(
+                DEFAULT_PARALLELISM,
+                DEFAULT_SCAN_STARTUP_MODE,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                new String[] {"dbo.customers"},
+                false,
+                1,
+                0,
+                null,
+                releaseEnabledGroupFetchOptions());
+    }
+
+    @Test
+    void testCoordinatorReleaseSurvivesStreamPhaseFailover() throws Exception {
+        // JobManager (coordinator) failover in the stream phase after the release: the light,
+        // released state must restore correctly and lose no data.
+        testSqlServerParallelSource(
+                DEFAULT_PARALLELISM,
+                DEFAULT_SCAN_STARTUP_MODE,
+                FailoverType.JM,
+                FailoverPhase.STREAM,
+                new String[] {"dbo.customers"},
+                false,
+                1,
+                0,
+                null,
+                releaseEnabledGroupFetchOptions());
+    }
+
+    @Test
+    void testCoordinatorReleaseSurvivesStreamPhaseReaderFailover() throws Exception {
+        // TaskManager (reader) failover in the stream phase with the release enabled: the
+        // generation guard must reject any stale assembled report and no data is lost.
+        testSqlServerParallelSource(
+                DEFAULT_PARALLELISM,
+                DEFAULT_SCAN_STARTUP_MODE,
+                FailoverType.TM,
+                FailoverPhase.STREAM,
+                new String[] {"dbo.customers"},
+                false,
+                1,
+                0,
+                null,
+                releaseEnabledGroupFetchOptions());
+    }
+
+    private static Map<String, String> releaseEnabledGroupFetchOptions() {
+        Map<String, String> options = new HashMap<>();
+        options.put("chunk-meta.group.size", "2");
+        options.put("scan.incremental.snapshot.metadata.release.enabled", "true");
+        return options;
+    }
+
     private void testSqlServerParallelSource(
             FailoverType failoverType, FailoverPhase failoverPhase, String[] captureCustomerTables)
             throws Exception {
@@ -419,7 +481,8 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
                 false,
                 1,
                 0,
-                null);
+                null,
+                Collections.emptyMap());
     }
 
     private void testSqlServerParallelSource(
@@ -451,7 +514,8 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
                 skipSnapshotBackfill,
                 restartAttempts,
                 delayBetweenAttempts,
-                chunkColumn);
+                chunkColumn,
+                Collections.emptyMap());
     }
 
     private void testSqlServerParallelSource(
@@ -463,7 +527,8 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
             boolean skipSnapshotBackfill,
             int restartAttempts,
             long delayBetweenAttempts,
-            String chunkColumn)
+            String chunkColumn,
+            Map<String, String> extraOptions)
             throws Exception {
 
         String databaseName = "customer";
@@ -511,11 +576,14 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
                         databaseName,
                         getTableNameRegex(captureCustomerTables),
                         skipSnapshotBackfill,
-                        chunkColumn == null
-                                ? ""
-                                : ",'scan.incremental.snapshot.chunk.key-column'='"
-                                        + chunkColumn
-                                        + "'");
+                        (chunkColumn == null
+                                        ? ""
+                                        : ",'scan.incremental.snapshot.chunk.key-column'='"
+                                                + chunkColumn
+                                                + "'")
+                                + extraOptions.entrySet().stream()
+                                        .map(e -> ",'" + e.getKey() + "'='" + e.getValue() + "'")
+                                        .collect(Collectors.joining()));
         tEnv.executeSql(sourceDDL);
         TableResult tableResult = tEnv.executeSql("select * from customers");
 

@@ -112,7 +112,7 @@ public class FlussEventSerializationSchemaTest {
                         .build();
         CreateTableEvent createTableEvent1 = new CreateTableEvent(table1, schema1);
         flussMetaDataApplier.applySchemaChange(createTableEvent1);
-        verifySchemaChangeEvent(table1, serializer.serialize(createTableEvent1));
+        assertThat(serializer.serialize(createTableEvent1)).isNull();
 
         BinaryRecordDataGenerator generator1 =
                 new BinaryRecordDataGenerator(
@@ -186,7 +186,7 @@ public class FlussEventSerializationSchemaTest {
                         .build();
         CreateTableEvent createTableEvent2 = new CreateTableEvent(table2, schema2);
         flussMetaDataApplier.applySchemaChange(createTableEvent2);
-        verifySchemaChangeEvent(table2, serializer.serialize(createTableEvent2));
+        assertThat(serializer.serialize(createTableEvent2)).isNull();
 
         BinaryRecordDataGenerator generator2 =
                 new BinaryRecordDataGenerator(
@@ -253,7 +253,7 @@ public class FlussEventSerializationSchemaTest {
                         .build();
         CreateTableEvent createTableEvent1 = new CreateTableEvent(table1, schemaBefore);
         flussMetaDataApplier.applySchemaChange(createTableEvent1);
-        verifySchemaChangeEvent(table1, serializer.serialize(createTableEvent1));
+        assertThat(serializer.serialize(createTableEvent1)).isNull();
 
         BinaryRecordDataGenerator generator1 =
                 new BinaryRecordDataGenerator(
@@ -276,7 +276,7 @@ public class FlussEventSerializationSchemaTest {
 
         // 2. add column at last.
         flussMetaDataApplier.applySchemaChange(addColumnEvent);
-        verifySchemaChangeEvent(table1, serializer.serialize(addColumnEvent));
+        assertThat(serializer.serialize(addColumnEvent)).isNull();
         BinaryRecordDataGenerator generator2 =
                 new BinaryRecordDataGenerator(
                         schemaAfter.getColumnDataTypes().toArray(new DataType[0]));
@@ -297,28 +297,22 @@ public class FlussEventSerializationSchemaTest {
                 serializer.serialize(updateEvent1));
     }
 
-    private void verifySchemaChangeEvent(TableId tableId, FlussEvent flussEvent) throws Exception {
-        verifySerializeResult(
-                new FlussEvent(
-                        TablePath.of(tableId.getSchemaName(), tableId.getTableName()), null, true),
-                flussEvent);
-    }
-
     private void verifyDataChangeEvent(TableId tableId, FlussRowWithOp row, FlussEvent flussEvent)
             throws Exception {
+        TablePath tablePath = TablePath.of(tableId.getSchemaName(), tableId.getTableName());
+        int schemaId = conn.getTable(tablePath).getTableInfo().getSchemaId();
         verifySerializeResult(
                 new FlussEvent(
                         TablePath.of(tableId.getSchemaName(), tableId.getTableName()),
                         Collections.singletonList(row),
-                        false),
+                        schemaId),
                 flussEvent);
     }
 
     private void verifySerializeResult(FlussEvent expectedEvent, FlussEvent actualflussEvent) {
 
         assertThat(actualflussEvent.getTablePath()).isEqualTo(expectedEvent.getTablePath());
-        assertThat(actualflussEvent.isShouldRefreshSchema())
-                .isEqualTo(expectedEvent.isShouldRefreshSchema());
+        assertThat(actualflussEvent.getSchemaId()).isEqualTo(expectedEvent.getSchemaId());
         List<FlussRowWithOp> actualRowWithOps = actualflussEvent.getRowWithOps();
         List<FlussRowWithOp> expectedRowWithOps = expectedEvent.getRowWithOps();
         if (actualRowWithOps == null) {

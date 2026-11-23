@@ -26,6 +26,9 @@ import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceSplit
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -77,6 +80,12 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
      */
     private final ChunkSplitterState chunkSplitterState;
 
+    /**
+     * Whether the bulk snapshot split metadata has been released from the coordinator (FLINK-40697,
+     * generalizing FLINK-39775). After release the metadata maps are empty (a "light" state).
+     */
+    private final boolean snapshotMetaReleased;
+
     public SnapshotPendingSplitsState(
             List<TableId> alreadyProcessedTables,
             List<SchemalessSnapshotSplit> remainingSplits,
@@ -89,17 +98,48 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
             boolean isRemainingTablesCheckpointed,
             Map<String, Long> splitFinishedCheckpointIds,
             ChunkSplitterState chunkSplitterState) {
-        this.alreadyProcessedTables = alreadyProcessedTables;
-        this.remainingSplits = remainingSplits;
-        this.assignedSplits = assignedSplits;
-        this.splitFinishedOffsets = splitFinishedOffsets;
+        this(
+                alreadyProcessedTables,
+                remainingSplits,
+                assignedSplits,
+                tableSchemas,
+                splitFinishedOffsets,
+                assignerStatus,
+                remainingTables,
+                isTableIdCaseSensitive,
+                isRemainingTablesCheckpointed,
+                splitFinishedCheckpointIds,
+                chunkSplitterState,
+                false);
+    }
+
+    public SnapshotPendingSplitsState(
+            List<TableId> alreadyProcessedTables,
+            List<SchemalessSnapshotSplit> remainingSplits,
+            Map<String, SchemalessSnapshotSplit> assignedSplits,
+            Map<TableId, TableChanges.TableChange> tableSchemas,
+            Map<String, Offset> splitFinishedOffsets,
+            AssignerStatus assignerStatus,
+            List<TableId> remainingTables,
+            boolean isTableIdCaseSensitive,
+            boolean isRemainingTablesCheckpointed,
+            Map<String, Long> splitFinishedCheckpointIds,
+            ChunkSplitterState chunkSplitterState,
+            boolean snapshotMetaReleased) {
+        // FLINK-38061: make defensive copy to avoid potential concurrent modification of the
+        // collections.
+        this.alreadyProcessedTables = new ArrayList<>(alreadyProcessedTables);
+        this.remainingSplits = new ArrayList<>(remainingSplits);
+        this.assignedSplits = new LinkedHashMap<>(assignedSplits);
+        this.splitFinishedOffsets = new HashMap<>(splitFinishedOffsets);
         this.assignerStatus = assignerStatus;
-        this.remainingTables = remainingTables;
+        this.remainingTables = new ArrayList<>(remainingTables);
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
-        this.tableSchemas = tableSchemas;
+        this.tableSchemas = new HashMap<>(tableSchemas);
         this.chunkSplitterState = chunkSplitterState;
-        this.splitFinishedCheckpointIds = splitFinishedCheckpointIds;
+        this.splitFinishedCheckpointIds = new HashMap<>(splitFinishedCheckpointIds);
+        this.snapshotMetaReleased = snapshotMetaReleased;
     }
 
     public Map<String, Long> getSplitFinishedCheckpointIds() {
@@ -146,6 +186,10 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         return chunkSplitterState;
     }
 
+    public boolean isSnapshotMetaReleased() {
+        return snapshotMetaReleased;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -164,7 +208,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 && Objects.equals(assignedSplits, that.assignedSplits)
                 && Objects.equals(splitFinishedOffsets, that.splitFinishedOffsets)
                 && Objects.equals(splitFinishedCheckpointIds, that.splitFinishedCheckpointIds)
-                && Objects.equals(chunkSplitterState, that.chunkSplitterState);
+                && Objects.equals(chunkSplitterState, that.chunkSplitterState)
+                && snapshotMetaReleased == that.snapshotMetaReleased;
     }
 
     @Override
@@ -179,7 +224,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 isTableIdCaseSensitive,
                 isRemainingTablesCheckpointed,
                 splitFinishedCheckpointIds,
-                chunkSplitterState);
+                chunkSplitterState,
+                snapshotMetaReleased);
     }
 
     @Override
@@ -205,6 +251,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 + splitFinishedCheckpointIds
                 + ", chunkSplitterState="
                 + chunkSplitterState
+                + ", snapshotMetaReleased="
+                + snapshotMetaReleased
                 + '}';
     }
 }

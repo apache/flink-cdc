@@ -30,6 +30,7 @@ import io.debezium.relational.TableEditor;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
 import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -95,7 +96,7 @@ class PendingSplitsStateSerializerTest {
     @MethodSource("params")
     void testRepeatedSerializationCache(PendingSplitsState state) throws Exception {
         final PendingSplitsStateSerializer serializer =
-                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE);
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE, true);
 
         final byte[] ser1 = serializer.serialize(state);
         final byte[] ser2 = serializer.serialize(state);
@@ -107,7 +108,7 @@ class PendingSplitsStateSerializerTest {
     @MethodSource("params")
     void testOutputIsFinallyCleared(PendingSplitsState state) throws Exception {
         final PendingSplitsStateSerializer serializer =
-                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE);
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE, true);
 
         final byte[] ser1 = serializer.serialize(state);
         state.serializedFormCache = null;
@@ -121,10 +122,100 @@ class PendingSplitsStateSerializerTest {
         Assertions.assertThat(ser1).isEqualTo(ser2);
     }
 
+    @Test
+    void testSerializeAndDeserializeReleasedHybridState() throws Exception {
+        // The "light" state produced after releasing the snapshot metadata must round-trip, and
+        // the persisted released flag (PendingSplitsStateSerializer v6) must survive.
+        HybridPendingSplitsState released = getTestReleasedHybridPendingSplitsState();
+        PendingSplitsState roundTripped = serializeAndDeserializeSourceEnumState(released);
+        Assertions.assertThat(roundTripped).isEqualTo(released);
+
+        SnapshotPendingSplitsState snapshot =
+                ((HybridPendingSplitsState) roundTripped).getSnapshotPendingSplits();
+        Assertions.assertThat(snapshot.getAssignedSplits()).isEmpty();
+        Assertions.assertThat(snapshot.getSplitFinishedOffsets()).isEmpty();
+        Assertions.assertThat(snapshot.getTableSchemas()).isEmpty();
+        Assertions.assertThat(snapshot.getAlreadyProcessedTables()).isNotEmpty();
+        Assertions.assertThat(snapshot.isSnapshotMetaReleased()).isTrue();
+        Assertions.assertThat(((HybridPendingSplitsState) roundTripped).isBinlogSplitAssigned())
+                .isTrue();
+    }
+
+    @Test
+    void testDeserializeV5SnapshotStateDefaultsReleasedFlagToFalse() throws Exception {
+        // A v5 checkpoint written before FLINK-39775 has no released-flag byte. For a snapshot
+        // state that byte is the last one written, so a v6 stream without its final byte is exactly
+        // the v5 wire format. Deserializing it under the current version must default
+        // snapshotMetaReleased to false and otherwise round-trip unchanged.
+        SnapshotPendingSplitsState state = getTestSnapshotPendingSplitsState(false);
+        PendingSplitsStateSerializer serializer =
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE, true);
+        byte[] v6 = serializer.serialize(state);
+        byte[] v5 = Arrays.copyOf(v6, v6.length - 1);
+
+        PendingSplitsState restored = serializer.deserialize(5, v5);
+
+        Assertions.assertThat(restored).isInstanceOf(SnapshotPendingSplitsState.class);
+        Assertions.assertThat(((SnapshotPendingSplitsState) restored).isSnapshotMetaReleased())
+                .isFalse();
+        Assertions.assertThat(restored).isEqualTo(state);
+    }
+
+    @Test
+    void testReleaseDisabledJobKeepsWritingV5Format() throws Exception {
+        // A job that leaves scan.incremental.snapshot.metadata.release.enabled off must keep
+        // writing
+        // the v5 format (no released flag), so it can still be restored by an older connector
+        // build.
+        SnapshotPendingSplitsState state = getTestSnapshotPendingSplitsState(false);
+        PendingSplitsStateSerializer v5Serializer =
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE, false);
+        PendingSplitsStateSerializer v6Serializer =
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE, true);
+
+        Assertions.assertThat(v5Serializer.getVersion()).isEqualTo(5);
+        Assertions.assertThat(v6Serializer.getVersion()).isEqualTo(6);
+
+        byte[] v6 = v6Serializer.serialize(state);
+        // Clear the lazily cached serialized form so the v5 serializer re-serializes the state.
+        state.serializedFormCache = null;
+        byte[] v5 = v5Serializer.serialize(state);
+
+        // For a snapshot state the released flag is the final byte, so the v5 bytes are exactly the
+        // v6 bytes without that trailing byte, i.e. the format an older connector wrote.
+        Assertions.assertThat(v5).isEqualTo(Arrays.copyOf(v6, v6.length - 1));
+
+        // A default-off job restores its own v5 checkpoint with the flag defaulting to false.
+        PendingSplitsState restored = v5Serializer.deserialize(5, v5);
+        Assertions.assertThat(restored).isEqualTo(state);
+        Assertions.assertThat(((SnapshotPendingSplitsState) restored).isSnapshotMetaReleased())
+                .isFalse();
+    }
+
+    @Test
+    void testReleaseDisabledSerializerRoundTripsHybridStateAtV5() throws Exception {
+        // The option-off serializer round-trips a hybrid state at v5 (the released flag is written
+        // for neither the snapshot part nor read back), leaving the flag false.
+        HybridPendingSplitsState state = getTestHybridPendingSplitsState(false);
+        PendingSplitsStateSerializer v5Serializer =
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE, false);
+
+        byte[] serialized = v5Serializer.serialize(state);
+        PendingSplitsState restored =
+                v5Serializer.deserialize(v5Serializer.getVersion(), serialized);
+
+        Assertions.assertThat(restored).isEqualTo(state);
+        Assertions.assertThat(
+                        ((HybridPendingSplitsState) restored)
+                                .getSnapshotPendingSplits()
+                                .isSnapshotMetaReleased())
+                .isFalse();
+    }
+
     static PendingSplitsState serializeAndDeserializeSourceEnumState(PendingSplitsState state)
             throws Exception {
         final PendingSplitsStateSerializer serializer =
-                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE);
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE, true);
         byte[] serialized = serializer.serialize(state);
         return serializer.deserialize(serializer.getVersion(), serialized);
     }
@@ -201,6 +292,28 @@ class PendingSplitsStateSerializerTest {
             boolean checkpointWhenSplitting) {
         return new HybridPendingSplitsState(
                 getTestSnapshotPendingSplitsState(checkpointWhenSplitting), false);
+    }
+
+    private static HybridPendingSplitsState getTestReleasedHybridPendingSplitsState() {
+        // After releasing the snapshot metadata, the hybrid state is just a normal state
+        // with empty assigned/finished/schema maps and isBinlogSplitAssigned=true.
+        final List<TableId> alreadyProcessedTables = new ArrayList<>();
+        alreadyProcessedTables.add(tableId0);
+        alreadyProcessedTables.add(tableId1);
+        SnapshotPendingSplitsState snapshotState =
+                new SnapshotPendingSplitsState(
+                        alreadyProcessedTables,
+                        new ArrayList<>(),
+                        new LinkedHashMap<>(),
+                        new HashMap<>(),
+                        new HashMap<>(),
+                        AssignerStatus.INITIAL_ASSIGNING_FINISHED,
+                        new ArrayList<>(),
+                        false,
+                        true,
+                        ChunkSplitterState.NO_SPLITTING_TABLE_STATE,
+                        true);
+        return new HybridPendingSplitsState(snapshotState, true);
     }
 
     private static BinlogPendingSplitsState getTestBinlogPendingSplitsState() {

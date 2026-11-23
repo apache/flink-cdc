@@ -93,6 +93,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final double distributionFactorLower;
     private final StartupOptions startupOptions;
     private final boolean scanNewlyAddedTableEnabled;
+    private final boolean releaseSnapshotMetadataEnabled;
     private final boolean closeIdleReaders;
     private final Properties jdbcProperties;
     private final Duration heartbeatInterval;
@@ -103,6 +104,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final boolean assignUnboundedChunkFirst;
 
     private final boolean appendOnly;
+
+    private final double scanRateLimitRecordsPerSecond;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -136,6 +139,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             double distributionFactorLower,
             StartupOptions startupOptions,
             boolean scanNewlyAddedTableEnabled,
+            boolean releaseSnapshotMetadataEnabled,
             boolean closeIdleReaders,
             Properties jdbcProperties,
             Duration heartbeatInterval,
@@ -144,7 +148,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             boolean parseOnlineSchemaChanges,
             boolean useLegacyJsonFormat,
             boolean assignUnboundedChunkFirst,
-            boolean appendOnly) {
+            boolean appendOnly,
+            double scanRateLimitRecordsPerSecond) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -166,6 +171,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.distributionFactorLower = distributionFactorLower;
         this.startupOptions = startupOptions;
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
+        this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
         this.closeIdleReaders = closeIdleReaders;
         this.jdbcProperties = jdbcProperties;
         this.parseOnlineSchemaChanges = parseOnlineSchemaChanges;
@@ -178,6 +184,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.useLegacyJsonFormat = useLegacyJsonFormat;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
         this.appendOnly = appendOnly;
+        this.scanRateLimitRecordsPerSecond = scanRateLimitRecordsPerSecond;
     }
 
     @Override
@@ -233,6 +240,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .startupOptions(startupOptions)
                             .deserializer(deserializer)
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
+                            .releaseSnapshotMetadataEnabled(releaseSnapshotMetadataEnabled)
                             .closeIdleReaders(closeIdleReaders)
                             .jdbcProperties(jdbcProperties)
                             .heartbeatInterval(heartbeatInterval)
@@ -241,6 +249,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .parseOnLineSchemaChanges(parseOnlineSchemaChanges)
                             .useLegacyJsonFormat(useLegacyJsonFormat)
                             .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
+                            .scanRateLimitRecordsPerSecond(scanRateLimitRecordsPerSecond)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -322,6 +331,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         distributionFactorLower,
                         startupOptions,
                         scanNewlyAddedTableEnabled,
+                        releaseSnapshotMetadataEnabled,
                         closeIdleReaders,
                         jdbcProperties,
                         heartbeatInterval,
@@ -330,7 +340,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         parseOnlineSchemaChanges,
                         useLegacyJsonFormat,
                         assignUnboundedChunkFirst,
-                        appendOnly);
+                        appendOnly,
+                        scanRateLimitRecordsPerSecond);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -353,6 +364,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && distributionFactorUpper == that.distributionFactorUpper
                 && distributionFactorLower == that.distributionFactorLower
                 && scanNewlyAddedTableEnabled == that.scanNewlyAddedTableEnabled
+                && releaseSnapshotMetadataEnabled == that.releaseSnapshotMetadataEnabled
                 && closeIdleReaders == that.closeIdleReaders
                 && Objects.equals(physicalSchema, that.physicalSchema)
                 && Objects.equals(hostname, that.hostname)
@@ -376,7 +388,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && parseOnlineSchemaChanges == that.parseOnlineSchemaChanges
                 && useLegacyJsonFormat == that.useLegacyJsonFormat
                 && assignUnboundedChunkFirst == that.assignUnboundedChunkFirst
-                && Objects.equals(appendOnly, that.appendOnly);
+                && Objects.equals(appendOnly, that.appendOnly)
+                && scanRateLimitRecordsPerSecond == that.scanRateLimitRecordsPerSecond;
     }
 
     @Override
@@ -405,6 +418,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 producedDataType,
                 metadataKeys,
                 scanNewlyAddedTableEnabled,
+                releaseSnapshotMetadataEnabled,
                 closeIdleReaders,
                 jdbcProperties,
                 heartbeatInterval,
@@ -413,7 +427,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 parseOnlineSchemaChanges,
                 useLegacyJsonFormat,
                 assignUnboundedChunkFirst,
-                appendOnly);
+                appendOnly,
+                scanRateLimitRecordsPerSecond);
     }
 
     @Override

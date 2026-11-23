@@ -245,6 +245,9 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
         if (this.getFilename() != null
                 && that.getFilename() != null
                 && this.getFilename().compareToIgnoreCase(that.getFilename()) != 0) {
+            if (this.getFilename().length() != that.getFilename().length()) {
+                return Integer.compare(this.getFilename().length(), that.getFilename().length());
+            }
             return this.getFilename().compareToIgnoreCase(that.getFilename());
         }
 

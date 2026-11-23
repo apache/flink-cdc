@@ -1,9 +1,9 @@
 ---
 title: "Data Sink"
-weight: 3
-type: docs
-aliases:
-  - /core-concept/data-sink/
+slug: "/docs/core-concept/data-sink"
+sidebar_position: 3
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

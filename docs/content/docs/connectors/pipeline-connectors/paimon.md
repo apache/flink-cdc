@@ -1,9 +1,9 @@
 ---
 title: "Paimon"
-weight: 3
-type: docs
-aliases:
-- /connectors/pipeline-connectors/paimon
+slug: "/docs/connectors/pipeline-connectors/paimon"
+sidebar_position: 3
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -27,6 +27,9 @@ under the License.
 # Paimon Pipeline Connector
 
 The Paimon Pipeline connector can be used as the *Data Sink* of the pipeline, and write data to [Paimon](https://paimon.apache.org). This document describes how to set up the Paimon Pipeline connector.
+
+To replace an existing Paimon MySQL CDC Action, see
+[Migrate Paimon MySQL CDC Actions to Flink CDC](../../examples-and-best-practices/migrate-paimon-cdc-action.md).
 
 ## What can the connector do?
 * Create table automatically if not exist
@@ -128,14 +131,14 @@ Pipeline Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Pass options of Paimon catalog to pipeline，See <a href="https://paimon.apache.org/docs/master/maintenance/configurations/#catalogoptions">Paimon catalog options</a>。 </td>
+      <td>Pass options of Paimon catalog to pipeline. See <a href="https://paimon.apache.org/docs/master/maintenance/configurations/#catalogoptions">Paimon catalog options</a>. </td>
     </tr>
     <tr>
       <td>table.properties.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Pass options of  Paimon table to pipeline，See <a href="https://paimon.apache.org/docs/master/maintenance/configurations/#coreoptions">Paimon table options</a>。 </td>
+      <td>Pass options of  Paimon table to pipeline. See <a href="https://paimon.apache.org/docs/master/maintenance/configurations/#coreoptions">Paimon table options</a>. </td>
     </tr>
     </tbody>
 </table>    
@@ -233,5 +236,3 @@ Data Type Mapping
     </tbody>
 </table>
 </div>
-
-{{< top >}}
