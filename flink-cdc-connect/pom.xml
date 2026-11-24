@@ -46,7 +46,7 @@ limitations under the License.
             <dependencies>
                 <dependency>
                     <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink1-compat</artifactId>
+                    <artifactId>flink-cdc-flink-1.20</artifactId>
                     <version>${project.version}</version>
                     <type>test-jar</type>
                     <scope>test</scope>
@@ -68,20 +68,20 @@ limitations under the License.
                 </dependency>
                 <dependency>
                     <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink2-compat</artifactId>
+                    <artifactId>flink-cdc-flink-2.2</artifactId>
                     <version>${project.version}</version>
                     <scope>provided</scope>
                 </dependency>
                 <dependency>
                     <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink2-compat</artifactId>
+                    <artifactId>flink-cdc-flink-2.2</artifactId>
                     <version>${project.version}</version>
                     <type>test-jar</type>
                     <scope>test</scope>
                 </dependency>
                 <dependency>
                     <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink1-compat</artifactId>
+                    <artifactId>flink-cdc-flink-1.20</artifactId>
                     <version>${project.version}</version>
                     <scope>provided</scope>
                     <exclusions>
@@ -91,10 +91,10 @@ limitations under the License.
                         </exclusion>
                     </exclusions>
                 </dependency>
-                <!-- Exclude flink1-compat test-jar when using flink2 profile -->
+                <!-- Exclude flink-cdc-flink-1.20 test-jar when using flink2 profile -->
                 <dependency>
                     <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink1-compat</artifactId>
+                    <artifactId>flink-cdc-flink-1.20</artifactId>
                     <version>${project.version}</version>
                     <type>test-jar</type>
                     <scope>provided</scope>
@@ -122,7 +122,7 @@ limitations under the License.
                                     <artifactItems>
                                         <artifactItem>
                                             <groupId>org.apache.flink</groupId>
-                                            <artifactId>flink-cdc-flink2-compat</artifactId>
+                                            <artifactId>flink-cdc-flink-2.2</artifactId>
                                             <version>${project.version}</version>
                                             <outputDirectory>${project.build.directory}/flink2-extra-libs</outputDirectory>
                                         </artifactItem>
@@ -148,7 +148,7 @@ limitations under the License.
                         <artifactId>maven-surefire-plugin</artifactId>
                         <configuration>
                             <additionalClasspathElements>
-                                <additionalClasspathElement>${project.build.directory}/flink2-extra-libs/flink-cdc-flink2-compat-${project.version}.jar</additionalClasspathElement>
+                                <additionalClasspathElement>${project.build.directory}/flink2-extra-libs/flink-cdc-flink-2.2-${project.version}.jar</additionalClasspathElement>
                                 <additionalClasspathElement>${project.build.directory}/flink2-extra-libs/flink-shaded-guava-${flink.2.x.shaded.guava.version}.jar</additionalClasspathElement>
                                 <additionalClasspathElement>${project.build.directory}/flink2-extra-libs/flink-streaming-java-${flink.2.x.version}.jar</additionalClasspathElement>
                             </additionalClasspathElements>
