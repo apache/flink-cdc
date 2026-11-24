@@ -72,6 +72,9 @@ limitations under the License.
         <flink.1.x.version>1.20.3</flink.1.x.version>
         <flink.2.x.version>2.2.0</flink.2.x.version>
         <flink.version>${flink.1.x.version}</flink.version>
+        <!-- Compat layer of the active Flink generation, switched by the
+             root pom flink1/flink2 profiles. -->
+        <flink.compat.artifactId>flink-cdc-flink-1.20</flink.compat.artifactId>
         <flink.major.version>1.20</flink.major.version>
         <flink.1.x.shaded.guava.version>31.1-jre-17.0</flink.1.x.shaded.guava.version>
         <flink.2.x.shaded.guava.version>33.4.0-jre-20.0</flink.2.x.shaded.guava.version>
@@ -115,6 +118,7 @@ limitations under the License.
         <maven.compiler.source>${source.java.version}</maven.compiler.source>
         <maven.compiler.target>${target.java.version}</maven.compiler.target>
         <flink.kafka.connector.version>3.3.0-1.20</flink.kafka.connector.version>
+        <flink.connector.elasticsearch.version>3.1.0-1.20</flink.connector.elasticsearch.version>
         <paimon.flink.major.version>1.20</paimon.flink.major.version>
         <fluss.flink.major.version>1.20</fluss.flink.major.version>
     </properties>
@@ -860,7 +864,10 @@ limitations under the License.
         <profile>
             <id>flink2</id>
             <properties>
+                <flink.version>${flink.2.x.version}</flink.version>
+                <flink.compat.artifactId>flink-cdc-flink-2.2</flink.compat.artifactId>
                 <flink.kafka.connector.version>4.0.1-2.0</flink.kafka.connector.version>
+                <flink.connector.elasticsearch.version>4.0.0-2.0</flink.connector.elasticsearch.version>
                 <paimon.flink.major.version>2.1</paimon.flink.major.version>
                 <iceberg.flink.major.version>2.0</iceberg.flink.major.version>
                 <fluss.flink.major.version>2.2</fluss.flink.major.version>

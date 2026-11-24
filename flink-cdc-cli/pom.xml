@@ -80,22 +80,23 @@ limitations under the License.
             <scope>provided</scope>
         </dependency>
 
+        <!-- Compat layer of the active Flink generation, selected via
+             flink.compat.artifactId in the root pom profiles. -->
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>${flink.compat.artifactId}</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
     </dependencies>
 
     <profiles>
+        <!-- Only activates the root pom's flink2 test classpath machinery for this
+             module (copy-flink2-guava and the surefire additional classpath elements
+             come from the root pom's pluginManagement). -->
         <profile>
             <id>flink2</id>
-            <properties>
-                <flink.version>${flink.2.x.version}</flink.version>
-            </properties>
-            <dependencies>
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink-2.2</artifactId>
-                    <version>${project.version}</version>
-                    <scope>provided</scope>
-                </dependency>
-            </dependencies>
             <build>
                 <plugins>
                     <plugin>

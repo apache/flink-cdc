@@ -57,39 +57,26 @@ limitations under the License.
             <artifactId>flink-cdc-python</artifactId>
             <version>${project.version}</version>
         </dependency>
+
+        <!-- Compat layer of the active Flink generation, selected via
+             flink.compat.artifactId in the root pom profiles. -->
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>${flink.compat.artifactId}</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <profiles>
+        <!-- The 2.x-line dist ships the 2.x shaded guava; the 1.x flavor comes
+             from the dependency inherited from the root pom. -->
         <profile>
             <id>flink2</id>
             <dependencies>
                 <dependency>
                     <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink-2.2</artifactId>
-                    <version>${project.version}</version>
-                </dependency>
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
                     <artifactId>flink-shaded-guava</artifactId>
                     <version>${flink.2.x.shaded.guava.version}</version>
-                </dependency>
-            </dependencies>
-        </profile>
-        <profile>
-            <id>flink1</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <dependencies>
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink-1.20</artifactId>
-                    <version>${project.version}</version>
-                </dependency>
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-shaded-guava</artifactId>
-                    <version>${flink.1.x.shaded.guava.version}</version>
                 </dependency>
             </dependencies>
         </profile>
