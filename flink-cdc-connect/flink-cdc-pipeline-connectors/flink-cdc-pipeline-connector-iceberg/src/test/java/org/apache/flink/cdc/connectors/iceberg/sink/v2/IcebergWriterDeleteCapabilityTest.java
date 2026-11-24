@@ -30,11 +30,13 @@ import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogUtil;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.data.IcebergGenerics;
 import org.apache.iceberg.data.Record;
 import org.apache.iceberg.io.CloseableIterable;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -102,6 +104,99 @@ class IcebergWriterDeleteCapabilityTest {
             context.commit();
             assertThat(context.read(keyedTable)).isEmpty();
             assertThat(context.read(appendTable)).containsExactlyInAnyOrder("1, north", "1, east");
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testUpdateChangingTargetKeyButNotCdcKeyDeletesOldRow(boolean partitioned)
+            throws Exception {
+        TableId tableId = TableId.parse("test.reassigned_key_table");
+        RecordData north = record(1L, "north");
+        RecordData east = record(1L, "east");
+
+        try (TestContext context = new TestContext()) {
+            Schema.Builder targetSchema =
+                    Schema.newBuilder()
+                            .physicalColumn("id", DataTypes.BIGINT().notNull())
+                            .physicalColumn("region", DataTypes.STRING().notNull())
+                            .primaryKey("region");
+            if (partitioned) {
+                targetSchema.partitionKey("id");
+            }
+            context.createTable(tableId, targetSchema.build(), schema(true, false));
+
+            context.writer.write(DataChangeEvent.insertEvent(tableId, north), null);
+            context.commit();
+            // The CDC key id is unchanged, but the target key region changes.
+            context.writer.write(DataChangeEvent.updateEvent(tableId, north, east), null);
+            context.commit();
+            assertThat(context.read(tableId)).containsExactly("1, east");
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testExistingTargetWithReorderedKeyColumn(boolean partitioned) throws Exception {
+        TableId tableId = TableId.parse("test.reordered_key_table");
+        Schema cdcSchema = threeColumnSchema("id", "other", false);
+        Schema.Builder targetSchema =
+                Schema.newBuilder()
+                        .physicalColumn("other", DataTypes.BIGINT())
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id");
+        if (partitioned) {
+            targetSchema.partitionKey("other");
+        }
+        BinaryRecordDataGenerator generator = threeColumnGenerator(cdcSchema);
+
+        try (TestContext context = new TestContext()) {
+            context.createTable(tableId, targetSchema.build(), cdcSchema);
+            context.writer.write(
+                    DataChangeEvent.insertEvent(tableId, threeColumnRecord(generator, 1L, 100L)),
+                    null);
+            context.commit();
+            // Rows are mapped by position, so the CDC column other feeds the target key id.
+            context.writer.write(
+                    DataChangeEvent.updateEvent(
+                            tableId,
+                            threeColumnRecord(generator, 1L, 100L),
+                            threeColumnRecord(generator, 1L, 200L)),
+                    null);
+            context.commit();
+            assertThat(context.read(tableId, "other", "id", "name")).containsExactly("1, 200, a");
+        }
+    }
+
+    @Test
+    void testKeyColumnRenamedInCatalog() throws Exception {
+        TableId tableId = TableId.parse("test.renamed_key_table");
+        Schema schema = threeColumnSchema("id", "other", false);
+        BinaryRecordDataGenerator generator = threeColumnGenerator(schema);
+
+        try (TestContext context = new TestContext()) {
+            context.createTable(tableId, schema, schema);
+            context.writer.write(
+                    DataChangeEvent.insertEvent(tableId, threeColumnRecord(generator, 1L, 100L)),
+                    null);
+            context.commit();
+
+            // Swap the names of id and other. Field ids, and so the identifier field, stay put.
+            Table table = context.catalog.loadTable(TableIdentifier.parse(tableId.identifier()));
+            table.updateSchema().renameColumn("id", "tmp").commit();
+            table.updateSchema().renameColumn("other", "id").commit();
+            table.updateSchema().renameColumn("tmp", "other").commit();
+            context.writer.flush(false);
+
+            context.writer.write(
+                    DataChangeEvent.updateEvent(
+                            tableId,
+                            threeColumnRecord(generator, 1L, 100L),
+                            threeColumnRecord(generator, 2L, 100L)),
+                    null);
+            context.commit();
+            assertThat(context.read(tableId, "other", "id", "name")).containsExactly("2, 100, a");
         }
     }
 
@@ -301,6 +396,29 @@ class IcebergWriterDeleteCapabilityTest {
         return generator.generate(new Object[] {id, BinaryStringData.fromString(region)});
     }
 
+    private static Schema threeColumnSchema(
+            String keyColumn, String otherColumn, boolean partitionedByKey) {
+        Schema.Builder builder =
+                Schema.newBuilder()
+                        .physicalColumn(keyColumn, DataTypes.BIGINT().notNull())
+                        .physicalColumn(otherColumn, DataTypes.BIGINT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey(keyColumn);
+        if (partitionedByKey) {
+            builder.partitionKey(keyColumn);
+        }
+        return builder.build();
+    }
+
+    private static BinaryRecordDataGenerator threeColumnGenerator(Schema schema) {
+        return new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+    }
+
+    private static RecordData threeColumnRecord(
+            BinaryRecordDataGenerator generator, long first, long second) {
+        return generator.generate(new Object[] {first, second, BinaryStringData.fromString("a")});
+    }
+
     private class TestContext implements AutoCloseable {
 
         private final Catalog catalog;
@@ -351,13 +469,20 @@ class IcebergWriterDeleteCapabilityTest {
         }
 
         private List<String> read(TableId tableId) throws Exception {
+            return read(tableId, "id", "region");
+        }
+
+        private List<String> read(TableId tableId, String... columns) throws Exception {
             List<String> result = new ArrayList<>();
             try (CloseableIterable<Record> records =
                     IcebergGenerics.read(
                                     catalog.loadTable(TableIdentifier.parse(tableId.identifier())))
                             .build()) {
                 for (Record record : records) {
-                    result.add(record.getField("id") + ", " + record.getField("region"));
+                    result.add(
+                            Arrays.stream(columns)
+                                    .map(column -> String.valueOf(record.getField(column)))
+                                    .collect(Collectors.joining(", ")));
                 }
             }
             return result;
