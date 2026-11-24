@@ -66,8 +66,8 @@ Flink CDC is organized around the Pipeline abstraction: a user-defined data pipe
 
 Currently, Flink CDC supports two Flink generations simultaneously:
 
-- `flink-cdc-flink-1.20` — Flink 1.x compatibility layer (currently 1.20.3), under the `flink-cdc-flink` aggregate. Default profile.
-- `flink-cdc-flink-2.2` — Flink 2.x compatibility layer (currently 2.2.0), under the `flink-cdc-flink` aggregate. Activated via `-Pflink2`.
+- `flink-cdc-flink-1.20` — Flink 1.x compatibility layer (currently 1.20.3), under the `flink-cdc-compat` aggregate. Default profile.
+- `flink-cdc-flink-2.2` — Flink 2.x compatibility layer (currently 2.2.0), under the `flink-cdc-compat` aggregate. Activated via `-Pflink2`.
 
 All modules that depend on Flink APIs must declare their Flink dependencies as `provided` and reference `${flink.version}`, which is resolved by the active profile.
 Please verify your changes in both Flink 1.20 (LTS) and Flink 2.x (latest).

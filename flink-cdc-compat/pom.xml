@@ -25,7 +25,7 @@ limitations under the License.
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>flink-cdc-flink</artifactId>
+    <artifactId>flink-cdc-compat</artifactId>
     <packaging>pom</packaging>
 
     <modules>
