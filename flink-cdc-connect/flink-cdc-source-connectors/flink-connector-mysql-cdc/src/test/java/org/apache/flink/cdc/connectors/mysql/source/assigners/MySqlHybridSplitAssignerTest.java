@@ -241,6 +241,33 @@ class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
         assigner.close();
     }
 
+    @Test
+    void testSnapshotOnlyModeDoesNotSetProcessingBacklog() {
+        MySqlSourceConfig configuration =
+                getConfig(new String[] {"customers"}, StartupOptions.snapshot());
+        MockMySqlSplitEnumeratorEnumeratorContext enumeratorContext =
+                getMySqlSplitEnumeratorContext();
+        final MySqlHybridSplitAssigner assigner =
+                new MySqlHybridSplitAssigner(
+                        configuration,
+                        DEFAULT_PARALLELISM,
+                        new ArrayList<>(),
+                        false,
+                        enumeratorContext);
+        assigner.open();
+        List<MySqlSnapshotSplit> snapshotSplits = drainSnapshotSplits(assigner);
+        Map<String, BinlogOffset> finishedOffsets = new HashMap<>();
+        int i = 0;
+        for (MySqlSnapshotSplit snapshotSplit : snapshotSplits) {
+            BinlogOffset binlogOffset =
+                    BinlogOffset.builder().setBinlogFilePosition("foo", i++).build();
+            finishedOffsets.put(snapshotSplit.splitId(), binlogOffset);
+        }
+        assigner.onFinishedSplits(finishedOffsets);
+        assertThat(enumeratorContext.getProcessingBacklogUpdates()).isEmpty();
+        assigner.close();
+    }
+
     private MySqlSourceConfigFactory getConfigFactory(String[] captureTables) {
         String[] captureTableIds =
                 Arrays.stream(captureTables)
