@@ -664,17 +664,23 @@ public abstract class PipelineTestEnvironment extends TestLogger {
             }
             List<JobStatusMessage> endedJobs =
                     flinkOutput ? jobsIfAllEnded() : Collections.emptyList();
+            long checkedAt = System.currentTimeMillis();
             if (endedJobs.isEmpty()) {
                 allJobsEndedAt = -1;
             } else if (allJobsEndedAt < 0) {
-                allJobsEndedAt = now;
-            } else if (now - allJobsEndedAt >= ENDED_JOBS_OUTPUT_GRACE.toMillis()) {
+                allJobsEndedAt = checkedAt;
+            } else if (checkedAt - allJobsEndedAt >= ENDED_JOBS_OUTPUT_GRACE.toMillis()) {
+                String endedJobsDescription = describeEndedJobs(endedJobs);
+                String stdout = consumer.toUtf8String();
+                if (condition.test(stdout)) {
+                    return;
+                }
                 throw new TimeoutException(
                         failureMessage
                                 + ", and every job has ended:"
-                                + describeEndedJobs(endedJobs)
+                                + endedJobsDescription
                                 + "\nstdout: "
-                                + consumer.toUtf8String());
+                                + stdout);
             }
             Thread.sleep(1000);
         }
