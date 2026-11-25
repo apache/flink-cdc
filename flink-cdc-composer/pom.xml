@@ -123,7 +123,7 @@ limitations under the License.
             <dependencies>
                 <dependency>
                     <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink2-compat</artifactId>
+                    <artifactId>flink-cdc-flink-2.2</artifactId>
                     <version>${project.version}</version>
                     <scope>provided</scope>
                 </dependency>
@@ -137,7 +137,7 @@ limitations under the License.
             <dependencies>
                 <dependency>
                     <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink1-compat</artifactId>
+                    <artifactId>flink-cdc-flink-1.20</artifactId>
                     <version>${project.version}</version>
                     <scope>provided</scope>
                 </dependency>

@@ -77,7 +77,7 @@ limitations under the License.
     </dependencies>
 
     <profiles>
-        <!-- Default profile: use flink-cdc-flink1-compat -->
+        <!-- Default profile: use flink-cdc-flink-1.20 -->
         <profile>
             <id>flink1</id>
             <activation>
@@ -86,18 +86,18 @@ limitations under the License.
             <dependencies>
                 <dependency>
                     <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink1-compat</artifactId>
+                    <artifactId>flink-cdc-flink-1.20</artifactId>
                     <version>${project.version}</version>
                 </dependency>
             </dependencies>
         </profile>
-        <!-- Flink 2 profile: use flink-cdc-flink2-compat -->
+        <!-- Flink 2 profile: use flink-cdc-flink-2.2 -->
         <profile>
             <id>flink2</id>
             <dependencies>
                 <dependency>
                     <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink2-compat</artifactId>
+                    <artifactId>flink-cdc-flink-2.2</artifactId>
                     <version>${project.version}</version>
                 </dependency>
             </dependencies>
