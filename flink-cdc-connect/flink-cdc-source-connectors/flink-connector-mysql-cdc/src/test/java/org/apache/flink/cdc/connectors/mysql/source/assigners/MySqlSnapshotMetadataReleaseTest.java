@@ -407,18 +407,19 @@ class MySqlSnapshotMetadataReleaseTest {
     }
 
     @Test
-    void testEnumeratorSerializerWritesV6OnlyWhenReleaseEnabled() {
-        // The real wiring: MySqlSource.getEnumeratorCheckpointSerializer() picks the serializer
-        // version from the option, so a release-enabled job writes v6 and a default-off job keeps
-        // writing v5.
-        assertThat(buildSource(true).getEnumeratorCheckpointSerializer().getVersion()).isEqualTo(6);
+    void testEnumeratorSerializerWritesV7() {
+        // The real wiring: MySqlSource.getEnumeratorCheckpointSerializer() always writes v7 now
+        // (FLINK-39478), because the checkpointIdToFinish field must be persisted in every
+        // checkpoint regardless of the release option. Versions 5 and 6 remain readable for
+        // older checkpoints.
+        assertThat(buildSource(true).getEnumeratorCheckpointSerializer().getVersion()).isEqualTo(7);
         assertThat(buildSource(false).getEnumeratorCheckpointSerializer().getVersion())
-                .isEqualTo(5);
+                .isEqualTo(7);
     }
 
     @Test
     void testReleasedStateSerializedThenRestoredWithOptionOffFailsFast() throws Exception {
-        // End to end: a released state serialized by the release-on serializer (v6, flag true),
+        // End to end: a released state serialized by the release-on serializer (v7, flag true),
         // then
         // restored with the option off, must deserialize the flag as true and fail fast rather than
         // silently dropping the marker by rewriting the v5 format.

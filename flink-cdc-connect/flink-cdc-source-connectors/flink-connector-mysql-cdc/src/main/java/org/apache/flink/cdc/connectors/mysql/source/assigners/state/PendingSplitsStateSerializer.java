@@ -45,13 +45,14 @@ import java.util.Map;
  */
 public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<PendingSplitsState> {
 
-    // Checkpoint format version. Version 6 (FLINK-39775) additionally persists the
-    // snapshot-metadata released flag, and is written only when metadata release is enabled. A job
-    // that leaves the option off keeps writing version 5, so it can still be restored by an older
-    // connector build that does not understand the flag.
-    private static final int VERSION_WITHOUT_RELEASED_FLAG = 5;
+    // Checkpoint format versions. Version 5 carries neither new field. Version 6 (FLINK-39775)
+    // additionally persists the snapshot-metadata released flag. Version 7 (FLINK-39478)
+    // additionally persists the optional checkpointIdToFinish field, written before the released
+    // flag; the read-back order matches the write order. Checkpoints written by older builds
+    // (versions 5 and 6) still restore. A checkpoint written as version 7 requires a connector
+    // build that understands it.
     private static final int VERSION_WITH_RELEASED_FLAG = 6;
-
+    private static final int VERSION_WITH_CHECKPOINT_ID = 7;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
@@ -71,9 +72,11 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
 
     @Override
     public int getVersion() {
-        return releaseSnapshotMetadataEnabled
-                ? VERSION_WITH_RELEASED_FLAG
-                : VERSION_WITHOUT_RELEASED_FLAG;
+        // Version 7 is always written: the checkpointIdToFinish field (FLINK-39478) must be
+        // persisted in every checkpoint, and getVersion() cannot depend on the state being
+        // serialized. Versions 5 and 6 remain readable for checkpoints written by older builds.
+        // The releaseSnapshotMetadataEnabled flag is retained for constructor compatibility.
+        return VERSION_WITH_CHECKPOINT_ID;
     }
 
     @Override
@@ -124,6 +127,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             case 4:
             case 5:
             case 6:
+            case 7:
                 return deserializePendingSplitsState(version, serialized);
             default:
                 throw new IOException("Unknown version: " + version);
@@ -190,11 +194,14 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                             new Object[] {chunkSplitterState.getNextChunkStart().getValue()}));
             out.writeInt(chunkSplitterState.getNextChunkId());
         }
-        // v6 (FLINK-39775): the released flag is written only when release is enabled. A job with
-        // the option off keeps the v5 format and stays restorable by an older connector build.
-        if (releaseSnapshotMetadataEnabled) {
-            out.writeBoolean(state.isSnapshotMetaReleased());
+        // v7 (FLINK-39478): persist the optional checkpointIdToFinish field, then the released
+        // flag (FLINK-39775). Both are always written in v7 so the layout matches getVersion().
+        Long checkpointIdToFinish = state.getCheckpointIdToFinish();
+        out.writeBoolean(checkpointIdToFinish != null);
+        if (checkpointIdToFinish != null) {
+            out.writeLong(checkpointIdToFinish);
         }
+        out.writeBoolean(state.isSnapshotMetaReleased());
     }
 
     private void serializeHybridPendingSplitsState(
@@ -318,10 +325,17 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 nextChunkId = in.readInt();
             }
         }
-        // v6 (FLINK-39775): the released flag is persisted; older versions never released, so it
-        // defaults to false.
+        // v7 (FLINK-39478): the checkpointIdToFinish field is present; v6 (FLINK-39775) carries
+        // only the released flag, v5 neither.
+        Long checkpointIdToFinish = null;
+        if (version >= VERSION_WITH_CHECKPOINT_ID) {
+            boolean hasCheckpointIdToFinish = in.readBoolean();
+            if (hasCheckpointIdToFinish) {
+                checkpointIdToFinish = in.readLong();
+            }
+        }
         boolean snapshotMetaReleased = false;
-        if (version >= 6) {
+        if (version >= VERSION_WITH_RELEASED_FLAG) {
             snapshotMetaReleased = in.readBoolean();
         }
         return new SnapshotPendingSplitsState(
@@ -340,7 +354,8 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                                 splittingTableId,
                                 ChunkSplitterState.ChunkBound.middleOf(nextChunkStart),
                                 nextChunkId),
-                snapshotMetaReleased);
+                snapshotMetaReleased,
+                checkpointIdToFinish);
     }
 
     private HybridPendingSplitsState deserializeHybridPendingSplitsState(

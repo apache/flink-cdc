@@ -61,6 +61,7 @@ class PendingSplitsStateSerializerTest {
         return Stream.of(
                 Arguments.of(getTestSnapshotPendingSplitsState(true)),
                 Arguments.of(getTestSnapshotPendingSplitsState(false)),
+                Arguments.of(getTestSnapshotPendingSplitsStateWithCheckpointIdToFinish()),
                 Arguments.of(getTestHybridPendingSplitsState(false)),
                 Arguments.of(getTestHybridPendingSplitsState(true)),
                 Arguments.of(getTestBinlogPendingSplitsState()));
@@ -90,6 +91,40 @@ class PendingSplitsStateSerializerTest {
                                     .keySet())
                     .isEqualTo(getTestTableSchema(tableId0, tableId1).keySet());
         }
+    }
+
+    @ParameterizedTest
+    @MethodSource("params")
+    void testCheckpointIdToFinishRoundTrip(PendingSplitsState state) throws Exception {
+        PendingSplitsState deserialized = serializeAndDeserializeSourceEnumState(state);
+        if (state instanceof SnapshotPendingSplitsState) {
+            Assertions.assertThat(
+                            ((SnapshotPendingSplitsState) deserialized).getCheckpointIdToFinish())
+                    .isEqualTo(((SnapshotPendingSplitsState) state).getCheckpointIdToFinish());
+        } else if (state instanceof HybridPendingSplitsState) {
+            Assertions.assertThat(
+                            ((HybridPendingSplitsState) deserialized)
+                                    .getSnapshotPendingSplits()
+                                    .getCheckpointIdToFinish())
+                    .isEqualTo(
+                            ((HybridPendingSplitsState) state)
+                                    .getSnapshotPendingSplits()
+                                    .getCheckpointIdToFinish());
+        }
+    }
+
+    @Test
+    void testDeserializeV5MissingCheckpointIdToFinish() throws Exception {
+        // FLINK-39478: v5 read path predates checkpointIdToFinish; deserializing a payload as v5
+        // must not attempt to read the new trailing field and must return null for it.
+        SnapshotPendingSplitsState state = getTestSnapshotPendingSplitsState(false);
+        final PendingSplitsStateSerializer serializer =
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE, true);
+        byte[] serialized = serializer.serialize(state);
+        PendingSplitsState restored = serializer.deserialize(5, serialized);
+        Assertions.assertThat(restored).isInstanceOf(SnapshotPendingSplitsState.class);
+        Assertions.assertThat(((SnapshotPendingSplitsState) restored).getCheckpointIdToFinish())
+                .isNull();
     }
 
     @ParameterizedTest
@@ -125,7 +160,7 @@ class PendingSplitsStateSerializerTest {
     @Test
     void testSerializeAndDeserializeReleasedHybridState() throws Exception {
         // The "light" state produced after releasing the snapshot metadata must round-trip, and
-        // the persisted released flag (PendingSplitsStateSerializer v6) must survive.
+        // the persisted released flag (PendingSplitsStateSerializer v7) must survive.
         HybridPendingSplitsState released = getTestReleasedHybridPendingSplitsState();
         PendingSplitsState roundTripped = serializeAndDeserializeSourceEnumState(released);
         Assertions.assertThat(roundTripped).isEqualTo(released);
@@ -143,15 +178,16 @@ class PendingSplitsStateSerializerTest {
 
     @Test
     void testDeserializeV5SnapshotStateDefaultsReleasedFlagToFalse() throws Exception {
-        // A v5 checkpoint written before FLINK-39775 has no released-flag byte. For a snapshot
-        // state that byte is the last one written, so a v6 stream without its final byte is exactly
-        // the v5 wire format. Deserializing it under the current version must default
-        // snapshotMetaReleased to false and otherwise round-trip unchanged.
+        // A v5 checkpoint written before FLINK-39775 carries neither the checkpointIdToFinish
+        // field nor the released flag. For a snapshot state those are the last two bytes written
+        // by the v7 serializer, so a v7 stream without its final two bytes is exactly the v5 wire
+        // format. Deserializing it under version 5 must default snapshotMetaReleased to false
+        // and checkpointIdToFinish to null, and otherwise round-trip unchanged.
         SnapshotPendingSplitsState state = getTestSnapshotPendingSplitsState(false);
         PendingSplitsStateSerializer serializer =
                 new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE, true);
-        byte[] v6 = serializer.serialize(state);
-        byte[] v5 = Arrays.copyOf(v6, v6.length - 1);
+        byte[] v7 = serializer.serialize(state);
+        byte[] v5 = Arrays.copyOf(v7, v7.length - 2);
 
         PendingSplitsState restored = serializer.deserialize(5, v5);
 
@@ -162,40 +198,39 @@ class PendingSplitsStateSerializerTest {
     }
 
     @Test
-    void testReleaseDisabledJobKeepsWritingV5Format() throws Exception {
-        // A job that leaves scan.incremental.snapshot.metadata.release.enabled off must keep
-        // writing
-        // the v5 format (no released flag), so it can still be restored by an older connector
-        // build.
+    void testSerializersAlwaysWriteV7Format() throws Exception {
+        // FLINK-39478: the checkpointIdToFinish field must be persisted in every checkpoint, and
+        // getVersion() cannot depend on the state being serialized, so both serializers now write
+        // version 7 regardless of the release option. Versions 5 and 6 remain readable: reading a
+        // v7 payload back under those version stamps defaults the fields they do not carry.
         SnapshotPendingSplitsState state = getTestSnapshotPendingSplitsState(false);
-        PendingSplitsStateSerializer v5Serializer =
+        PendingSplitsStateSerializer releaseOffSerializer =
                 new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE, false);
-        PendingSplitsStateSerializer v6Serializer =
+        PendingSplitsStateSerializer releaseOnSerializer =
                 new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE, true);
 
-        Assertions.assertThat(v5Serializer.getVersion()).isEqualTo(5);
-        Assertions.assertThat(v6Serializer.getVersion()).isEqualTo(6);
+        Assertions.assertThat(releaseOffSerializer.getVersion()).isEqualTo(7);
+        Assertions.assertThat(releaseOnSerializer.getVersion()).isEqualTo(7);
 
-        byte[] v6 = v6Serializer.serialize(state);
-        // Clear the lazily cached serialized form so the v5 serializer re-serializes the state.
+        byte[] releaseOnBytes = releaseOnSerializer.serialize(state);
+        // Clear the lazily cached serialized form so the other serializer re-serializes the state.
         state.serializedFormCache = null;
-        byte[] v5 = v5Serializer.serialize(state);
+        byte[] releaseOffBytes = releaseOffSerializer.serialize(state);
+        Assertions.assertThat(releaseOffBytes).isEqualTo(releaseOnBytes);
 
-        // For a snapshot state the released flag is the final byte, so the v5 bytes are exactly the
-        // v6 bytes without that trailing byte, i.e. the format an older connector wrote.
-        Assertions.assertThat(v5).isEqualTo(Arrays.copyOf(v6, v6.length - 1));
-
-        // A default-off job restores its own v5 checkpoint with the flag defaulting to false.
-        PendingSplitsState restored = v5Serializer.deserialize(5, v5);
-        Assertions.assertThat(restored).isEqualTo(state);
-        Assertions.assertThat(((SnapshotPendingSplitsState) restored).isSnapshotMetaReleased())
-                .isFalse();
+        // A v7 payload read back as v5 or v6 defaults the fields those versions do not carry.
+        PendingSplitsState asV5 = releaseOffSerializer.deserialize(5, releaseOnBytes);
+        Assertions.assertThat(asV5).isEqualTo(state);
+        PendingSplitsState asV6 = releaseOffSerializer.deserialize(6, releaseOnBytes);
+        Assertions.assertThat(asV6).isEqualTo(state);
+        Assertions.assertThat(((SnapshotPendingSplitsState) asV6).getCheckpointIdToFinish())
+                .isNull();
     }
 
     @Test
-    void testReleaseDisabledSerializerRoundTripsHybridStateAtV5() throws Exception {
-        // The option-off serializer round-trips a hybrid state at v5 (the released flag is written
-        // for neither the snapshot part nor read back), leaving the flag false.
+    void testReleaseDisabledSerializerRoundTripsHybridState() throws Exception {
+        // The option-off serializer round-trips a hybrid state at v7 (both new fields are written
+        // and read back), leaving the released flag false for a state that never released.
         HybridPendingSplitsState state = getTestHybridPendingSplitsState(false);
         PendingSplitsStateSerializer v5Serializer =
                 new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE, false);
@@ -286,6 +321,25 @@ class PendingSplitsStateSerializerTest {
                     true,
                     ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
         }
+    }
+
+    private static SnapshotPendingSplitsState
+            getTestSnapshotPendingSplitsStateWithCheckpointIdToFinish() {
+        // Reuse the base state and overlay a non-null checkpointIdToFinish, exercising the
+        // FLINK-39478 serialization path (version 7).
+        SnapshotPendingSplitsState base = getTestSnapshotPendingSplitsState(false);
+        return new SnapshotPendingSplitsState(
+                base.getAlreadyProcessedTables(),
+                base.getRemainingSplits(),
+                base.getAssignedSplits(),
+                base.getTableSchemas(),
+                base.getSplitFinishedOffsets(),
+                base.getSnapshotAssignerStatus(),
+                base.getRemainingTables(),
+                base.isTableIdCaseSensitive(),
+                base.isRemainingTablesCheckpointed(),
+                base.getChunkSplitterState(),
+                42L);
     }
 
     private static HybridPendingSplitsState getTestHybridPendingSplitsState(
