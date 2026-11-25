@@ -20,10 +20,14 @@ package org.apache.flink.cdc.connectors.mysql.source.utils;
 import org.apache.flink.api.connector.source.mocks.MockSplitEnumeratorContext;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /** A mock enumerator context to record isProcessingBacklog. */
 public class MockMySqlSplitEnumeratorEnumeratorContext
         extends MockSplitEnumeratorContext<MySqlSplit> {
     private boolean isProcessingBacklog = false;
+    private final List<Boolean> processingBacklogUpdates = new ArrayList<>();
 
     public MockMySqlSplitEnumeratorEnumeratorContext(int parallelism) {
         super(parallelism);
@@ -32,9 +36,14 @@ public class MockMySqlSplitEnumeratorEnumeratorContext
     @Override
     public void setIsProcessingBacklog(boolean isProcessingBacklog) {
         this.isProcessingBacklog = isProcessingBacklog;
+        processingBacklogUpdates.add(isProcessingBacklog);
     }
 
     public boolean isProcessingBacklog() {
         return isProcessingBacklog;
+    }
+
+    public List<Boolean> getProcessingBacklogUpdates() {
+        return processingBacklogUpdates;
     }
 }

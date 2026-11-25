@@ -429,7 +429,9 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     public void onFinishedSplits(Map<String, BinlogOffset> splitFinishedOffsets) {
         this.splitFinishedOffsets.putAll(splitFinishedOffsets);
         if (allSnapshotSplitsFinished()) {
-            enumeratorContext.setIsProcessingBacklog(false);
+            if (reportsProcessingBacklog()) {
+                enumeratorContext.setIsProcessingBacklog(false);
+            }
             if (AssignerStatus.isAssigningSnapshotSplits(assignerStatus)) {
                 // Skip the waiting checkpoint when current parallelism is 1 which means we do not
                 // need
@@ -666,8 +668,16 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     }
 
     private void shouldEnterProcessingBacklog() {
-        if (assignerStatus == AssignerStatus.INITIAL_ASSIGNING) {
+        if (assignerStatus == AssignerStatus.INITIAL_ASSIGNING && reportsProcessingBacklog()) {
             enumeratorContext.setIsProcessingBacklog(true);
         }
+    }
+
+    /**
+     * A snapshot-only source does not report backlog: its readers finish when the snapshot ends,
+     * and Flink fails a reader that a backlog event reaches just after it finished (FLINK-41644).
+     */
+    private boolean reportsProcessingBacklog() {
+        return !sourceConfig.getStartupOptions().isSnapshotOnly();
     }
 }
