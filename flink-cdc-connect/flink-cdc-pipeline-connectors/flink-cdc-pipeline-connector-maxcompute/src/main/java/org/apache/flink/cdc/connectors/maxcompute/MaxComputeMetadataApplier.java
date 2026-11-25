@@ -25,10 +25,12 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
@@ -72,11 +74,14 @@ public class MaxComputeMetadataApplier implements MetadataApplier {
 
     @Override
     public Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes() {
-        return EnumSet.allOf(SchemaChangeEventType.class);
+        return EnumSet.complementOf(EnumSet.of(SchemaChangeEventType.REORDER_COLUMN));
     }
 
     @Override
     public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
+        if (schemaChangeEvent instanceof ReorderColumnEvent) {
+            throw new UnsupportedSchemaChangeEventException(schemaChangeEvent);
+        }
         LOG.info("MaxCompute apply schema change event: {}", schemaChangeEvent);
         try {
             if (schemaChangeEvent instanceof CreateTableEvent) {

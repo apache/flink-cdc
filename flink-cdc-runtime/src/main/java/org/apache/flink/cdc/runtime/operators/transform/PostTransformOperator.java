@@ -27,6 +27,7 @@ import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.model.AiModelClient;
@@ -282,6 +283,11 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
 
         if (hasAsteriskMap.getOrDefault(tableId, true)) {
             // See comments in PreTransformOperator#cacheChangeSchema method.
+            if (event instanceof ReorderColumnEvent) {
+                return ReorderColumnEventTransformer.transformReorderColumnEvent(
+                                (ReorderColumnEvent) event, prevPostSchema, nextPostSchema)
+                        .map(Event.class::cast);
+            }
             return SchemaUtils.transformSchemaChangeEvent(true, columnNamesBeforeChange, event)
                     .map(Event.class::cast);
         } else {

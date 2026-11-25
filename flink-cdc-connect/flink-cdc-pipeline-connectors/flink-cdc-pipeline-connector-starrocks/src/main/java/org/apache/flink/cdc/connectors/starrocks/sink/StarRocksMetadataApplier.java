@@ -19,10 +19,12 @@ package org.apache.flink.cdc.connectors.starrocks.sink;
 
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.ColumnPosition;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
@@ -45,6 +47,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksUtils.toStarRocksDataType;
 import static org.apache.flink.cdc.connectors.starrocks.sink.utils.StarRocksEscapingUtils.escape;
@@ -94,6 +97,7 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                 SchemaChangeEventType.RENAME_COLUMN,
                 SchemaChangeEventType.ALTER_COLUMN_TYPE,
                 SchemaChangeEventType.DROP_TABLE,
+                SchemaChangeEventType.REORDER_COLUMN,
                 SchemaChangeEventType.TRUNCATE_TABLE);
     }
 
@@ -121,7 +125,8 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                     LOG.warn(
                             "AlterTableCommentEvent is not supported by StarRocks connector yet. Event: {}",
                             alterTableCommentEvent);
-                });
+                },
+                this::applyReorderColumn);
     }
 
     private void applyCreateTable(CreateTableEvent createTableEvent) throws SchemaEvolveException {
@@ -355,5 +360,174 @@ public class StarRocksMetadataApplier implements MetadataApplier {
         } catch (StarRocksCatalogException e) {
             throw new SchemaEvolveException(dropTableEvent, e.getMessage(), e);
         }
+    }
+
+    private void applyReorderColumn(ReorderColumnEvent reorderColumnEvent)
+            throws SchemaEvolveException {
+        TableId tableId = reorderColumnEvent.tableId();
+        StarRocksTable currentTable;
+        try {
+            currentTable =
+                    catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
+        } catch (StarRocksCatalogException e) {
+            throw new SchemaEvolveException(reorderColumnEvent, "Failed to load table metadata", e);
+        }
+        if (currentTable == null) {
+            throw new SchemaEvolveException(reorderColumnEvent, "Table does not exist", null);
+        }
+
+        List<StarRocksColumn> targetColumns =
+                applyColumnMoves(currentTable.getColumns(), reorderColumnEvent);
+        validateKeyColumnsRemainFirst(currentTable, targetColumns, reorderColumnEvent);
+        if (sameColumnOrder(currentTable, targetColumns)) {
+            return;
+        }
+
+        List<StarRocksColumn> appliedColumns = new ArrayList<>(currentTable.getColumns());
+        Set<String> tableKeys =
+                currentTable.getTableKeys().orElseGet(ArrayList::new).stream()
+                        .collect(Collectors.toSet());
+        try {
+            for (int index = 0; index < targetColumns.size(); index++) {
+                StarRocksColumn targetColumn = targetColumns.get(index);
+                if (appliedColumns
+                        .get(index)
+                        .getColumnName()
+                        .equals(targetColumn.getColumnName())) {
+                    continue;
+                }
+
+                String precedingColumn =
+                        index == 0 ? null : targetColumns.get(index - 1).getColumnName();
+                catalog.alterColumnPosition(
+                        tableId.getSchemaName(),
+                        tableId.getTableName(),
+                        targetColumn,
+                        tableKeys.contains(targetColumn.getColumnName()),
+                        precedingColumn,
+                        schemaChangeConfig.getTimeoutSecond());
+                appliedColumns.remove(targetColumn);
+                appliedColumns.add(index, targetColumn);
+            }
+            LOG.info("Successful to apply reorder column, event: {}", reorderColumnEvent);
+        } catch (StarRocksCatalogException e) {
+            if (isTargetOrderPresent(tableId, targetColumns)) {
+                LOG.info(
+                        "Successful to apply reorder column after a failed request, event: {}",
+                        reorderColumnEvent,
+                        e);
+                return;
+            }
+            throw new SchemaEvolveException(
+                    reorderColumnEvent, "Failed to apply reorder column", e);
+        }
+    }
+
+    private static StarRocksColumn findColumn(List<StarRocksColumn> columns, String columnName) {
+        if (columnName == null) {
+            return null;
+        }
+        for (StarRocksColumn column : columns) {
+            if (column.getColumnName().equals(columnName)) {
+                return column;
+            }
+        }
+        return null;
+    }
+
+    private List<StarRocksColumn> applyColumnMoves(
+            List<StarRocksColumn> currentColumns, ReorderColumnEvent reorderColumnEvent) {
+        if (reorderColumnEvent.getColumnMoves() == null) {
+            throw new SchemaEvolveException(
+                    reorderColumnEvent, "Column moves must not be null", null);
+        }
+
+        List<StarRocksColumn> targetColumns = new ArrayList<>(currentColumns);
+        for (ReorderColumnEvent.ColumnMove move : reorderColumnEvent.getColumnMoves()) {
+            if (move == null || move.getColumnName() == null || move.getPosition() == null) {
+                throw new SchemaEvolveException(reorderColumnEvent, "Invalid column move", null);
+            }
+            StarRocksColumn movedColumn = findColumn(targetColumns, move.getColumnName());
+            if (movedColumn == null) {
+                throw new SchemaEvolveException(
+                        reorderColumnEvent,
+                        "Referenced column does not exist: " + move.getColumnName(),
+                        null);
+            }
+            targetColumns.remove(movedColumn);
+
+            int targetIndex;
+            switch (move.getPosition()) {
+                case FIRST:
+                    targetIndex = 0;
+                    break;
+                case LAST:
+                    targetIndex = targetColumns.size();
+                    break;
+                case BEFORE:
+                case AFTER:
+                    StarRocksColumn anchorColumn =
+                            findColumn(targetColumns, move.getReferenceColumnName());
+                    if (anchorColumn == null) {
+                        throw new SchemaEvolveException(
+                                reorderColumnEvent,
+                                "Referenced anchor column does not exist: "
+                                        + move.getReferenceColumnName(),
+                                null);
+                    }
+                    targetIndex = targetColumns.indexOf(anchorColumn);
+                    if (move.getPosition() == ColumnPosition.AFTER) {
+                        targetIndex++;
+                    }
+                    break;
+                default:
+                    throw new SchemaEvolveException(
+                            reorderColumnEvent, "Unsupported column position", null);
+            }
+            targetColumns.add(targetIndex, movedColumn);
+        }
+        return targetColumns;
+    }
+
+    private void validateKeyColumnsRemainFirst(
+            StarRocksTable table,
+            List<StarRocksColumn> targetColumns,
+            ReorderColumnEvent reorderColumnEvent) {
+        List<String> tableKeys = table.getTableKeys().orElseGet(ArrayList::new);
+        for (int index = 0; index < tableKeys.size(); index++) {
+            if (!tableKeys.get(index).equals(targetColumns.get(index).getColumnName())) {
+                throw new SchemaEvolveException(
+                        reorderColumnEvent,
+                        "StarRocks primary key columns must remain first and in their existing order",
+                        null);
+            }
+        }
+    }
+
+    private boolean isTargetOrderPresent(TableId tableId, List<StarRocksColumn> targetColumns) {
+        try {
+            return catalog.getTable(tableId.getSchemaName(), tableId.getTableName())
+                    .map(table -> sameColumnOrder(table, targetColumns))
+                    .orElse(false);
+        } catch (StarRocksCatalogException e) {
+            LOG.warn("Failed to re-read table {} after reorder failure", tableId, e);
+            return false;
+        }
+    }
+
+    private static boolean sameColumnOrder(
+            StarRocksTable table, List<StarRocksColumn> targetColumns) {
+        if (table.getColumns().size() != targetColumns.size()) {
+            return false;
+        }
+        for (int index = 0; index < targetColumns.size(); index++) {
+            if (!table.getColumns()
+                    .get(index)
+                    .getColumnName()
+                    .equals(targetColumns.get(index).getColumnName())) {
+                return false;
+            }
+        }
+        return true;
     }
 }

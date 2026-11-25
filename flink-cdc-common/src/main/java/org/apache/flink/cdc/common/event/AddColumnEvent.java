@@ -19,6 +19,7 @@ package org.apache.flink.cdc.common.event;
 
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.schema.Column;
+import org.apache.flink.cdc.common.utils.Preconditions;
 
 import javax.annotation.Nullable;
 
@@ -45,21 +46,29 @@ public final class AddColumnEvent implements SchemaChangeEvent {
     }
 
     public static AddColumnEvent.ColumnWithPosition first(Column addColumn) {
-        return new ColumnWithPosition(addColumn, ColumnPosition.FIRST, null);
+        return ColumnWithPosition.of(
+                addColumn, org.apache.flink.cdc.common.event.ColumnPosition.FIRST, null);
     }
 
     public static AddColumnEvent.ColumnWithPosition last(Column addColumn) {
-        return new ColumnWithPosition(addColumn, ColumnPosition.LAST, null);
+        return ColumnWithPosition.of(
+                addColumn, org.apache.flink.cdc.common.event.ColumnPosition.LAST, null);
     }
 
     public static AddColumnEvent.ColumnWithPosition before(
-            Column addColumn, String existedColumnName) {
-        return new ColumnWithPosition(addColumn, ColumnPosition.BEFORE, existedColumnName);
+            Column addColumn, String referenceColumnName) {
+        return ColumnWithPosition.of(
+                addColumn,
+                org.apache.flink.cdc.common.event.ColumnPosition.BEFORE,
+                referenceColumnName);
     }
 
     public static AddColumnEvent.ColumnWithPosition after(
-            Column addColumn, String existedColumnName) {
-        return new ColumnWithPosition(addColumn, ColumnPosition.AFTER, existedColumnName);
+            Column addColumn, String referenceColumnName) {
+        return ColumnWithPosition.of(
+                addColumn,
+                org.apache.flink.cdc.common.event.ColumnPosition.AFTER,
+                referenceColumnName);
     }
 
     /** Returns the added columns. */
@@ -67,16 +76,35 @@ public final class AddColumnEvent implements SchemaChangeEvent {
         return addedColumns;
     }
 
-    /** relative Position of column. */
+    /**
+     * Relative position of a column.
+     *
+     * @deprecated Use {@link org.apache.flink.cdc.common.event.ColumnPosition} instead.
+     */
+    @Deprecated
     public enum ColumnPosition implements Serializable {
         BEFORE,
         AFTER,
         FIRST,
-        LAST
+        LAST;
+
+        /** Converts this legacy position to the top-level position type. */
+        public org.apache.flink.cdc.common.event.ColumnPosition toColumnPosition() {
+            return org.apache.flink.cdc.common.event.ColumnPosition.valueOf(name());
+        }
+
+        /** Converts a top-level position to the legacy position type, preserving {@code null}. */
+        @Nullable
+        public static ColumnPosition fromColumnPosition(
+                @Nullable org.apache.flink.cdc.common.event.ColumnPosition position) {
+            return position == null ? null : ColumnPosition.valueOf(position.name());
+        }
     }
 
     /** represents result of an ADD COLUMN DDL that may change column sequence. */
     public static class ColumnWithPosition implements Serializable {
+
+        private static final long serialVersionUID = 487237014867351187L;
 
         /** The added column. */
         private final Column addColumn;
@@ -94,6 +122,11 @@ public final class AddColumnEvent implements SchemaChangeEvent {
             existedColumnName = null;
         }
 
+        /**
+         * @deprecated Use {@link #of(Column, org.apache.flink.cdc.common.event.ColumnPosition,
+         *     String)} instead.
+         */
+        @Deprecated
         public ColumnWithPosition(
                 Column addColumn, ColumnPosition position, @Nullable String existedColumnName) {
             this.addColumn = addColumn;
@@ -101,16 +134,57 @@ public final class AddColumnEvent implements SchemaChangeEvent {
             this.existedColumnName = existedColumnName;
         }
 
+        public static ColumnWithPosition of(
+                Column addColumn,
+                org.apache.flink.cdc.common.event.ColumnPosition position,
+                @Nullable String referenceColumnName) {
+            Preconditions.checkArgument(addColumn != null, "addColumn must not be null");
+            Preconditions.checkArgument(position != null, "position must not be null");
+            boolean relativePosition =
+                    position == org.apache.flink.cdc.common.event.ColumnPosition.BEFORE
+                            || position == org.apache.flink.cdc.common.event.ColumnPosition.AFTER;
+            Preconditions.checkArgument(
+                    relativePosition == (referenceColumnName != null),
+                    relativePosition
+                            ? "Column %s with position %s must define referenceColumnName"
+                            : "Column %s with position %s must not define referenceColumnName",
+                    addColumn.getName(),
+                    position);
+            Preconditions.checkArgument(
+                    !addColumn.getName().equals(referenceColumnName),
+                    "Added column %s cannot reference itself",
+                    addColumn.getName());
+            return new ColumnWithPosition(
+                    addColumn, ColumnPosition.fromColumnPosition(position), referenceColumnName);
+        }
+
         public Column getAddColumn() {
             return addColumn;
         }
 
+        /**
+         * @deprecated Use {@link #getColumnPosition()} instead.
+         */
+        @Deprecated
         public ColumnPosition getPosition() {
             return position;
         }
 
+        public org.apache.flink.cdc.common.event.ColumnPosition getColumnPosition() {
+            return position.toColumnPosition();
+        }
+
+        /**
+         * @deprecated Use {@link #getReferenceColumnName()} instead.
+         */
+        @Deprecated
         @Nullable
         public String getExistedColumnName() {
+            return existedColumnName;
+        }
+
+        @Nullable
+        public String getReferenceColumnName() {
             return existedColumnName;
         }
 

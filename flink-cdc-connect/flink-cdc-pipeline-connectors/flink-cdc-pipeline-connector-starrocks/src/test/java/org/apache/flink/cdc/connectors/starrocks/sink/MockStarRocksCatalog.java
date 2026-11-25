@@ -195,4 +195,76 @@ public class MockStarRocksCatalog extends StarRocksEnrichedCatalog {
                         .build();
         dbTables.put(tableName, newTable);
     }
+
+    @Override
+    public void alterColumnPosition(
+            String databaseName,
+            String tableName,
+            StarRocksColumn column,
+            boolean isKey,
+            String precedingColumn,
+            long timeoutSecond)
+            throws StarRocksCatalogException {
+        Map<String, StarRocksTable> dbTables = tables.get(databaseName);
+        if (dbTables == null) {
+            throw new StarRocksCatalogException(
+                    String.format("database %s does not exist", databaseName));
+        }
+        StarRocksTable oldTable = dbTables.get(tableName);
+        if (oldTable == null) {
+            throw new StarRocksCatalogException(
+                    String.format("table %s.%s does not exist", databaseName, tableName));
+        }
+
+        List<StarRocksColumn> reorderedColumns = new ArrayList<>(oldTable.getColumns());
+        StarRocksColumn movedColumn = oldTable.getColumn(column.getColumnName());
+        if (movedColumn == null) {
+            throw new StarRocksCatalogException(
+                    String.format("column %s does not exist", column.getColumnName()));
+        }
+        reorderedColumns.remove(movedColumn);
+        int targetIndex = 0;
+        if (precedingColumn != null) {
+            StarRocksColumn preceding = oldTable.getColumn(precedingColumn);
+            if (preceding == null || !reorderedColumns.contains(preceding)) {
+                throw new StarRocksCatalogException(
+                        String.format("column %s does not exist", precedingColumn));
+            }
+            targetIndex = reorderedColumns.indexOf(preceding) + 1;
+        }
+        reorderedColumns.add(targetIndex, movedColumn);
+
+        List<StarRocksColumn> newColumns = new ArrayList<>();
+        for (StarRocksColumn reorderedColumn : reorderedColumns) {
+            newColumns.add(copyColumn(reorderedColumn, newColumns.size()));
+        }
+        dbTables.put(tableName, copyTable(oldTable, newColumns));
+    }
+
+    private static StarRocksColumn copyColumn(StarRocksColumn column, int ordinalPosition) {
+        return new StarRocksColumn.Builder()
+                .setColumnName(column.getColumnName())
+                .setOrdinalPosition(ordinalPosition)
+                .setDataType(column.getDataType())
+                .setNullable(column.isNullable())
+                .setDefaultValue(column.getDefaultValue().orElse(null))
+                .setColumnSize(column.getColumnSize().orElse(null))
+                .setDecimalDigits(column.getDecimalDigits().orElse(null))
+                .setColumnComment(column.getColumnComment().orElse(null))
+                .build();
+    }
+
+    private static StarRocksTable copyTable(StarRocksTable table, List<StarRocksColumn> columns) {
+        return new StarRocksTable.Builder()
+                .setDatabaseName(table.getDatabaseName())
+                .setTableName(table.getTableName())
+                .setTableType(table.getTableType())
+                .setColumns(columns)
+                .setTableKeys(table.getTableKeys().orElse(null))
+                .setDistributionKeys(table.getDistributionKeys().orElse(null))
+                .setNumBuckets(table.getNumBuckets().orElse(null))
+                .setComment(table.getComment().orElse(null))
+                .setTableProperties(table.getProperties())
+                .build();
+    }
 }

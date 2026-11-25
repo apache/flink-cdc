@@ -17,18 +17,24 @@
 
 package org.apache.flink.cdc.connectors.oceanbase.sink;
 
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.AlterTableCommentEvent;
+import org.apache.flink.cdc.common.event.ColumnPosition;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
@@ -45,8 +51,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /** Supports {@link OceanBaseDataSink} to schema evolution. */
 public class OceanBaseMetadataApplier implements MetadataApplier {
@@ -54,6 +64,8 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
     private static final Logger LOG = LoggerFactory.getLogger(OceanBaseMetadataApplier.class);
 
     private final OceanBaseCatalog catalog;
+    private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes =
+            Arrays.stream(SchemaChangeEventTypeFamily.ALL).collect(Collectors.toSet());
 
     public OceanBaseMetadataApplier(OceanBaseConnectorOptions connectorOptions) {
         try {
@@ -64,8 +76,35 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
         }
     }
 
+    @VisibleForTesting
+    OceanBaseMetadataApplier(OceanBaseCatalog catalog) {
+        this.catalog = Preconditions.checkNotNull(catalog);
+    }
+
+    @Override
+    public MetadataApplier setAcceptedSchemaEvolutionTypes(
+            Set<SchemaChangeEventType> schemaEvolutionTypes) {
+        this.enabledSchemaEvolutionTypes = new HashSet<>(schemaEvolutionTypes);
+        return this;
+    }
+
+    @Override
+    public boolean acceptsSchemaEvolutionType(SchemaChangeEventType schemaChangeEventType) {
+        return enabledSchemaEvolutionTypes.contains(schemaChangeEventType);
+    }
+
+    @Override
+    public Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes() {
+        return Arrays.stream(SchemaChangeEventTypeFamily.ALL)
+                .filter(type -> type != SchemaChangeEventType.REORDER_COLUMN)
+                .collect(Collectors.toSet());
+    }
+
     @Override
     public void applySchemaChange(SchemaChangeEvent event) {
+        if (event instanceof ReorderColumnEvent) {
+            throw new UnsupportedSchemaChangeEventException(event);
+        }
         SchemaChangeEventVisitor.<Void, SchemaEvolveException>visit(
                 event,
                 addColumnEvent -> {
@@ -126,7 +165,7 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
         for (AddColumnEvent.ColumnWithPosition columnWithPosition :
                 addColumnEvent.getAddedColumns()) {
             Preconditions.checkState(
-                    columnWithPosition.getPosition() == AddColumnEvent.ColumnPosition.LAST,
+                    columnWithPosition.getColumnPosition() == ColumnPosition.LAST,
                     "The oceanbase pipeline connector currently only supports add the column to the last.");
 
             // we will ignore position information, and always add the column to the last.

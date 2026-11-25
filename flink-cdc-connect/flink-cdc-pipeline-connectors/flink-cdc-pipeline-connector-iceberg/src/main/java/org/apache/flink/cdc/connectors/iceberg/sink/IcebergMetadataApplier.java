@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
@@ -123,6 +124,9 @@ public class IcebergMetadataApplier implements MetadataApplier {
     @Override
     public void applySchemaChange(SchemaChangeEvent schemaChangeEvent)
             throws SchemaEvolveException {
+        if (schemaChangeEvent instanceof ReorderColumnEvent) {
+            throw new UnsupportedSchemaChangeEventException(schemaChangeEvent);
+        }
         if (catalog == null) {
             Configuration configuration = HadoopConfUtils.createConfiguration(hadoopConfOptions);
             catalog =

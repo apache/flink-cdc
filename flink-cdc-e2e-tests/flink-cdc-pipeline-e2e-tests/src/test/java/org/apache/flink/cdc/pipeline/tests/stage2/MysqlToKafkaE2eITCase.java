@@ -441,4 +441,95 @@ class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
             return false;
         }
     }
+
+    @Test
+    void testReorderColumnsWithDebeziumJson() throws Exception {
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.products\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: kafka\n"
+                                + "  properties.bootstrap.servers: kafka:9092\n"
+                                + "  topic: %s\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: %d\n"
+                                + "  schema.change.behavior: evolve",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        mysqlInventoryDatabase.getDatabaseName(),
+                        topic,
+                        parallelism);
+        Path kafkaCdcJar = TestUtils.getResource("kafka-cdc-pipeline-connector.jar");
+        JobID jobId = submitPipelineJob(pipelineJob, kafkaCdcJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+
+        List<ConsumerRecord<byte[], byte[]>> collectedRecords = new ArrayList<>();
+        waitUntilSpecificEventCount(collectedRecords, 9);
+        collectedRecords.clear();
+        waitUntilStreamSplitReady(jobId, parallelism);
+
+        String mysqlJdbcUrl =
+                String.format(
+                        "jdbc:mysql://%s:%s/%s",
+                        MYSQL.getHost(),
+                        MYSQL.getDatabasePort(),
+                        mysqlInventoryDatabase.getDatabaseName());
+        String databaseName = mysqlInventoryDatabase.getDatabaseName();
+        List<String> expectedPreReorderRecords =
+                List.of(
+                        "{\"before\":null,\"after\":{\"id\":110,\"name\":\"pre-reorder\",\"description\":\"before\",\"weight\":1.5,\"enum_c\":\"red\",\"json_c\":null,\"point_c\":null},\"op\":\"c\",\"source\":{\"db\":\""
+                                + databaseName
+                                + "\",\"table\":\"products\"}}",
+                        "{\"before\":{\"id\":110,\"name\":\"pre-reorder\",\"description\":\"before\",\"weight\":1.5,\"enum_c\":\"red\",\"json_c\":null,\"point_c\":null},\"after\":{\"id\":110,\"name\":\"pre-reorder\",\"description\":\"before-update\",\"weight\":1.5,\"enum_c\":\"red\",\"json_c\":null,\"point_c\":null},\"op\":\"u\",\"source\":{\"db\":\""
+                                + databaseName
+                                + "\",\"table\":\"products\"}}");
+        List<String> expectedPostReorderRecords =
+                List.of(
+                        "{\"before\":null,\"after\":{\"description\":\"after\",\"weight\":2.5,\"id\":111,\"name\":\"post-reorder\",\"enum_c\":\"red\",\"json_c\":null,\"point_c\":null},\"op\":\"c\",\"source\":{\"db\":\""
+                                + databaseName
+                                + "\",\"table\":\"products\"}}",
+                        "{\"before\":{\"description\":\"after\",\"weight\":2.5,\"id\":111,\"name\":\"post-reorder\",\"enum_c\":\"red\",\"json_c\":null,\"point_c\":null},\"after\":{\"description\":\"after\",\"weight\":3.5,\"id\":111,\"name\":\"post-reorder\",\"enum_c\":\"red\",\"json_c\":null,\"point_c\":null},\"op\":\"u\",\"source\":{\"db\":\""
+                                + databaseName
+                                + "\",\"table\":\"products\"}}");
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            stat.execute(
+                    "INSERT INTO products (name, description, weight) "
+                            + "VALUES ('pre-reorder', 'before', 1.5);");
+            stat.execute("UPDATE products SET description = 'before-update' WHERE id = 110;");
+            waitUntilSpecificEventCount(collectedRecords, 2);
+            assertThat(deserializeValues(collectedRecords))
+                    .containsExactlyElementsOf(expectedPreReorderRecords);
+            collectedRecords.clear();
+
+            stat.execute(
+                    "ALTER TABLE products "
+                            + "MODIFY COLUMN description VARCHAR(512) FIRST, "
+                            + "MODIFY COLUMN weight FLOAT AFTER description;");
+            stat.execute(
+                    "INSERT INTO products (name, description, weight) "
+                            + "VALUES ('post-reorder', 'after', 2.5);");
+            stat.execute("UPDATE products SET weight = 3.5 WHERE id = 111;");
+        } catch (SQLException e) {
+            LOG.error("Update table for CDC failed.", e);
+            throw e;
+        }
+
+        waitUntilSpecificEventCount(collectedRecords, 2);
+        assertThat(deserializeValues(collectedRecords))
+                .containsExactlyElementsOf(expectedPostReorderRecords);
+    }
 }

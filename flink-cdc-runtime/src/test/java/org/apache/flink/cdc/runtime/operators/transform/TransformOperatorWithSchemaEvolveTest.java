@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
@@ -569,6 +570,55 @@ class TransformOperatorWithSchemaEvolveTest {
                                                 AddColumnEvent.ColumnPosition.AFTER,
                                                 "name"))))
                 .runTests("inserting columns at last");
+    }
+
+    @Test
+    void testReorderWithPreWildcardAndComputedColumn() throws Exception {
+        TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
+        ReorderColumnEvent sourceReorderEvent =
+                new ReorderColumnEvent(
+                        tableId,
+                        Collections.singletonList(ReorderColumnEvent.ColumnMove.last("id")));
+        ReorderColumnEvent transformedReorderEvent =
+                new ReorderColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                ReorderColumnEvent.ColumnMove.before("id", "computed")));
+
+        TransformWithSchemaEvolveTestCase.of(
+                        tableId,
+                        "*, id + age as computed",
+                        null,
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .physicalColumn("age", DataTypes.INT())
+                                .primaryKey("id")
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .physicalColumn("age", DataTypes.INT())
+                                .primaryKey("id")
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT().notNull())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .physicalColumn("age", DataTypes.INT())
+                                .physicalColumn("computed", DataTypes.INT())
+                                .primaryKey("id")
+                                .build())
+                .initializeHarness()
+                .runTests("initializing table")
+                .evolveFromSource(sourceReorderEvent)
+                .expectInPreTransformed(sourceReorderEvent)
+                .expectInPostTransformed(transformedReorderEvent)
+                .runTests("reordering a wildcard column before a computed column")
+                .insertSource("Alice", 17, 1)
+                .expectInPreTransformed("Alice", 17, 1)
+                .expectInPostTransformed("Alice", 17, 1, 18)
+                .runTests("transforming data with the reordered schema")
+                .destroyHarness();
     }
 
     /** This case tests when schema evolution happens with a wildcard character in the middle. */

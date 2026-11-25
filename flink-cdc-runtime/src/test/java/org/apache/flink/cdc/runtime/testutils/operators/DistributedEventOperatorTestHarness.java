@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.FlushSuccessEvent;
@@ -53,6 +54,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.Executors;
 
 import static org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils.unwrap;
@@ -98,6 +100,25 @@ public class DistributedEventOperatorTestHarness<
             int subtaskIndex,
             Duration applyDuration,
             Duration rpcTimeout) {
+        this(operator, numOutputs, subtaskIndex, new ArrayList<>(), applyDuration, rpcTimeout);
+    }
+
+    public DistributedEventOperatorTestHarness(
+            OP operator,
+            int numOutputs,
+            List<RouteRule> routingRules,
+            Duration applyDuration,
+            Duration rpcTimeout) {
+        this(operator, numOutputs, 0, routingRules, applyDuration, rpcTimeout);
+    }
+
+    private DistributedEventOperatorTestHarness(
+            OP operator,
+            int numOutputs,
+            int subtaskIndex,
+            List<RouteRule> routingRules,
+            Duration applyDuration,
+            Duration rpcTimeout) {
         this.operator = operator;
         this.numOutputs = numOutputs;
         this.subtaskIndex = subtaskIndex;
@@ -110,7 +131,7 @@ public class DistributedEventOperatorTestHarness<
                         mockedContext,
                         Executors.newFixedThreadPool(1),
                         new CollectingMetadataApplier(applyDuration),
-                        new ArrayList<>(),
+                        routingRules,
                         RouteMode.ALL_MATCH,
                         SchemaChangeBehavior.LENIENT,
                         rpcTimeout);

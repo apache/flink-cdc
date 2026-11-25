@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
@@ -121,7 +122,8 @@ public class PaimonMetadataApplier implements MetadataApplier, ExistingTableSche
                 SchemaChangeEventType.ADD_COLUMN,
                 SchemaChangeEventType.DROP_COLUMN,
                 SchemaChangeEventType.RENAME_COLUMN,
-                SchemaChangeEventType.ALTER_COLUMN_TYPE);
+                SchemaChangeEventType.ALTER_COLUMN_TYPE,
+                SchemaChangeEventType.REORDER_COLUMN);
     }
 
     @Override
@@ -184,7 +186,8 @@ public class PaimonMetadataApplier implements MetadataApplier, ExistingTableSche
                 this::applyDropTable,
                 this::applyRenameColumn,
                 this::applyTruncateTable,
-                this::applyAlterTableComment);
+                this::applyAlterTableComment,
+                this::applyReorderColumn);
     }
 
     @Override
@@ -270,7 +273,7 @@ public class PaimonMetadataApplier implements MetadataApplier, ExistingTableSche
         try {
             List<SchemaChange> tableChangeList = new ArrayList<>();
             for (AddColumnEvent.ColumnWithPosition columnWithPosition : event.getAddedColumns()) {
-                switch (columnWithPosition.getPosition()) {
+                switch (columnWithPosition.getColumnPosition()) {
                     case FIRST:
                         tableChangeList.addAll(
                                 SchemaChangeProvider.add(
@@ -292,19 +295,20 @@ public class PaimonMetadataApplier implements MetadataApplier, ExistingTableSche
                         break;
                     case AFTER:
                         checkNotNull(
-                                columnWithPosition.getExistedColumnName(),
+                                columnWithPosition.getReferenceColumnName(),
                                 "Existing column name must be provided for AFTER position");
                         SchemaChange.Move after =
                                 SchemaChange.Move.after(
                                         columnWithPosition.getAddColumn().getName(),
-                                        columnWithPosition.getExistedColumnName());
+                                        columnWithPosition.getReferenceColumnName());
                         tableChangeList.addAll(
                                 SchemaChangeProvider.add(columnWithPosition, after, tableOptions));
                         break;
                     default:
                         throw new SchemaEvolveException(
                                 event,
-                                "Unknown column position: " + columnWithPosition.getPosition());
+                                "Unknown column position: "
+                                        + columnWithPosition.getColumnPosition());
                 }
             }
             return tableChangeList;
@@ -501,5 +505,92 @@ public class PaimonMetadataApplier implements MetadataApplier, ExistingTableSche
     /** Check if DataType can be converted to BLOB (BINARY, VARBINARY, CHAR or VARCHAR). */
     private boolean isSupportedTypeForBlob(DataType dataType) {
         return dataType.isAnyOf(BINARY_STRING, CHARACTER_STRING);
+    }
+
+    private void applyReorderColumn(ReorderColumnEvent event) throws SchemaEvolveException {
+        try {
+            Identifier identifier =
+                    new Identifier(event.tableId().getSchemaName(), event.tableId().getTableName());
+            FileStoreTable table = (FileStoreTable) catalog.getTable(identifier);
+            List<String> simulatedColumnNames = new ArrayList<>(table.rowType().getFieldNames());
+            List<SchemaChange> tableChangeList = new ArrayList<>();
+            for (ReorderColumnEvent.ColumnMove columnMove : event.getColumnMoves()) {
+                SchemaChange.Move move = toPaimonMove(columnMove);
+                if (applyColumnMove(simulatedColumnNames, columnMove)) {
+                    tableChangeList.add(SchemaChange.updateColumnPosition(move));
+                }
+            }
+            if (!tableChangeList.isEmpty()) {
+                catalog.alterTable(identifier, tableChangeList, true);
+            }
+        } catch (Catalog.TableNotExistException
+                | Catalog.ColumnAlreadyExistException
+                | Catalog.ColumnNotExistException e) {
+            throw new SchemaEvolveException(event, e.getMessage(), e);
+        }
+    }
+
+    private SchemaChange.Move toPaimonMove(ReorderColumnEvent.ColumnMove columnMove) {
+        String columnName = columnMove.getColumnName();
+        switch (columnMove.getPosition()) {
+            case FIRST:
+                return SchemaChange.Move.first(columnName);
+            case LAST:
+                return SchemaChange.Move.last(columnName);
+            case BEFORE:
+                return SchemaChange.Move.before(
+                        columnName,
+                        checkNotNull(
+                                columnMove.getReferenceColumnName(),
+                                "Existing column name must be provided for BEFORE position"));
+            case AFTER:
+                return SchemaChange.Move.after(
+                        columnName,
+                        checkNotNull(
+                                columnMove.getReferenceColumnName(),
+                                "Existing column name must be provided for AFTER position"));
+            default:
+                throw new IllegalArgumentException(
+                        "Unknown column position: " + columnMove.getPosition());
+        }
+    }
+
+    private boolean applyColumnMove(
+            List<String> simulatedColumnNames, ReorderColumnEvent.ColumnMove columnMove) {
+        List<String> reorderedColumnNames = new ArrayList<>(simulatedColumnNames);
+        checkArgument(
+                reorderedColumnNames.remove(columnMove.getColumnName()),
+                "Column %s not found",
+                columnMove.getColumnName());
+        switch (columnMove.getPosition()) {
+            case FIRST:
+                reorderedColumnNames.add(0, columnMove.getColumnName());
+                break;
+            case LAST:
+                reorderedColumnNames.add(columnMove.getColumnName());
+                break;
+            case BEFORE:
+                reorderedColumnNames.add(
+                        checkColumnPosition(
+                                columnMove.getReferenceColumnName(), reorderedColumnNames),
+                        columnMove.getColumnName());
+                break;
+            case AFTER:
+                reorderedColumnNames.add(
+                        checkColumnPosition(
+                                        columnMove.getReferenceColumnName(), reorderedColumnNames)
+                                + 1,
+                        columnMove.getColumnName());
+                break;
+            default:
+                throw new IllegalArgumentException(
+                        "Unknown column position: " + columnMove.getPosition());
+        }
+        if (simulatedColumnNames.equals(reorderedColumnNames)) {
+            return false;
+        }
+        simulatedColumnNames.clear();
+        simulatedColumnNames.addAll(reorderedColumnNames);
+        return true;
     }
 }

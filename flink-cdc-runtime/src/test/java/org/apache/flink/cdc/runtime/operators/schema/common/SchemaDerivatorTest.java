@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
@@ -527,6 +528,15 @@ public class SchemaDerivatorTest extends SchemaTestBase {
                                 new DropColumnEvent(
                                         NORMALIZE_TEST_TABLE_ID,
                                         Collections.singletonList("notes"))))
+                .isEmpty();
+
+        assertThat(
+                        normalizeEvent(
+                                SchemaChangeBehavior.LENIENT,
+                                new ReorderColumnEvent(
+                                        NORMALIZE_TEST_TABLE_ID,
+                                        Collections.singletonList(
+                                                ReorderColumnEvent.ColumnMove.first("age")))))
                 .isEmpty();
 
         assertThat(

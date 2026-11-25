@@ -38,6 +38,7 @@ import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TAB
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.RENAME_COLUMN;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.REORDER_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.TRUNCATE_TABLE;
 
 /** A {@link TypeSerializer} for {@link SchemaChangeEvent}. */
@@ -87,7 +88,8 @@ public final class SchemaChangeEventSerializer extends TypeSerializerSingleton<S
                 DropTableEventSerializer.INSTANCE::copy,
                 RenameColumnEventSerializer.INSTANCE::copy,
                 TruncateTableEventSerializer.INSTANCE::copy,
-                AlterTableCommentEventSerializer.INSTANCE::copy);
+                AlterTableCommentEventSerializer.INSTANCE::copy,
+                ReorderColumnEventSerializer.INSTANCE::copy);
     }
 
     @Override
@@ -136,6 +138,10 @@ public final class SchemaChangeEventSerializer extends TypeSerializerSingleton<S
                     enumSerializer.serialize(ALTER_TABLE_COMMENT, target);
                     AlterTableCommentEventSerializer.INSTANCE.serialize(
                             alterTableCommentEvent, target);
+                },
+                reorderColumnEvent -> {
+                    enumSerializer.serialize(REORDER_COLUMN, target);
+                    ReorderColumnEventSerializer.INSTANCE.serialize(reorderColumnEvent, target);
                 });
     }
 
@@ -157,6 +163,8 @@ public final class SchemaChangeEventSerializer extends TypeSerializerSingleton<S
                 return DropTableEventSerializer.INSTANCE.deserialize(source);
             case TRUNCATE_TABLE:
                 return TruncateTableEventSerializer.INSTANCE.deserialize(source);
+            case REORDER_COLUMN:
+                return ReorderColumnEventSerializer.INSTANCE.deserialize(source);
             case ALTER_TABLE_COMMENT:
                 return AlterTableCommentEventSerializer.INSTANCE.deserialize(source);
             default:

@@ -24,9 +24,11 @@ import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.ColumnPosition;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
@@ -47,6 +49,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -588,5 +591,52 @@ class DebeziumJsonSerializationSchemaTest {
                                 + "\"payload\":{\"before\":null,\"after\":{\"id\":1,\"arr\":[\"item1\",\"item2\"],\"map\":{\"key1\":100,\"key2\":200},\"row\":{\"f1\":\"nested\",\"f2\":42}},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"table1\"}}}");
 
         assertThat(actual).isEqualTo(expected);
+    }
+
+    @Test
+    void testSerializeAfterColumnReorder() throws Exception {
+        ObjectMapper mapper = JacksonMapperFactory.createObjectMapper();
+        SerializationSchema<Event> serializationSchema =
+                ChangeLogJsonFormatFactory.createSerializationSchema(
+                        new Configuration(),
+                        JsonSerializationType.DEBEZIUM_JSON,
+                        ZoneId.systemDefault());
+        serializationSchema.open(new MockInitializationContext());
+
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("city", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        assertThat(serializationSchema.serialize(new CreateTableEvent(TABLE_1, schema))).isNull();
+        assertThat(
+                        serializationSchema.serialize(
+                                new ReorderColumnEvent(
+                                        TABLE_1,
+                                        Collections.singletonList(
+                                                new ReorderColumnEvent.ColumnMove(
+                                                        "city", ColumnPosition.AFTER, "id")))))
+                .isNull();
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        RowType.of(DataTypes.INT(), DataTypes.STRING(), DataTypes.STRING()));
+        byte[] bytes =
+                serializationSchema.serialize(
+                        DataChangeEvent.insertEvent(
+                                TABLE_1,
+                                generator.generate(
+                                        new Object[] {
+                                            7,
+                                            BinaryStringData.fromString("Hangzhou"),
+                                            BinaryStringData.fromString("Alice")
+                                        })));
+
+        JsonNode after = mapper.readTree(bytes).path("after");
+        assertThat(after.path("name").asText()).isEqualTo("Alice");
+        assertThat(after.path("id").asInt()).isEqualTo(7);
+        assertThat(after.path("city").asText()).isEqualTo("Hangzhou");
     }
 }

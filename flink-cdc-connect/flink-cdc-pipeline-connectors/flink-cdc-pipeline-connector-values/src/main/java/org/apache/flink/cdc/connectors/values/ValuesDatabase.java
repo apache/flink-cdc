@@ -27,6 +27,7 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
@@ -51,7 +52,6 @@ import javax.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -112,6 +112,7 @@ public class ValuesDatabase {
                     SchemaChangeEventType.ALTER_COLUMN_TYPE,
                     SchemaChangeEventType.CREATE_TABLE,
                     SchemaChangeEventType.DROP_COLUMN,
+                    SchemaChangeEventType.REORDER_COLUMN,
                     SchemaChangeEventType.RENAME_COLUMN,
                     SchemaChangeEventType.ALTER_TABLE_COMMENT);
         }
@@ -297,7 +298,7 @@ public class ValuesDatabase {
         private final TableId tableId;
 
         // [primaryKeys, [column_name, column_value]]
-        private final Map<String, Map<String, RecordData>> records;
+        private final Map<String, Map<String, ColumnValue>> records;
 
         private final LinkedList<Column> columns;
 
@@ -325,20 +326,18 @@ public class ValuesDatabase {
         public List<String> getResult() {
             List<String> results = new ArrayList<>();
             synchronized (lock) {
-                List<RecordData.FieldGetter> fieldGetters = SchemaUtils.createFieldGetters(columns);
                 records.forEach(
                         (key, record) -> {
                             StringBuilder stringBuilder = new StringBuilder(tableId.toString());
                             stringBuilder.append(":");
                             for (int i = 0; i < columns.size(); i++) {
                                 Column column = columns.get(i);
-                                RecordData.FieldGetter fieldGetter = fieldGetters.get(i);
                                 stringBuilder
                                         .append(column.getName())
                                         .append("=")
                                         .append(
                                                 Optional.ofNullable(record.get(column.getName()))
-                                                        .map(fieldGetter::getFieldOrNull)
+                                                        .map(ColumnValue::getValue)
                                                         .orElse(""))
                                         .append(";");
                             }
@@ -378,9 +377,13 @@ public class ValuesDatabase {
 
         private void insert(RecordData recordData) {
             String primaryKey = buildPrimaryKeyStr(recordData);
-            Map<String, RecordData> record = new HashMap<>();
+            Map<String, ColumnValue> record = new HashMap<>();
             for (int i = 0; i < recordData.getArity(); i++) {
-                record.put(columns.get(i).getName(), recordData);
+                Column column = columns.get(i);
+                record.put(
+                        column.getName(),
+                        new ColumnValue(
+                                recordData, RecordData.createFieldGetter(column.getType(), i)));
             }
             records.put(primaryKey, record);
         }
@@ -399,6 +402,8 @@ public class ValuesDatabase {
                     applyRenameColumnEvent((RenameColumnEvent) event);
                 } else if (event instanceof AlterColumnTypeEvent) {
                     applyAlterColumnTypeEvent((AlterColumnTypeEvent) event);
+                } else if (event instanceof ReorderColumnEvent) {
+                    applyReorderColumnEvent((ReorderColumnEvent) event);
                 } else if (event instanceof AlterTableCommentEvent) {
                     applyAlterTableCommentEvent((AlterTableCommentEvent) event);
                 }
@@ -416,7 +421,6 @@ public class ValuesDatabase {
                     }
                 }
             }
-            primaryKeyIndexes.sort(Comparator.naturalOrder());
         }
 
         private String buildPrimaryKeyStr(RecordData recordData) {
@@ -450,6 +454,16 @@ public class ValuesDatabase {
                             });
         }
 
+        private void applyReorderColumnEvent(ReorderColumnEvent event) {
+            Schema currentSchema =
+                    Schema.newBuilder().setColumns(columns).primaryKey(primaryKeys).build();
+            Schema reorderedSchema = SchemaUtils.applySchemaChangeEvent(currentSchema, event);
+            columns.clear();
+            columns.addAll(reorderedSchema.getColumns());
+            columnNames.clear();
+            columnNames.addAll(reorderedSchema.getColumnNames());
+        }
+
         private void applyAlterTableCommentEvent(AlterTableCommentEvent event) {
             this.comment = event.getComment();
         }
@@ -476,7 +490,8 @@ public class ValuesDatabase {
                     case BEFORE:
                         {
                             int index =
-                                    columnNames.indexOf(columnWithPosition.getExistedColumnName());
+                                    columnNames.indexOf(
+                                            columnWithPosition.getReferenceColumnName());
                             columns.add(index, columnWithPosition.getAddColumn());
                             columnNames.add(index, columnWithPosition.getAddColumn().getName());
                             break;
@@ -484,7 +499,8 @@ public class ValuesDatabase {
                     case AFTER:
                         {
                             int index =
-                                    columnNames.indexOf(columnWithPosition.getExistedColumnName());
+                                    columnNames.indexOf(
+                                            columnWithPosition.getReferenceColumnName());
                             columns.add(index + 1, columnWithPosition.getAddColumn());
                             columnNames.add(index + 1, columnWithPosition.getAddColumn().getName());
                             break;
@@ -529,7 +545,7 @@ public class ValuesDatabase {
                                 records.forEach(
                                         (key, record) -> {
                                             if (record.containsKey(beforeName)) {
-                                                RecordData value = record.get(beforeName);
+                                                ColumnValue value = record.get(beforeName);
                                                 record.remove(beforeName);
                                                 record.put(afterName, value);
                                             }
@@ -539,6 +555,22 @@ public class ValuesDatabase {
 
         private void applyTruncateTableEvent(TruncateTableEvent event) {
             records.clear();
+        }
+
+        private static class ColumnValue {
+
+            private final RecordData recordData;
+
+            private final RecordData.FieldGetter fieldGetter;
+
+            private ColumnValue(RecordData recordData, RecordData.FieldGetter fieldGetter) {
+                this.recordData = recordData;
+                this.fieldGetter = fieldGetter;
+            }
+
+            private Object getValue() {
+                return fieldGetter.getFieldOrNull(recordData);
+            }
         }
     }
 }
