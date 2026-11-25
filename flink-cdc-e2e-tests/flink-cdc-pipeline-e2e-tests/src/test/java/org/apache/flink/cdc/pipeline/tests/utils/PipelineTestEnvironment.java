@@ -75,6 +75,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import static org.apache.flink.util.Preconditions.checkState;
@@ -99,6 +100,8 @@ public abstract class PipelineTestEnvironment extends TestLogger {
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
     protected static final Duration EVENT_WAITING_TIMEOUT = Duration.ofMinutes(3);
     protected static final Duration STARTUP_WAITING_TIMEOUT = Duration.ofMinutes(5);
+    // How long the container output may lag behind the end of the last job.
+    private static final Duration ENDED_JOBS_OUTPUT_GRACE = Duration.ofSeconds(10);
 
     public static final Network NETWORK = Network.newNetwork();
 
@@ -614,23 +617,11 @@ public abstract class PipelineTestEnvironment extends TestLogger {
 
     protected void waitUntilSpecificEvent(ToStringConsumer consumer, String event, Duration timeout)
             throws Exception {
-        boolean result = false;
-        long endTimeout = System.currentTimeMillis() + timeout.toMillis();
-        while (System.currentTimeMillis() < endTimeout) {
-            String stdout = consumer.toUtf8String();
-            if (containsEventLine(stdout, event)) {
-                result = true;
-                break;
-            }
-            Thread.sleep(1000);
-        }
-        if (!result) {
-            throw new TimeoutException(
-                    "failed to get specific event: "
-                            + event
-                            + " from stdout: "
-                            + consumer.toUtf8String());
-        }
+        waitUntilOutput(
+                consumer,
+                stdout -> containsEventLine(stdout, event),
+                "failed to get specific event: " + event,
+                timeout);
     }
 
     protected boolean containsEventLine(String stdout, String event) {
@@ -644,21 +635,97 @@ public abstract class PipelineTestEnvironment extends TestLogger {
 
     protected void waitUntilLogContains(
             ToStringConsumer consumer, String fragment, Duration timeout) throws Exception {
-        boolean result = false;
-        long endTimeout = System.currentTimeMillis() + timeout.toMillis();
-        while (System.currentTimeMillis() < endTimeout) {
-            if (consumer.toUtf8String().contains(fragment)) {
-                result = true;
-                break;
+        waitUntilOutput(
+                consumer,
+                stdout -> stdout.contains(fragment),
+                "failed to get log fragment: " + fragment,
+                timeout);
+    }
+
+    /**
+     * Waits until the consumer's output satisfies the condition. A wait on the JobManager or
+     * TaskManager output gives up once every job of the cluster has ended, as no more output will
+     * come, and reports how the jobs ended, which the TaskManager output does not show.
+     */
+    private void waitUntilOutput(
+            ToStringConsumer consumer,
+            Predicate<String> condition,
+            String failureMessage,
+            Duration timeout)
+            throws Exception {
+        boolean flinkOutput = consumer == taskManagerConsumer || consumer == jobManagerConsumer;
+        long deadline = System.currentTimeMillis() + timeout.toMillis();
+        long allJobsEndedAt = -1;
+        while (!condition.test(consumer.toUtf8String())) {
+            long now = System.currentTimeMillis();
+            if (now >= deadline) {
+                throw new TimeoutException(
+                        failureMessage + " from stdout: " + consumer.toUtf8String());
+            }
+            List<JobStatusMessage> endedJobs =
+                    flinkOutput ? jobsIfAllEnded() : Collections.emptyList();
+            long checkedAt = System.currentTimeMillis();
+            if (endedJobs.isEmpty()) {
+                allJobsEndedAt = -1;
+            } else if (allJobsEndedAt < 0) {
+                allJobsEndedAt = checkedAt;
+            } else if (checkedAt - allJobsEndedAt >= ENDED_JOBS_OUTPUT_GRACE.toMillis()) {
+                String endedJobsDescription = describeEndedJobs(endedJobs);
+                String stdout = consumer.toUtf8String();
+                if (condition.test(stdout)) {
+                    return;
+                }
+                throw new TimeoutException(
+                        failureMessage
+                                + ", and every job has ended:"
+                                + endedJobsDescription
+                                + "\nstdout: "
+                                + stdout);
             }
             Thread.sleep(1000);
         }
-        if (!result) {
-            throw new TimeoutException(
-                    "failed to get log fragment: "
-                            + fragment
-                            + " from stdout: "
-                            + consumer.toUtf8String());
+    }
+
+    /** The cluster's jobs if it has any and all of them have ended, otherwise an empty list. */
+    private List<JobStatusMessage> jobsIfAllEnded() {
+        try {
+            Collection<JobStatusMessage> jobs =
+                    getRestClusterClient().listJobs().get(10, TimeUnit.SECONDS);
+            if (!jobs.isEmpty()
+                    && jobs.stream().allMatch(job -> job.getJobState().isGloballyTerminalState())) {
+                return new ArrayList<>(jobs);
+            }
+        } catch (Exception e) {
+            LOG.debug("Failed to list the jobs of the cluster.", e);
         }
+        return Collections.emptyList();
+    }
+
+    private String describeEndedJobs(List<JobStatusMessage> jobs) {
+        StringBuilder description = new StringBuilder();
+        for (JobStatusMessage job : jobs) {
+            description.append(
+                    String.format(
+                            "%njob '%s' (%s) %s",
+                            job.getJobName(), job.getJobId(), job.getJobState()));
+            if (job.getJobState() == JobStatus.FAILED) {
+                try {
+                    getRestClusterClient()
+                            .requestJobResult(job.getJobId())
+                            .get(10, TimeUnit.SECONDS)
+                            .getSerializedThrowable()
+                            .ifPresent(
+                                    cause ->
+                                            description
+                                                    .append(": ")
+                                                    .append(
+                                                            ExceptionUtils.stringifyException(
+                                                                    cause)));
+                } catch (Exception e) {
+                    description.append(", its failure cause is unavailable: ").append(e);
+                }
+            }
+        }
+        return description.toString();
     }
 }
