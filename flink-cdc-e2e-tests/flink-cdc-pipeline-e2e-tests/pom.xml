@@ -877,7 +877,6 @@ limitations under the License.
         <profile>
             <id>flink2</id>
             <properties>
-                <flink.version>${flink.2.x.version}</flink.version>
                 <flink.hadoop.compatibility.artifact-id>flink-hadoop-compatibility</flink.hadoop.compatibility.artifact-id>
             </properties>
         </profile>

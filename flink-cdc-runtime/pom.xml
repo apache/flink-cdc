@@ -101,14 +101,22 @@ limitations under the License.
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+
+        <!-- Compat layer of the active Flink generation, selected via
+             flink.compat.artifactId in the root pom profiles. -->
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>${flink.compat.artifactId}</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <profiles>
+        <!-- Only activates the root pom's flink2 test classpath machinery for this
+             module (copy-flink2-guava and the surefire additional classpath elements
+             come from the root pom's pluginManagement). -->
         <profile>
             <id>flink2</id>
-            <properties>
-                <flink.version>${flink.2.x.version}</flink.version>
-            </properties>
             <build>
                 <plugins>
                     <plugin>
@@ -121,27 +129,6 @@ limitations under the License.
                     </plugin>
                 </plugins>
             </build>
-            <dependencies>
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink2-compat</artifactId>
-                    <version>${project.version}</version>
-                    <scope>provided</scope>
-                </dependency>
-            </dependencies>
-        </profile>
-        <profile>
-            <id>flink1</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <dependencies>
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink1-compat</artifactId>
-                    <version>${project.version}</version>
-                </dependency>
-            </dependencies>
         </profile>
         <profile>
             <id>flink2-exclude-flink1</id>
@@ -154,7 +141,7 @@ limitations under the License.
             <dependencies>
                 <dependency>
                     <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink1-compat</artifactId>
+                    <artifactId>flink-cdc-flink-1.20</artifactId>
                     <version>${project.version}</version>
                     <scope>provided</scope>
                     <exclusions>
