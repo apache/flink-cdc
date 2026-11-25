@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -51,6 +52,7 @@ import org.testcontainers.lifecycle.Startables;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -92,6 +94,27 @@ class OceanBaseMetadataApplierTest {
         metadataApplier = new OceanBaseMetadataApplier(connectorOptions);
         catalog = new OceanBaseTestMySQLCatalog(connectorOptions);
         catalog.open();
+    }
+
+    @Test
+    void testAcceptedSchemaEvolutionTypes() {
+        assertThat(metadataApplier.getSupportedSchemaEvolutionTypes())
+                .containsExactlyInAnyOrder(SchemaChangeEventType.values());
+        assertThat(metadataApplier.acceptsSchemaEvolutionType(SchemaChangeEventType.DROP_TABLE))
+                .isTrue();
+
+        metadataApplier.setAcceptedSchemaEvolutionTypes(
+                EnumSet.complementOf(
+                        EnumSet.of(
+                                SchemaChangeEventType.DROP_TABLE,
+                                SchemaChangeEventType.TRUNCATE_TABLE)));
+
+        assertThat(metadataApplier.acceptsSchemaEvolutionType(SchemaChangeEventType.DROP_TABLE))
+                .isFalse();
+        assertThat(metadataApplier.acceptsSchemaEvolutionType(SchemaChangeEventType.TRUNCATE_TABLE))
+                .isFalse();
+        assertThat(metadataApplier.acceptsSchemaEvolutionType(SchemaChangeEventType.ADD_COLUMN))
+                .isTrue();
     }
 
     @Test
