@@ -49,6 +49,7 @@ class SqlServerTimezoneITCase extends SqlServerTestBase {
     @BeforeEach
     public void before() {
         TestValuesTableFactory.clearAllData();
+        tEnv.getConfig().set("table.exec.sink.require-on-conflict", "false");
         env.setParallelism(1);
     }
 
