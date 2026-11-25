@@ -20,7 +20,6 @@ package org.apache.flink.cdc.connectors.fluss.source.reader;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.api.connector.source.util.ratelimit.RateLimiterStrategy;
-import org.apache.flink.cdc.connectors.fluss.sink.v2.metrics.WrapperFlussMetricRegistry;
 import org.apache.flink.cdc.connectors.fluss.source.event.FinishedKvSnapshotConsumeEvent;
 import org.apache.flink.cdc.connectors.fluss.source.event.TableRemovalAckEvent;
 import org.apache.flink.cdc.connectors.fluss.source.event.TableSubscriptionEvent;
@@ -69,7 +68,7 @@ public class FlussSourceReader<T>
     private static final Logger LOG = LoggerFactory.getLogger(FlussSourceReader.class);
 
     private final FlussRecordEmitter<T> recordEmitter;
-    private final WrapperFlussMetricRegistry metricRegistry;
+    private final FlussSourceReaderMetrics sourceReaderMetrics;
     private final SourceReaderContext readerContext;
     private final Set<TableBucket> reportedFinishedSnapshotBuckets;
     private final FlussSourceFetcherManager fetcherManager;
@@ -85,25 +84,22 @@ public class FlussSourceReader<T>
             FutureCompletingBlockingQueue<RecordsWithSplitIds<FlussSourceRecord>> elementsQueue,
             SourceReaderContext readerContext,
             org.apache.fluss.config.Configuration flussConfig,
-            WrapperFlussMetricRegistry metricRegistry,
             FlussSourceReaderMetrics sourceReaderMetrics,
             FlussRecordEmitter<T> recordEmitter,
             @Nullable RateLimiterStrategy rateLimiterStrategy) {
         this(
                 readerContext,
-                metricRegistry,
+                sourceReaderMetrics,
                 recordEmitter,
                 new FlussSourceFetcherManager(
                         elementsQueue,
-                        () ->
-                                new FlussSplitReader(
-                                        flussConfig, metricRegistry, sourceReaderMetrics)),
+                        () -> new FlussSplitReader(flussConfig, sourceReaderMetrics)),
                 rateLimiterStrategy);
     }
 
     FlussSourceReader(
             SourceReaderContext readerContext,
-            WrapperFlussMetricRegistry metricRegistry,
+            FlussSourceReaderMetrics sourceReaderMetrics,
             FlussRecordEmitter<T> recordEmitter,
             FlussSourceFetcherManager fetcherManager,
             @Nullable RateLimiterStrategy rateLimiterStrategy) {
@@ -115,7 +111,7 @@ public class FlussSourceReader<T>
                 readerContext,
                 rateLimiterStrategy);
         this.recordEmitter = recordEmitter;
-        this.metricRegistry = metricRegistry;
+        this.sourceReaderMetrics = sourceReaderMetrics;
         this.readerContext = readerContext;
         this.reportedFinishedSnapshotBuckets = new HashSet<>();
         this.fetcherManager = fetcherManager;
@@ -132,7 +128,7 @@ public class FlussSourceReader<T>
         try {
             super.close();
         } finally {
-            metricRegistry.close();
+            sourceReaderMetrics.closeSplitReaderMetricRegistry();
         }
     }
 

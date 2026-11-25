@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.fluss.source.reader;
 
+import org.apache.flink.cdc.connectors.fluss.source.metrics.FlussSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussHybridSnapshotLogSplit;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussLogSplit;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussSplitBase;
@@ -25,6 +26,8 @@ import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.splitreader.SplitsAddition;
 import org.apache.flink.connector.base.source.reader.splitreader.SplitsChange;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
+import org.apache.flink.metrics.testutils.MetricListener;
+import org.apache.flink.runtime.metrics.groups.InternalSourceReaderMetricGroup;
 
 import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.admin.Admin;
@@ -111,7 +114,7 @@ class FlussSplitReaderTest {
                         PHYSICAL_TABLE_PATH, currentSnapshotBucket, 1L, 10L);
         FlussHybridSnapshotLogSplit queuedSnapshot =
                 new FlussHybridSnapshotLogSplit(PHYSICAL_TABLE_PATH, queuedSnapshotBucket, 2L, 10L);
-        FlussSplitReader reader = new FlussSplitReader(new Configuration(), null, null);
+        FlussSplitReader reader = new FlussSplitReader(new Configuration(), readerMetrics());
         AtomicBoolean tableClosed = new AtomicBoolean();
         AtomicBoolean batchScannerClosed = new AtomicBoolean();
         AtomicBoolean logScannerWokenUp = new AtomicBoolean();
@@ -203,7 +206,7 @@ class FlussSplitReaderTest {
 
     @Test
     void testUnsubscriptionFailurePropagates() throws Exception {
-        FlussSplitReader reader = new FlussSplitReader(new Configuration(), null, null);
+        FlussSplitReader reader = new FlussSplitReader(new Configuration(), readerMetrics());
         bucketToSplit(reader)
                 .put(TABLE_BUCKET, new FlussLogSplit(PHYSICAL_TABLE_PATH, TABLE_BUCKET, 10L));
         IllegalStateException failure = new IllegalStateException("Test unsubscribe failure");
@@ -240,7 +243,7 @@ class FlussSplitReaderTest {
                 new FlussLogSplit(retainedPartition, retainedLogBucket, 20L);
         FlussHybridSnapshotLogSplit retainedSnapshot =
                 new FlussHybridSnapshotLogSplit(retainedPartition, retainedSnapshotBucket, 3L, 20L);
-        FlussSplitReader reader = new FlussSplitReader(new Configuration(), null, null);
+        FlussSplitReader reader = new FlussSplitReader(new Configuration(), readerMetrics());
         AtomicBoolean tableClosed = new AtomicBoolean();
         AtomicBoolean batchScannerClosed = new AtomicBoolean();
         AtomicBoolean logScannerClosed = new AtomicBoolean();
@@ -332,7 +335,7 @@ class FlussSplitReaderTest {
     void testPartitionUnsubscriptionFailurePropagates() throws Exception {
         PhysicalTablePath partition = PhysicalTablePath.of(TABLE_PATH, "expired");
         TableBucket tableBucket = new TableBucket(TABLE_ID, 11L, 0);
-        FlussSplitReader reader = new FlussSplitReader(new Configuration(), null, null);
+        FlussSplitReader reader = new FlussSplitReader(new Configuration(), readerMetrics());
         bucketToSplit(reader).put(tableBucket, new FlussLogSplit(partition, tableBucket, 10L));
         IllegalStateException failure = new IllegalStateException("Test unsubscribe failure");
         setField(
@@ -361,7 +364,7 @@ class FlussSplitReaderTest {
                 new FlussHybridSnapshotLogSplit(expiredPartition, expiredBucket, 1L, 10L);
         FlussHybridSnapshotLogSplit retainedSnapshot =
                 new FlussHybridSnapshotLogSplit(retainedPartition, retainedBucket, 2L, 20L);
-        FlussSplitReader reader = new FlussSplitReader(new Configuration(), null, null);
+        FlussSplitReader reader = new FlussSplitReader(new Configuration(), readerMetrics());
         AtomicBoolean batchScannerClosed = new AtomicBoolean();
         BatchScanner batchScanner =
                 proxy(
@@ -452,7 +455,7 @@ class FlussSplitReaderTest {
                         new TableBucket(OTHER_TABLE_ID, 22L, 0),
                         10L);
         FlussSplitReader reader =
-                new FlussSplitReader(new Configuration(), null, null) {
+                new FlussSplitReader(new Configuration(), readerMetrics()) {
                     @Override
                     public void handleSplitsChanges(SplitsChange<FlussSplitBase> changes) {}
                 };
@@ -729,7 +732,7 @@ class FlussSplitReaderTest {
             throws Exception {
         Configuration config = new Configuration();
         config.set(ConfigOptions.CLIENT_REQUEST_TIMEOUT, Duration.ofMillis(10));
-        FlussSplitReader reader = new FlussSplitReader(config, null, null);
+        FlussSplitReader reader = new FlussSplitReader(config, readerMetrics());
         Admin admin =
                 proxy(
                         Admin.class,
@@ -867,6 +870,11 @@ class FlussSplitReaderTest {
                 Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type}, handler));
     }
 
+    private static FlussSourceReaderMetrics readerMetrics() {
+        return new FlussSourceReaderMetrics(
+                InternalSourceReaderMetricGroup.mock(new MetricListener().getMetricGroup()));
+    }
+
     private static class TestingSplitReader extends FlussSplitReader {
 
         private final CountDownLatch splitAdded = new CountDownLatch(1);
@@ -880,7 +888,7 @@ class FlussSplitReaderTest {
         private String finishedSplitId;
 
         private TestingSplitReader() {
-            super(new Configuration(), null, null);
+            super(new Configuration(), readerMetrics());
         }
 
         @Override

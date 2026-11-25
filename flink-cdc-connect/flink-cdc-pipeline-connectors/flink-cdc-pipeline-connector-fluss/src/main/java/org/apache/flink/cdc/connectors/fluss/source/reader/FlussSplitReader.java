@@ -43,6 +43,7 @@ import org.apache.fluss.config.ConfigOptions;
 import org.apache.fluss.config.Configuration;
 import org.apache.fluss.exception.PartitionNotExistException;
 import org.apache.fluss.metadata.PhysicalTablePath;
+import org.apache.fluss.metadata.Schema;
 import org.apache.fluss.metadata.TableBucket;
 import org.apache.fluss.metadata.TableInfo;
 import org.apache.fluss.metadata.TablePath;
@@ -111,11 +112,9 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
     private long currentReadRecordsCount;
 
     public FlussSplitReader(
-            Configuration flussConfig,
-            WrapperFlussMetricRegistry metricRegistry,
-            FlussSourceReaderMetrics sourceReaderMetrics) {
+            Configuration flussConfig, FlussSourceReaderMetrics sourceReaderMetrics) {
         this.flussConfig = flussConfig;
-        this.metricRegistry = metricRegistry;
+        this.metricRegistry = sourceReaderMetrics.createSplitReaderMetricRegistry();
         this.sourceReaderMetrics = sourceReaderMetrics;
         this.tables = new HashMap<>();
         this.tableRowTypes = new HashMap<>();
@@ -193,9 +192,7 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
                             splitsChanges.getClass()));
         }
 
-        if (connection == null) {
-            connection = ConnectionFactory.createConnection(flussConfig, metricRegistry);
-        }
+        getOrCreateConnection();
 
         Set<PhysicalTablePath> missingPartitions = new HashSet<>();
         for (FlussSplitBase split : splitsChanges.splits()) {
@@ -411,15 +408,18 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
         }
     }
 
-    private MultiTableLogScanner getOrCreateTableLogScanner() {
-        if (currentLogScanner != null) {
-            return currentLogScanner;
-        }
+    private Connection getOrCreateConnection() {
         if (connection == null) {
             connection = ConnectionFactory.createConnection(flussConfig, metricRegistry);
         }
+        return connection;
+    }
 
-        currentLogScanner = connection.getMultiTable().newMultiTableScan().createLogScanner();
+    private MultiTableLogScanner getOrCreateTableLogScanner() {
+        if (currentLogScanner == null) {
+            currentLogScanner =
+                    getOrCreateConnection().getMultiTable().newMultiTableScan().createLogScanner();
+        }
         return currentLogScanner;
     }
 
@@ -435,13 +435,10 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
 
     protected Table getOrCreateTable(TablePath tablePath) {
         if (!tables.containsKey(tablePath)) {
-            if (connection == null) {
-                connection = ConnectionFactory.createConnection(flussConfig);
-            }
-            Table table = connection.getTable(tablePath);
+            Table table = getOrCreateConnection().getTable(tablePath);
             tables.put(tablePath, table);
             TableInfo tableInfo = table.getTableInfo();
-            org.apache.fluss.metadata.Schema schema = tableInfo.getSchema();
+            Schema schema = tableInfo.getSchema();
             RowType rowType = schemaToRowType(schema);
             tableRowTypes.put(tablePath, rowType);
             tablePrimaryKeyNames.put(tablePath, schema.getPrimaryKeyColumnNames());
@@ -464,9 +461,9 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
         return keys != null ? keys : Collections.emptyList();
     }
 
-    private static RowType schemaToRowType(org.apache.fluss.metadata.Schema schema) {
+    private static RowType schemaToRowType(Schema schema) {
         List<DataField> fields = new ArrayList<>();
-        for (org.apache.fluss.metadata.Schema.Column column : schema.getColumns()) {
+        for (Schema.Column column : schema.getColumns()) {
             fields.add(new DataField(column.getName(), column.getDataType(), column.getColumnId()));
         }
         return new RowType(fields);

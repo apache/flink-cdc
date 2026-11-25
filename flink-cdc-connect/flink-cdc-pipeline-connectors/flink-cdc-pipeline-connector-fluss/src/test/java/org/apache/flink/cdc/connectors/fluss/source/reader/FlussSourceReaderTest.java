@@ -23,7 +23,6 @@ import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.cdc.common.event.Event;
-import org.apache.flink.cdc.connectors.fluss.sink.v2.metrics.WrapperFlussMetricRegistry;
 import org.apache.flink.cdc.connectors.fluss.source.deserializer.FlussRecordDeserializer;
 import org.apache.flink.cdc.connectors.fluss.source.event.FinishedKvSnapshotConsumeEvent;
 import org.apache.flink.cdc.connectors.fluss.source.event.TableRemovalAckEvent;
@@ -170,8 +169,7 @@ class FlussSourceReaderTest {
         FlussSourceReader<Event> reader =
                 new FlussSourceReader<>(
                         readerContext,
-                        new WrapperFlussMetricRegistry(
-                                readerContext.metricGroup(), Collections.emptySet()),
+                        new FlussSourceReaderMetrics(readerContext.metricGroup()),
                         new FlussRecordEmitter<>(new FlussRecordDeserializer()),
                         fetcherManager,
                         null);
@@ -208,8 +206,7 @@ class FlussSourceReaderTest {
         FlussSourceReader<Event> reader =
                 new FlussSourceReader<>(
                         readerContext,
-                        new WrapperFlussMetricRegistry(
-                                readerContext.metricGroup(), Collections.emptySet()),
+                        new FlussSourceReaderMetrics(readerContext.metricGroup()),
                         new FlussRecordEmitter<>(new FlussRecordDeserializer()),
                         fetcherManager,
                         null);
@@ -252,8 +249,7 @@ class FlussSourceReaderTest {
         FlussSourceReader<Event> reader =
                 new FlussSourceReader<>(
                         readerContext,
-                        new WrapperFlussMetricRegistry(
-                                readerContext.metricGroup(), Collections.emptySet()),
+                        new FlussSourceReaderMetrics(readerContext.metricGroup()),
                         new FlussRecordEmitter<>(new FlussRecordDeserializer()),
                         fetcherManager,
                         null);
@@ -301,8 +297,7 @@ class FlussSourceReaderTest {
         try (FlussSourceReader<Event> reader =
                 new FlussSourceReader<>(
                         readerContext,
-                        new WrapperFlussMetricRegistry(
-                                readerContext.metricGroup(), Collections.emptySet()),
+                        new FlussSourceReaderMetrics(readerContext.metricGroup()),
                         recordEmitter,
                         fetcherManager,
                         null)) {
@@ -351,8 +346,7 @@ class FlussSourceReaderTest {
         FlussSourceReader<Event> reader =
                 new FlussSourceReader<>(
                         readerContext,
-                        new WrapperFlussMetricRegistry(
-                                readerContext.metricGroup(), Collections.emptySet()),
+                        new FlussSourceReaderMetrics(readerContext.metricGroup()),
                         new FlussRecordEmitter<>(new FlussRecordDeserializer()),
                         fetcherManager,
                         null);
@@ -464,8 +458,7 @@ class FlussSourceReaderTest {
         FlussSourceReader<Event> reader =
                 new FlussSourceReader<>(
                         readerContext,
-                        new WrapperFlussMetricRegistry(
-                                readerContext.metricGroup(), Collections.emptySet()),
+                        new FlussSourceReaderMetrics(readerContext.metricGroup()),
                         recordEmitter,
                         fetcherManager,
                         null);
@@ -748,7 +741,7 @@ class FlussSourceReaderTest {
             TestingReaderContext readerContext, TrackingFetcherManager fetcherManager) {
         return new FlussSourceReader<>(
                 readerContext,
-                new WrapperFlussMetricRegistry(readerContext.metricGroup(), Collections.emptySet()),
+                new FlussSourceReaderMetrics(readerContext.metricGroup()),
                 new FlussRecordEmitter<>(new FlussRecordDeserializer()),
                 fetcherManager,
                 null);
@@ -759,7 +752,6 @@ class FlussSourceReaderTest {
                 new FutureCompletingBlockingQueue<RecordsWithSplitIds<FlussSourceRecord>>(),
                 readerContext,
                 new Configuration(),
-                new WrapperFlussMetricRegistry(readerContext.metricGroup(), Collections.emptySet()),
                 new FlussSourceReaderMetrics(readerContext.metricGroup()),
                 new FlussRecordEmitter<>(new FlussRecordDeserializer()),
                 null);
