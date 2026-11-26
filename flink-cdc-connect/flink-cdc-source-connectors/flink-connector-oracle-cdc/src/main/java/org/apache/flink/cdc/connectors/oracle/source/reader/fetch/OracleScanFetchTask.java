@@ -43,7 +43,10 @@ import io.debezium.util.Clock;
 import io.debezium.util.ColumnUtils;
 import io.debezium.util.Strings;
 import io.debezium.util.Threads;
+import oracle.jdbc.OracleResultSet;
+import org.apache.kafka.connect.data.SchemaAndValue;
 import org.apache.kafka.connect.errors.ConnectException;
+import org.apache.kafka.connect.header.ConnectHeaders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,6 +54,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.Optional;
+import java.util.regex.Pattern;
 
 import static org.apache.flink.cdc.connectors.oracle.source.reader.fetch.OracleStreamFetchTask.RedoLogSplitReadTask;
 import static org.apache.flink.cdc.connectors.oracle.source.utils.OracleUtils.buildSplitScanQuery;
@@ -269,16 +274,29 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                             snapshotSplit.getSplitKeyType(),
                             snapshotSplit.getSplitStart() == null,
                             snapshotSplit.getSplitEnd() == null);
+            // Rewrite SQL to append ROWID pseudo-column at the tail, because Oracle's SELECT *
+            // does not include ROWID. Placing ROWID after T0.* keeps the physical column
+            // positions unchanged (starting from 1), so we can manually build a ColumnArray
+            // excluding ROWID to bypass ColumnUtils.toArray strict validation, and read ROWID
+            // separately from the last result-set column.
+            // SELECT * FROM "SCHEMA"."TABLE" ... -> SELECT T0.*, ROWID FROM "SCHEMA"."TABLE" T0 ...
+            final String tableRef =
+                    org.apache.flink.cdc.connectors.oracle.source.utils.OracleUtils
+                            .quoteSchemaAndTable(snapshotSplit.getTableId());
+            final String rowIdSelectSql =
+                    selectSql.replaceFirst(
+                            "SELECT \\* FROM " + Pattern.quote(tableRef),
+                            "SELECT T0.*, ROWID FROM " + tableRef + " T0");
             LOG.info(
                     "For split '{}' of table {} using select statement: '{}'",
                     snapshotSplit.splitId(),
                     table.id(),
-                    selectSql);
+                    rowIdSelectSql);
 
             try (PreparedStatement selectStatement =
                             readTableSplitDataStatement(
                                     jdbcConnection,
-                                    selectSql,
+                                    rowIdSelectSql,
                                     snapshotSplit.getSplitStart() == null,
                                     snapshotSplit.getSplitEnd() == null,
                                     snapshotSplit.getSplitStart(),
@@ -287,7 +305,21 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                                     connectorConfig.getQueryFetchSize());
                     ResultSet rs = selectStatement.executeQuery()) {
 
-                ColumnUtils.ColumnArray columnArray = ColumnUtils.toArray(rs, table);
+                // Manually build ColumnArray from Table columns to bypass ColumnUtils strict
+                // validation on the extra ROWID column at the tail of the ResultSet. Physical
+                // columns still occupy ResultSet positions 1..N (SELECT T0.* preserves their
+                // order), ROWID is at position N+1.
+                final int rowIdColumnIndex = rs.getMetaData().getColumnCount();
+                io.debezium.relational.Column[] tableColumns =
+                        table.columns().toArray(new io.debezium.relational.Column[0]);
+                int greatestPosition = 0;
+                for (io.debezium.relational.Column c : tableColumns) {
+                    if (c.position() > greatestPosition) {
+                        greatestPosition = c.position();
+                    }
+                }
+                ColumnUtils.ColumnArray columnArray =
+                        new ColumnUtils.ColumnArray(tableColumns, greatestPosition);
                 long rows = 0;
                 Threads.Timer logTimer = getTableScanLogTimer();
 
@@ -295,6 +327,20 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                     rows++;
                     final Object[] row =
                             jdbcConnection.rowToArray(table, databaseSchema, rs, columnArray);
+                    // Extract ROWID pseudo-column (last column) from Oracle JDBC ResultSet.
+                    String rowId = null;
+                    try {
+                        oracle.sql.ROWID oracleRowId =
+                                ((OracleResultSet) rs).getROWID(rowIdColumnIndex);
+                        if (oracleRowId != null) {
+                            rowId = oracleRowId.stringValue();
+                        }
+                    } catch (Exception e) {
+                        LOG.debug(
+                                "Failed to extract ROWID from OracleResultSet at column index {}",
+                                rowIdColumnIndex,
+                                e);
+                    }
                     if (logTimer.expired()) {
                         long stop = clock.currentTimeInMillis();
                         LOG.info(
@@ -309,7 +355,7 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                     eventDispatcher.dispatchSnapshotEvent(
                             snapshotContext.partition,
                             table.id(),
-                            getChangeRecordEmitter(snapshotContext, table.id(), row),
+                            getChangeRecordEmitter(snapshotContext, table.id(), row, rowId),
                             snapshotReceiver);
                 }
                 LOG.info(
@@ -325,10 +371,23 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
         protected ChangeRecordEmitter<OraclePartition> getChangeRecordEmitter(
                 SnapshotContext<OraclePartition, OracleOffsetContext> snapshotContext,
                 TableId tableId,
-                Object[] row) {
+                Object[] row,
+                String rowId) {
             snapshotContext.offset.event(tableId, clock.currentTime());
-            return new SnapshotChangeRecordEmitter<>(
-                    snapshotContext.partition, snapshotContext.offset, row, clock);
+            return new SnapshotChangeRecordEmitter<OraclePartition>(
+                    snapshotContext.partition, snapshotContext.offset, row, clock) {
+                @Override
+                protected Optional<ConnectHeaders> getEmitConnectHeaders() {
+                    if (rowId != null) {
+                        ConnectHeaders headers = new ConnectHeaders();
+                        headers.add(
+                                oracle.sql.ROWID.class.getSimpleName(),
+                                new SchemaAndValue(null, rowId));
+                        return Optional.of(headers);
+                    }
+                    return Optional.empty();
+                }
+            };
         }
 
         private Threads.Timer getTableScanLogTimer() {
