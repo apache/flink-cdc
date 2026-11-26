@@ -232,6 +232,7 @@ pipeline:
       <td>String</td>
       <td>StreamLoad 的参数。
         For example: <code> sink.properties.strict_mode: true</code>.
+        Stream Load 默认禁用压缩。设置 <code>sink.properties.compress_type: gz</code> 可启用 gzip 压缩。
         查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/data-operate/import/import-way/stream-load-manual"> StreamLoad 的属性</a></td> 
       </td>
     </tr>
@@ -267,6 +268,32 @@ pipeline:
     </tbody>
 </table>
 </div>
+
+## Stream Load 压缩
+
+Doris 连接器通过 Stream Load 写入 JSON 数据。虽然 Doris Flink Connector 26.3.0 默认启用 gzip，但本连接器默认禁用压缩，以保持对旧版 Doris 服务端的兼容性。
+
+Doris 从 3.0.5 开始支持 JSON Stream Load 压缩，详见 [Doris JSON 格式文档](https://doris.apache.org/docs/3.x/data-operate/import/file-format/json/)和 [Doris 3.0.5 发布说明](https://github.com/apache/doris/issues/50333)。
+
+| Doris 服务端版本 | JSON Stream Load gzip 支持情况 | 配置建议 |
+| --- | --- | --- |
+| 1.x / 2.x | 不支持 | 保持禁用压缩 |
+| 3.0.0–3.0.4 | 不支持 | 保持禁用压缩 |
+| 3.0.5 及后续 3.0.x 版本 | 支持 | 可选设置 `sink.properties.compress_type: gz` |
+| 3.1.x / 4.x | 支持 | 可选设置 `sink.properties.compress_type: gz` |
+
+此表仅适用于本连接器使用的 JSON Stream Load。CSV、Broker Load 以及厂商回移版本的压缩支持情况可能不同。旧版 Doris 可能会拒绝压缩 JSON，并报错 `compress data of JSON format is not supported.`。
+
+在支持的 Doris 服务端上启用 gzip 时，在 sink 配置中添加以下选项：
+
+```yaml
+sink:
+  type: doris
+  # 其他必填 sink 配置项……
+  sink.properties.compress_type: gz
+```
+
+设置 `sink.properties.compress_type: ""` 可显式禁用压缩。
 
 ## 数据类型映射
 
