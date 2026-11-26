@@ -495,6 +495,27 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
 
     @Override
     public void addSplits(Collection<SourceSplitBase> splits) {
+        if (!splits.isEmpty()) {
+            // FLINK-41010 (FLINK-40052 for MySQL): with parallelism 1, onFinishedSplits() advances
+            // the status to the "snapshot assigning finished" state right away. Re-adding failed
+            // splits without rolling the status back makes noMoreSplits() return true before those
+            // splits are read again, so createStreamSplit() runs while their finished offsets are
+            // still missing and fails with a NullPointerException that is then persisted into the
+            // next checkpoint.
+            if (assignerStatus == AssignerStatus.INITIAL_ASSIGNING_FINISHED) {
+                assignerStatus = AssignerStatus.INITIAL_ASSIGNING;
+                checkpointIdToFinish = null;
+                LOG.info(
+                        "Roll back assigner status to INITIAL_ASSIGNING because failed snapshot"
+                                + " splits are re-added.");
+            } else if (assignerStatus == AssignerStatus.NEWLY_ADDED_ASSIGNING_SNAPSHOT_FINISHED) {
+                assignerStatus = AssignerStatus.NEWLY_ADDED_ASSIGNING;
+                checkpointIdToFinish = null;
+                LOG.info(
+                        "Roll back assigner status to NEWLY_ADDED_ASSIGNING because failed snapshot"
+                                + " splits are re-added.");
+            }
+        }
         for (SourceSplitBase split : splits) {
             tableSchemas.putAll(split.asSnapshotSplit().getTableSchemas());
             remainingSplits.add(split.asSnapshotSplit().toSchemalessSnapshotSplit());
