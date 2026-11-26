@@ -43,19 +43,28 @@ public class MySqlDataSource implements DataSource {
 
     private final MySqlSourceConfigFactory configFactory;
     private final MySqlSourceConfig sourceConfig;
+    private final List<String> tableList;
 
     private List<MySqlReadableMetadata> readableMetadataList;
 
     public MySqlDataSource(MySqlSourceConfigFactory configFactory) {
-        this(configFactory, new ArrayList<>());
+        this(configFactory, new ArrayList<>(), null);
     }
 
     public MySqlDataSource(
             MySqlSourceConfigFactory configFactory,
             List<MySqlReadableMetadata> readableMetadataList) {
+        this(configFactory, readableMetadataList, null);
+    }
+
+    public MySqlDataSource(
+            MySqlSourceConfigFactory configFactory,
+            List<MySqlReadableMetadata> readableMetadataList,
+            List<String> tableList) {
         this.configFactory = configFactory;
         this.sourceConfig = configFactory.createConfig(0);
         this.readableMetadataList = readableMetadataList;
+        this.tableList = tableList;
     }
 
     @Override
@@ -85,7 +94,8 @@ public class MySqlDataSource implements DataSource {
                                         deserializer,
                                         sourceReaderMetrics,
                                         sourceConfig,
-                                        isTableIdCaseInsensitive));
+                                        isTableIdCaseInsensitive),
+                        tableList);
 
         return FlinkSourceProvider.of(source);
     }
