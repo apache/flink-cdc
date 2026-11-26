@@ -175,6 +175,20 @@ pipeline:
       <td>at-least-once 下是否使用 transaction stream load。</td>
     </tr>
     <tr>
+      <td>sink.transaction.multi-table.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否启用多表事务 Stream Load。启用后，同一个 Sink 子任务在同一刷写周期内写入的所有表共享一个 StarRocks 事务标签，数据原子可见。要求 StarRocks 服务端版本 &gt;= 4.0，且所有目标表必须位于同一个数据库。</td>
+    </tr>
+    <tr>
+      <td>sink.transaction.multi-table.buffer-size</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">134217728</td>
+      <td>Long</td>
+      <td>多表事务模式的全局缓冲区大小（字节），缓冲数据达到该阈值时触发刷写。</td>
+    </tr>
+    <tr>
       <td>sink.metric.histogram-window-size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">100</td>
@@ -238,6 +252,11 @@ pipeline:
 * 只支持主键表，因此源表必须有主键
 
 * 暂不支持 exactly-once，连接器 通过 at-least-once 和主键表实现幂等写
+
+* 多表事务 Stream Load（`sink.transaction.multi-table.enabled`）仅支持 StarRocks 服务端版本 >= 4.0，在更低版本或集群不可达时启用该选项会导致任务提交直接失败。启用后：
+  * 所有目标表必须路由到同一个 StarRocks 数据库，检测到跨库写入时任务会快速失败
+  * 同一个 Sink 子任务在同一刷写周期内写入的表共享一个 StarRocks 事务并原子可见，跨子任务之间的可见性不保证同步
+  * 语义仍为 at-least-once，故障恢复产生的重复数据依靠主键表幂等去重
 
 * 对于自动建表
   * 分桶键和主键相同

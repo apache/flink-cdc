@@ -183,4 +183,61 @@ class StarRocksDataSinkFactoryTest {
         ZoneId expectedZoneId = ZoneId.of("America/Los_Angeles");
         Assertions.assertThat(zoneId).isEqualTo(expectedZoneId);
     }
+
+    @Test
+    void testIsStarRocksVersionAtLeast() {
+        // 4.x and above
+        Assertions.assertThat(StarRocksDataSinkFactory.isStarRocksVersionAtLeast("4.0.0", 4))
+                .isTrue();
+        Assertions.assertThat(StarRocksDataSinkFactory.isStarRocksVersionAtLeast("4.0.16", 4))
+                .isTrue();
+        Assertions.assertThat(StarRocksDataSinkFactory.isStarRocksVersionAtLeast("4.1.6", 4))
+                .isTrue();
+        Assertions.assertThat(StarRocksDataSinkFactory.isStarRocksVersionAtLeast("10.2.3", 4))
+                .isTrue();
+        // below 4.x
+        Assertions.assertThat(StarRocksDataSinkFactory.isStarRocksVersionAtLeast("3.5.10", 4))
+                .isFalse();
+        Assertions.assertThat(StarRocksDataSinkFactory.isStarRocksVersionAtLeast("3.4.0", 4))
+                .isFalse();
+        // versions with build suffix
+        Assertions.assertThat(
+                        StarRocksDataSinkFactory.isStarRocksVersionAtLeast("4.0.16 abc123", 4))
+                .isTrue();
+        Assertions.assertThat(StarRocksDataSinkFactory.isStarRocksVersionAtLeast("4.0.16-rc01", 4))
+                .isTrue();
+        // malformed versions are treated as unsupported
+        Assertions.assertThat(StarRocksDataSinkFactory.isStarRocksVersionAtLeast("", 4)).isFalse();
+        Assertions.assertThat(StarRocksDataSinkFactory.isStarRocksVersionAtLeast("unknown", 4))
+                .isFalse();
+        Assertions.assertThat(StarRocksDataSinkFactory.isStarRocksVersionAtLeast(null, 4))
+                .isFalse();
+    }
+
+    @Test
+    void testMultiTableTransactionFailsFastWhenStarRocksNotReachable() {
+        DataSinkFactory sinkFactory =
+                FactoryDiscoveryUtils.getFactoryByIdentifier("starrocks", DataSinkFactory.class);
+        Assertions.assertThat(sinkFactory).isInstanceOf(StarRocksDataSinkFactory.class);
+
+        Configuration conf =
+                Configuration.fromMap(
+                        ImmutableMap.<String, String>builder()
+                                .put("jdbc-url", "jdbc:mysql://127.0.0.1:59030")
+                                .put("load-url", "127.0.0.1:58030")
+                                .put("username", "root")
+                                .put("password", "")
+                                .put("sink.transaction.multi-table.enabled", "true")
+                                .build());
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                sinkFactory.createDataSink(
+                                        new FactoryHelper.DefaultContext(
+                                                conf,
+                                                conf,
+                                                Thread.currentThread().getContextClassLoader())))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("multi-table transaction");
+    }
 }

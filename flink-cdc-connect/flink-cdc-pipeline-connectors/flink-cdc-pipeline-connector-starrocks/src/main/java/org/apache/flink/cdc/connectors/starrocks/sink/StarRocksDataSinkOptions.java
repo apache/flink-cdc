@@ -121,6 +121,25 @@ public class StarRocksDataSinkOptions {
                     .withDescription(
                             "Whether to use transaction stream load for at-least-once when it's available.");
 
+    public static final ConfigOption<Boolean> SINK_MULTI_TABLE_TRANSACTION_ENABLED =
+            ConfigOptions.key("sink.transaction.multi-table.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to enable multi-table transaction stream load. When enabled, all tables "
+                                    + "written by the same sink subtask within the same flush cycle share one "
+                                    + "StarRocks transaction label, so they become visible atomically. Requires "
+                                    + "StarRocks server version >= 4.0 and all target tables must be in the same "
+                                    + "database. Only at-least-once semantics is supported.");
+
+    public static final ConfigOption<Long> SINK_MULTI_TABLE_TRANSACTION_BUFFER_SIZE =
+            ConfigOptions.key("sink.transaction.multi-table.buffer-size")
+                    .longType()
+                    .defaultValue(134217728L)
+                    .withDescription(
+                            "Global buffer size in bytes for multi-table transaction mode. A flush is triggered "
+                                    + "when the buffered bytes reach this threshold.");
+
     public static final ConfigOption<Integer> SINK_METRIC_HISTOGRAM_WINDOW_SIZE =
             ConfigOptions.key("sink.metric.histogram-window-size")
                     .intType()
