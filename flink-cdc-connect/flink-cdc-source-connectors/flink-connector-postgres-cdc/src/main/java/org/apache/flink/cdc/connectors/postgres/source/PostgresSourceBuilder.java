@@ -403,12 +403,14 @@ public class PostgresSourceBuilder<T> {
                 SplitEnumeratorContext<SourceSplitBase> enumContext) {
             final SplitAssigner splitAssigner;
             PostgresSourceConfig sourceConfig = (PostgresSourceConfig) configFactory.create(0);
+            PostgresDialect postgresDialect = (PostgresDialect) dataSourceDialect;
             if (!sourceConfig.getStartupOptions().isStreamOnly()) {
                 try {
                     final List<TableId> remainingTables =
                             dataSourceDialect.discoverDataCollections(sourceConfig);
                     boolean isTableIdCaseSensitive =
                             dataSourceDialect.isDataCollectionIdCaseSensitive(sourceConfig);
+                    postgresDialect.setInitialSnapshotTables(remainingTables);
                     splitAssigner =
                             new HybridSplitAssigner<>(
                                     sourceConfig,
@@ -423,6 +425,7 @@ public class PostgresSourceBuilder<T> {
                             "Failed to discover captured tables for enumerator", e);
                 }
             } else {
+                postgresDialect.setInitialSnapshotTables(List.of());
                 splitAssigner =
                         new StreamSplitAssigner(
                                 sourceConfig, dataSourceDialect, offsetFactory, enumContext);
@@ -432,7 +435,7 @@ public class PostgresSourceBuilder<T> {
                     enumContext,
                     sourceConfig,
                     splitAssigner,
-                    (PostgresDialect) dataSourceDialect,
+                    postgresDialect,
                     this.getBoundedness());
         }
 
@@ -442,6 +445,8 @@ public class PostgresSourceBuilder<T> {
                 PendingSplitsState checkpoint) {
             final SplitAssigner splitAssigner;
             PostgresSourceConfig sourceConfig = (PostgresSourceConfig) configFactory.create(0);
+            PostgresDialect postgresDialect = (PostgresDialect) dataSourceDialect;
+            postgresDialect.setInitialSnapshotTables(List.of());
             if (checkpoint instanceof HybridPendingSplitsState) {
                 splitAssigner =
                         new HybridSplitAssigner<>(
@@ -465,11 +470,7 @@ public class PostgresSourceBuilder<T> {
             }
 
             return new PostgresSourceEnumerator(
-                    enumContext,
-                    sourceConfig,
-                    splitAssigner,
-                    (PostgresDialect) dataSourceDialect,
-                    getBoundedness());
+                    enumContext, sourceConfig, splitAssigner, postgresDialect, getBoundedness());
         }
 
         @Override

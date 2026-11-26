@@ -338,7 +338,13 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         if (version >= 8) {
             boolean hasTableIsSplitting = in.readBoolean();
             if (hasTableIsSplitting) {
-                TableId splittingTableId = TableId.parse(in.readUTF());
+                String splittingTableName = in.readUTF();
+                // The remaining table IDs preserve the catalog/schema distinction.
+                TableId splittingTableId =
+                        remainingTableIds.stream()
+                                .filter(id -> splittingTableName.equals(id.toDoubleQuotedString()))
+                                .findFirst()
+                                .orElseGet(() -> TableId.parse(splittingTableName));
                 Object nextChunkStart = SerializerUtils.serializedStringToRow(in.readUTF())[0];
                 Integer nextChunkId = in.readInt();
                 chunkSplitterState =
