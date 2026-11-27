@@ -34,6 +34,16 @@ class MongoUtilsTest {
     }
 
     @Test
+    void shouldHandleTildeAndAsteriskInCredentials() {
+        String connectionString =
+                MongoUtils.buildConnectionString(
+                        "user~*", "pass~*", "mongodb", "localhost:27017", null);
+
+        assertThat(connectionString)
+                .isEqualTo("mongodb://user%7E*:pass%7E*@localhost:27017");
+    }
+
+    @Test
     void shouldBuildConnectionStringWithoutCredentials() {
         String connectionString =
                 MongoUtils.buildConnectionString(null, null, "mongodb", "localhost:27017", null);
