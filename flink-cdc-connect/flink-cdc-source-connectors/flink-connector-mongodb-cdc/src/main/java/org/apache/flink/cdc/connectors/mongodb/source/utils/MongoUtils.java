@@ -436,7 +436,10 @@ public class MongoUtils {
         StringBuilder sb = new StringBuilder(scheme).append("://");
 
         if (StringUtils.isNotEmpty(username) && StringUtils.isNotEmpty(password)) {
-            sb.append(encodeValue(username)).append(":").append(encodeValue(password)).append("@");
+            sb.append(encodeCredential(username))
+                    .append(":")
+                    .append(encodeCredential(password))
+                    .append("@");
         }
 
         sb.append(checkNotNull(hosts));
@@ -446,6 +449,15 @@ public class MongoUtils {
         }
 
         return sb.toString();
+    }
+
+    // MongoDB connection strings require spaces in credentials to be percent-encoded as
+    // "%20" rather than "+". URLEncoder#encode (used by encodeValue) encodes spaces as "+",
+    // which is only safe for `application/x-www-form-urlencoded` content, not URI user info.
+    // Apply this correction here, specifically for credentials, rather than in encodeValue
+    // itself, since encodeValue is a generic percent-encoding utility used elsewhere.
+    private static String encodeCredential(String value) {
+        return encodeValue(value).replace("+", "%20");
     }
 
     // Checks if given exception is caused by change stream cursor issues, including
