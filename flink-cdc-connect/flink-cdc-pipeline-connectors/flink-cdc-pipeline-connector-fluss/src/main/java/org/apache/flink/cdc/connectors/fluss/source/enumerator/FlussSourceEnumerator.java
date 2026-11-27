@@ -81,7 +81,9 @@ import java.util.stream.Collectors;
  *
  * <p>Until this source adopts FLIP-537, a temporary reader-report protocol reconstructs bucket
  * ownership on startup. Discovery starts after every reader reports; restored splits remain with
- * their readers. The ownership view is not added to checkpoint state.
+ * their readers. Ownership survives local reader restarts, and returned splits keep their original
+ * owners. Reports from known readers are ignored. The ownership view is not checkpointed and is
+ * rebuilt from reader reports when the enumerator is restored.
  *
  * <p>The enumeration follows a four-phase pattern:
  *
@@ -93,8 +95,8 @@ import java.util.stream.Collectors;
  *       (callback).
  *   <li>{@link #initPendingBucketSplits} — resolves starting offsets and creates splits for new
  *       table-buckets (async).
- *   <li>{@link #handleTableBucketChanges} — marks physical table paths as assigned and distributes
- *       splits to readers (callback).
+ *   <li>{@link #handleTableBucketChanges} — queues initialized splits for owner selection and
+ *       assignment once all readers are ready (callback).
  * </ol>
  *
  * <p>Tracking is done at {@link PhysicalTablePath} granularity (i.e. tablePath + partitionName), so
@@ -120,10 +122,33 @@ public class FlussSourceEnumerator
     private final LeaseContext leaseContext;
 
     private final Set<PhysicalTablePath> assignedPhysicalTablePaths;
+
+    /** Splits awaiting delivery to selected owners, including splits returned to their owners. */
     private final Map<Integer, Set<FlussSplitBase>> pendingPartitionSplitAssignment;
-    // Select owners only after reader reports and the first discovery are available.
-    private final List<FlussSplitBase> restoredPendingSplits;
+
+    /** Initialized or restored pending splits whose owners have not yet been selected. */
+    private final List<FlussSplitBase> unassignedPendingSplits;
+
+    /**
+     * Combines each reader's bucket ownership into an enumerator-wide view for load balancing.
+     *
+     * <pre>{@code
+     * readerBuckets (global distribution)
+     *   +-- reader 0 -> {bucket A, bucket B}
+     *   +-- reader 1 -> {bucket C, bucket D}
+     *   `-- reader 2 -> {bucket E, bucket F}
+     * }</pre>
+     *
+     * <p>Initial reports establish entries, new assignments add buckets, and discovery removes
+     * inactive buckets. Only bucket identities are tracked here; offsets remain in the splits.
+     *
+     * <p>Entries survive local reader restarts because returned splits retain their owners. Later
+     * reports describe checkpoint-restored buckets and must not replace this maintained view. An
+     * absent entry means the reader's initial ownership is not yet known; an empty set means it has
+     * reported no buckets.
+     */
     private final Map<Integer, Set<TableBucket>> readerBuckets = new HashMap<>();
+
     // Runtime-only cursors for new assignments; not part of checkpoint state.
     private final Map<Long, Integer> nextReaderIndex = new HashMap<>();
     private boolean discoveryStarted;
@@ -171,7 +196,7 @@ public class FlussSourceEnumerator
         this.leaseContext = leaseContext;
         this.assignedPhysicalTablePaths = assignedPhysicalTablePaths;
         this.pendingPartitionSplitAssignment = new HashMap<>();
-        this.restoredPendingSplits = new ArrayList<>(remainingSplits);
+        this.unassignedPendingSplits = new ArrayList<>(remainingSplits);
         this.consumedKvSnapshotMap = new TreeMap<>();
         this.subscribedTablePaths = new HashSet<>();
         this.pendingRemovalTablePaths = new HashSet<>();
@@ -251,7 +276,7 @@ public class FlussSourceEnumerator
     }
 
     private void maybeStartDiscovery() {
-        if (admin == null || discoveryStarted || !allReadersReported()) {
+        if (admin == null || discoveryStarted || !allReadersReady()) {
             return;
         }
         discoveryStarted = true;
@@ -271,7 +296,8 @@ public class FlussSourceEnumerator
         }
     }
 
-    private boolean allReadersReported() {
+    /** All readers must be registered and their initial bucket ownership must be known. */
+    private boolean allReadersReady() {
         return context.registeredReaders().size() == context.currentParallelism()
                 && readerBuckets.keySet().containsAll(context.registeredReaders().keySet());
     }
@@ -366,7 +392,7 @@ public class FlussSourceEnumerator
                         .map(info -> info.tableBucket)
                         .collect(Collectors.toSet());
         readerBuckets.values().forEach(buckets -> buckets.retainAll(activeBuckets));
-        restoredPendingSplits.removeIf(split -> !activeBuckets.contains(split.getTableBucket()));
+        unassignedPendingSplits.removeIf(split -> !activeBuckets.contains(split.getTableBucket()));
         if (!sentSubscriptionSnapshot
                 || subscriptionChanged
                 || bucketsChanged
@@ -375,7 +401,7 @@ public class FlussSourceEnumerator
             sentSubscriptionSnapshot = true;
         }
 
-        // Assign restored splits before initializing new ones to preserve their offsets.
+        // Assign initialized splits before initializing new ones to preserve their offsets.
         assignPendingPartitionSplits();
         initializeNewTableBuckets(discoveryResult.tableBuckets);
     }
@@ -383,7 +409,7 @@ public class FlussSourceEnumerator
     private boolean removeExpiredPartitions() {
         Set<PhysicalTablePath> removedPartitions = new HashSet<>(assignedPhysicalTablePaths);
         removedPartitions.addAll(initializingPhysicalTablePaths);
-        restoredPendingSplits.stream()
+        unassignedPendingSplits.stream()
                 .map(FlussSplitBase::getPhysicalTablePath)
                 .forEach(removedPartitions::add);
         pendingPartitionSplitAssignment.values().stream()
@@ -453,12 +479,15 @@ public class FlussSourceEnumerator
     }
 
     private void initializeNewTableBuckets(List<TableBucketInfo> allBuckets) {
-        if (!allReadersReported()) {
+        if (!allReadersReady()) {
             return;
         }
 
         Set<PhysicalTablePath> knownPhysicalTablePaths = new HashSet<>(assignedPhysicalTablePaths);
         knownPhysicalTablePaths.addAll(initializingPhysicalTablePaths);
+        unassignedPendingSplits.stream()
+                .map(FlussSplitBase::getPhysicalTablePath)
+                .forEach(knownPhysicalTablePaths::add);
         pendingPartitionSplitAssignment.values().stream()
                 .flatMap(Set::stream)
                 .map(FlussSplitBase::getPhysicalTablePath)
@@ -807,13 +836,10 @@ public class FlussSourceEnumerator
     }
 
     // -------------------------------------------------------------------------
-    //  Phase 4: Handle new splits — mark assigned and assign to readers (callback)
+    //  Phase 4: Handle new splits — queue and assign when readers are ready (callback)
     // -------------------------------------------------------------------------
 
-    /**
-     * Receives newly created splits, records their {@link PhysicalTablePath}s as assigned, and
-     * distributes the splits to registered readers.
-     */
+    /** Receives initialized splits and queues them for assignment once all readers are ready. */
     private void handleTableBucketChanges(
             List<FlussSplitBase> newSplits,
             Throwable error,
@@ -871,7 +897,7 @@ public class FlussSourceEnumerator
                                                 && isCurrentPartitionBucket(split.getTableBucket()))
                         .collect(Collectors.toList());
         if (!effectiveNewSplits.isEmpty()) {
-            addPartitionSplitChangeToPendingAssignments(effectiveNewSplits);
+            unassignedPendingSplits.addAll(effectiveNewSplits);
             assignPendingPartitionSplits();
         }
         maybeClearRemovalTombstones();
@@ -947,8 +973,8 @@ public class FlussSourceEnumerator
     // This method should only be invoked in the coordinator executor thread.
     private void assignPendingPartitionSplits() {
         if (!sentSubscriptionSnapshot
-                || (pendingPartitionSplitAssignment.isEmpty() && restoredPendingSplits.isEmpty())
-                || !allReadersReported()) {
+                || (pendingPartitionSplitAssignment.isEmpty() && unassignedPendingSplits.isEmpty())
+                || !allReadersReady()) {
             return;
         }
         Set<TableBucket> discoveredBuckets = getDiscoveredBuckets();
@@ -960,8 +986,8 @@ public class FlussSourceEnumerator
                                         split ->
                                                 !discoveredBuckets.contains(
                                                         split.getTableBucket())));
-        addPartitionSplitChangeToPendingAssignments(restoredPendingSplits);
-        restoredPendingSplits.clear();
+        addPartitionSplitChangeToPendingAssignments(unassignedPendingSplits);
+        unassignedPendingSplits.clear();
         Map<Integer, List<FlussSplitBase>> incrementalAssignment = new HashMap<>();
 
         for (int pendingReader : context.registeredReaders().keySet()) {
@@ -1028,6 +1054,7 @@ public class FlussSourceEnumerator
     public void handleSourceEvent(int subtaskId, SourceEvent sourceEvent) {
         if (sourceEvent instanceof ReaderSplitReportEvent) {
             checkReaderRegistered(subtaskId);
+            // Local restarts retain ownership, which may include assignments after the checkpoint.
             if (readerBuckets.containsKey(subtaskId)) {
                 return;
             }
@@ -1142,8 +1169,7 @@ public class FlussSourceEnumerator
 
     @Override
     public void addReader(int subtaskId) {
-        LOG.info("Reader {} added, waiting for its split report.", subtaskId);
-        readerBuckets.remove(subtaskId);
+        LOG.info("Reader {} registered.", subtaskId);
         boolean restartedWithPendingRemoval =
                 !seenReaderSubtasks.add(subtaskId)
                         && (!pendingRemovalTablePaths.isEmpty()
@@ -1177,6 +1203,11 @@ public class FlussSourceEnumerator
                             pendingPartitionRemovalRequests,
                             partitionRemovalFences.keySet()));
         }
+        maybeStartDiscovery();
+        assignPendingPartitionSplits();
+        if (sentSubscriptionSnapshot) {
+            initializeNewTableBuckets(lastDiscoveredTableBuckets);
+        }
     }
 
     @Override
@@ -1187,7 +1218,7 @@ public class FlussSourceEnumerator
         partitionRemovalFences.replaceAll(
                 (partitionPath, fenceCheckpointId) ->
                         fenceCheckpointId < 0 ? checkpointId : fenceCheckpointId);
-        List<FlussSplitBase> remainingSplits = new ArrayList<>(restoredPendingSplits);
+        List<FlussSplitBase> remainingSplits = new ArrayList<>(unassignedPendingSplits);
         pendingPartitionSplitAssignment.forEach((reader, splits) -> remainingSplits.addAll(splits));
         return new FlussSourceEnumState(
                 assignedPhysicalTablePaths,

@@ -1200,7 +1200,7 @@ class FlussSourceEnumeratorTest {
 
     /**
      * Tests that initialization completing during a reader restart stays pending until the reader
-     * reports its restored splits, without losing or re-queuing splits.
+     * re-registers, without losing or re-queuing splits.
      */
     @ParameterizedTest
     @CsvSource({"true", "false"})
@@ -1237,14 +1237,115 @@ class FlussSourceEnumeratorTest {
 
                 context.registerReader(new ReaderInfo(0, "restarted_0"));
                 enumerator.addReader(0);
-                assertThat(context.getSplitsAssignmentSequence()).isEmpty();
-                enumerator.handleSourceEvent(0, new ReaderSplitReportEvent(Collections.emptySet()));
+                assertThat(context.getSplitsAssignmentSequence())
+                        .hasSize(failsDuringDiscovery ? 0 : 1);
                 while (!context.getOneTimeCallables().isEmpty()) {
                     context.runNextOneTimeCallable();
                 }
 
                 assertThat(assignedBucketIds(context, tableName))
                         .containsExactlyInAnyOrder(0, 1, 2);
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testInitializationDuringLocalRestartUsesKnownBucketDistribution(
+            boolean initializationBeforeRegistration) throws Throwable {
+        String tableName = "init_before_restored_report";
+        createPartitionedPkTable(tableName, 1);
+        TablePath tablePath = TablePath.of(DATABASE_NAME, tableName);
+        AtomicInteger offsetInitializationCount = new AtomicInteger();
+        OffsetsInitializer offsetsInitializer =
+                (partitionName, bucketIds, retriever) -> {
+                    long offset = 100L + offsetInitializationCount.incrementAndGet();
+                    return bucketIds.stream()
+                            .collect(Collectors.toMap(bucket -> bucket, bucket -> offset));
+                };
+
+        try (Connection connection =
+                        ConnectionFactory.createConnection(
+                                FLUSS_CLUSTER_EXTENSION.getClientConfig());
+                MockSplitEnumeratorContext<FlussSplitBase> context =
+                        new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            Admin admin = connection.getAdmin();
+            for (int partition = 0; partition < 16; partition++) {
+                createPartition(admin, tablePath, "old_" + partition);
+            }
+            FlussSourceEnumerator enumerator =
+                    newEnumerator(
+                            context,
+                            new FlussDefaultDiscoverer(),
+                            fqnRegex(DATABASE_NAME, tableName),
+                            offsetsInitializer,
+                            DISCOVERY_INTERVAL_MS);
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+                runDiscoveryCycle(context);
+                Map<TableBucket, Integer> restoredOwners = assignedOwners(context);
+                assertBalancedOwners(restoredOwners, NUM_READERS, 16);
+
+                for (int partition = 0; partition < 4; partition++) {
+                    createPartition(admin, tablePath, "new_" + partition);
+                }
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                assertThat(context.getOneTimeCallables()).hasSize(1);
+                context.unregisterReader(0);
+                List<FlussSplitBase> pendingSplits = Collections.emptyList();
+                if (initializationBeforeRegistration) {
+                    context.runNextOneTimeCallable();
+                    pendingSplits = enumerator.snapshotState(1L).getRemainingSplits();
+                    assertThat(pendingSplits).hasSize(4);
+                    context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                    assertThat(context.getOneTimeCallables()).isEmpty();
+                    assertThat(enumerator.snapshotState(2L).getRemainingSplits())
+                            .containsExactlyInAnyOrderElementsOf(pendingSplits);
+                }
+                assertThat(context.getSplitsAssignmentSequence()).hasSize(1);
+                context.registerReader(new ReaderInfo(0, "restarted_0"));
+                enumerator.addReader(0);
+                if (!initializationBeforeRegistration) {
+                    context.runNextOneTimeCallable();
+                }
+
+                assertThat(context.getSplitsAssignmentSequence()).hasSize(2);
+                List<FlussSplitBase> newSplits =
+                        context.getSplitsAssignmentSequence().get(1).assignment().values().stream()
+                                .flatMap(List::stream)
+                                .collect(Collectors.toList());
+                assertThat(newSplits)
+                        .hasSize(4)
+                        .allSatisfy(split -> assertThat(split).isInstanceOf(FlussLogSplit.class));
+                assertThat(newSplits)
+                        .extracting(split -> ((FlussLogSplit) split).getStartingOffset())
+                        .containsExactlyInAnyOrder(117L, 118L, 119L, 120L);
+                if (initializationBeforeRegistration) {
+                    assertThat(newSplits).containsExactlyInAnyOrderElementsOf(pendingSplits);
+                }
+                assertThat(
+                                assignedOwners(context).values().stream()
+                                        .collect(
+                                                Collectors.groupingBy(
+                                                        owner -> owner, Collectors.counting())))
+                        .containsEntry(0, 10L)
+                        .containsEntry(1, 10L);
+                assertThat(enumerator.snapshotState(3L).getRemainingSplits()).isEmpty();
+
+                reportOwnedBuckets(enumerator, 0, restoredOwners);
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                assertThat(context.getOneTimeCallables()).isEmpty();
+                assertThat(context.getSplitsAssignmentSequence()).hasSize(2);
+                assertThat(offsetInitializationCount.get()).isEqualTo(20);
+
+                createPartition(admin, tablePath, "after_report_0");
+                createPartition(admin, tablePath, "after_report_1");
+                runDiscoveryCycle(context);
+                assertBalancedOwners(assignedOwners(context), NUM_READERS, 22);
+                assertThat(offsetInitializationCount.get()).isEqualTo(22);
             } finally {
                 enumerator.close();
             }
@@ -1638,7 +1739,7 @@ class FlussSourceEnumeratorTest {
                     context.registerReader(new ReaderInfo(failedReader, "restarted"));
                     enumerator.addReader(failedReader);
                     assertThat(context.getSplitsAssignmentSequence())
-                            .hasSize(assignmentsBeforeRestart);
+                            .hasSize(assignmentsBeforeRestart + 1);
                     reportOwnedBuckets(enumerator, failedReader, restoredOwners);
                     assertThat(context.getSplitsAssignmentSequence())
                             .hasSize(assignmentsBeforeRestart + 1);
@@ -2013,6 +2114,7 @@ class FlussSourceEnumeratorTest {
                             .containsExactlyInAnyOrder(pendingSplit, returnedSplit);
                     context.registerReader(new ReaderInfo(originalOwner, "restarted"));
                     enumerator.addReader(originalOwner);
+                    assertThat(context.getSplitsAssignmentSequence()).hasSize(1);
                     reportOwnedBuckets(enumerator, originalOwner, reportedOwners);
                 }
                 assertThat(context.getOneTimeCallables()).isEmpty();
