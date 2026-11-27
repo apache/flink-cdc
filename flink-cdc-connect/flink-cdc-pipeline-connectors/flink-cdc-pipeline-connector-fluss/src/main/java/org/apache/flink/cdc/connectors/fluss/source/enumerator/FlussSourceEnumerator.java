@@ -74,36 +74,17 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 /**
- * The enumerator for Fluss source. It discovers tables using {@link TableDiscoverer}, queries their
- * metadata (schema, bucket count, partitions), and generates {@link FlussSplitBase}s for each
- * table-bucket pair, assigning new splits to readers with the fewest buckets of the same partition,
- * then the same table. A per-table round-robin cursor breaks remaining ties.
+ * Discovers Fluss table-buckets and assigns new splits to readers with the fewest buckets of the
+ * same partition, then the same table. A per-table round-robin cursor breaks remaining ties.
  *
- * <p>Until this source adopts FLIP-537, a temporary reader-report protocol reconstructs bucket
- * ownership on startup. Discovery starts after every reader reports; restored splits remain with
- * their readers. Ownership survives local reader restarts, and returned splits keep their original
- * owners. Reports from known readers are ignored. The ownership view is not checkpointed and is
- * rebuilt from reader reports when the enumerator is restored.
+ * <p>Until this source adopts FLIP-537, reader reports establish the initial bucket ownership view.
+ * New owners are selected only after all readers are registered, their initial reports are
+ * available, and the first discovery has removed inactive buckets from the view.
  *
- * <p>The enumeration follows a four-phase pattern:
- *
- * <ol>
- *   <li>{@link #getSubscribedTableBuckets()} — discovers subscribed tables and enumerates all
- *       table-buckets including partitions (async).
- *   <li>{@link #checkTableBucketChanges} — compares discovered table-buckets with assigned,
- *       pending, and initializing ones and triggers split creation for new table-buckets
- *       (callback).
- *   <li>{@link #initPendingBucketSplits} — resolves starting offsets and creates splits for new
- *       table-buckets (async).
- *   <li>{@link #handleTableBucketChanges} — queues initialized splits for owner selection and
- *       assignment once all readers are ready (callback).
- * </ol>
- *
- * <p>Tracking is done at {@link PhysicalTablePath} granularity (i.e. tablePath + partitionName), so
- * newly created partitions of an already-known table will be discovered and assigned.
- *
- * <p>The starting offsets for each bucket are resolved via the {@link OffsetsInitializer}, which
- * supports earliest, latest, and timestamp-based initialization strategies.
+ * <p>Local reader restarts retain this view, and returned splits keep their original owners. The
+ * view is not checkpointed: enumerator recovery rebuilds it from reader reports. Splits restored by
+ * readers stay with them; pending splits are checkpointed without owners and reassigned with their
+ * existing offsets.
  */
 public class FlussSourceEnumerator
         implements SplitEnumerator<FlussSplitBase, FlussSourceEnumState> {
@@ -123,29 +104,28 @@ public class FlussSourceEnumerator
 
     private final Set<PhysicalTablePath> assignedPhysicalTablePaths;
 
-    /** Splits awaiting delivery to selected owners, including splits returned to their owners. */
+    /**
+     * Splits with selected owners awaiting delivery, including splits returned to their original
+     * owners by {@link #addSplitsBack(List, int)}.
+     */
     private final Map<Integer, Set<FlussSplitBase>> pendingPartitionSplitAssignment;
 
-    /** Initialized or restored pending splits whose owners have not yet been selected. */
+    /**
+     * Initialized or restored pending splits awaiting owner selection. Assignment must preserve
+     * their existing offsets.
+     */
     private final List<FlussSplitBase> unassignedPendingSplits;
 
     /**
-     * Combines each reader's bucket ownership into an enumerator-wide view for load balancing.
+     * Global logical bucket ownership used for load balancing; it can differ from the buckets
+     * currently held by online readers.
      *
-     * <pre>{@code
-     * readerBuckets (global distribution)
-     *   +-- reader 0 -> {bucket A, bucket B}
-     *   +-- reader 1 -> {bucket C, bucket D}
-     *   `-- reader 2 -> {bucket E, bucket F}
-     * }</pre>
+     * <p>Within this enumerator instance, each reader's first report establishes its entry.
+     * Assignments add buckets and discovery removes inactive buckets. Registration does not clear
+     * entries; later reports must not overwrite ownership maintained since the checkpoint.
      *
-     * <p>Initial reports establish entries, new assignments add buckets, and discovery removes
-     * inactive buckets. Only bucket identities are tracked here; offsets remain in the splits.
-     *
-     * <p>Entries survive local reader restarts because returned splits retain their owners. Later
-     * reports describe checkpoint-restored buckets and must not replace this maintained view. An
-     * absent entry means the reader's initial ownership is not yet known; an empty set means it has
-     * reported no buckets.
+     * <p>An absent entry means no initial report has been received; an empty set is a known
+     * ownership view with no active buckets.
      */
     private final Map<Integer, Set<TableBucket>> readerBuckets = new HashMap<>();
 
@@ -306,13 +286,6 @@ public class FlussSourceEnumerator
     //  Phase 1: Discover subscribed table-buckets (runs async)
     // -------------------------------------------------------------------------
 
-    /**
-     * Discovers all subscribed tables via the {@link TableDiscoverer}, then queries their metadata
-     * (bucket count, partitions) and enumerates every individual table-bucket. For partitioned
-     * tables, each partition contributes its own set of buckets.
-     *
-     * @return the full list of discovered table-bucket entries.
-     */
     private DiscoveryResult getSubscribedTableBuckets() throws Exception {
         List<TableBucketInfo> allBuckets = new ArrayList<>();
         Set<TableId> discoveredTableIds = discoverer.discover();
@@ -357,10 +330,6 @@ public class FlussSourceEnumerator
     //  Phase 2: Check for table-bucket changes (callback)
     // -------------------------------------------------------------------------
 
-    /**
-     * Compares the discovered table-buckets against assigned, pending, and initializing {@link
-     * PhysicalTablePath}s and triggers split creation for newly discovered table-buckets.
-     */
     private void checkTableBucketChanges(DiscoveryResult discoveryResult, Throwable error) {
         if (error != null) {
             throw new FlinkRuntimeException("Failed to discover subscribed table-buckets.", error);
@@ -626,15 +595,6 @@ public class FlussSourceEnumerator
     //  Phase 3: Create pending splits for new table-buckets (runs async)
     // -------------------------------------------------------------------------
 
-    /**
-     * Groups the new table-buckets by {@link TablePath} (for the {@link BucketOffsetsRetrieverImpl}
-     * instance) and then by partition name (for batch offset resolution via the {@link
-     * OffsetsInitializer}), and creates {@link FlussSplitBase} instances.
-     *
-     * <p>For primary key tables with {@link SnapshotOffsetsInitializer} ("full" startup mode), KV
-     * snapshots are retrieved: buckets with a snapshot get a {@link FlussHybridSnapshotLogSplit},
-     * buckets without a snapshot fall back to a {@link FlussLogSplit}.
-     */
     private List<FlussSplitBase> initPendingBucketSplits(List<TableBucketInfo> newBuckets)
             throws Exception {
         List<FlussSplitBase> newSplits = new ArrayList<>();
@@ -685,9 +645,8 @@ public class FlussSourceEnumerator
     }
 
     /**
-     * Creates splits for primary key table buckets in "full" startup mode. Retrieves KV snapshots
-     * and creates {@link FlussHybridSnapshotLogSplit} for buckets with a snapshot, and falls back
-     * to {@link FlussLogSplit} for buckets without a snapshot.
+     * Primary key buckets in "full" startup mode use hybrid splits when a KV snapshot exists and
+     * fall back to log-only splits otherwise.
      */
     private List<FlussSplitBase> initHybridSnapshotLogSplits(
             TablePath tablePath,
@@ -839,7 +798,6 @@ public class FlussSourceEnumerator
     //  Phase 4: Handle new splits — queue and assign when readers are ready (callback)
     // -------------------------------------------------------------------------
 
-    /** Receives initialized splits and queues them for assignment once all readers are ready. */
     private void handleTableBucketChanges(
             List<FlussSplitBase> newSplits,
             Throwable error,
