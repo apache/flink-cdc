@@ -39,8 +39,7 @@ class MongoUtilsTest {
                 MongoUtils.buildConnectionString(
                         "user~*", "pass~*", "mongodb", "localhost:27017", null);
 
-        assertThat(connectionString)
-                .isEqualTo("mongodb://user%7E*:pass%7E*@localhost:27017");
+        assertThat(connectionString).isEqualTo("mongodb://user%7E*:pass%7E*@localhost:27017");
     }
 
     @Test
